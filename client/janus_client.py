@@ -18,15 +18,10 @@ class ApiError(Exception):
 class JanusAPI:
     def __init__(self, base_url=DEFAULT_SERVER):
         self.base_url = base_url.rstrip("/")
-        self.token = ""
         self.openapi = None
 
     def _headers(self):
-        h = {"Content-Type": "application/json", "Accept": "application/json"}
-        if self.token:
-            h["Authorization"] = f"Bearer {self.token}"
-            h["X-Access-Token"] = self.token
-        return h
+        return {"Content-Type": "application/json", "Accept": "application/json"}
 
     def request(self, method, path, payload=None, timeout=45):
         url = self.base_url + path
@@ -78,55 +73,33 @@ class JanusAPI:
 
     def _try_candidates(self, candidates, payload=None):
         last = None
+        seen = set()
         for path, method in candidates:
+            key = (path, method)
+            if key in seen:
+                continue
+            seen.add(key)
             try:
                 return self.request(method, path, payload if method != "GET" else None)
             except ApiError as e:
                 last = e
         raise last or ApiError("No compatible server endpoint was found.")
 
-    def register(self, username, password):
+    def chat(self, profile_id, message):
+        # Store login is intentionally not used here. profile_id is only a
+        # continuity key for the JANUS server until Play/App Store identity is added.
         payloads = [
-            {"username": username, "password": password},
-            {"name": username, "password": password},
-        ]
-        candidates = [("/auth/register", "POST"), ("/register", "POST"), ("/users/register", "POST")]
-        candidates += self._discover(["register"], ("post",))
-        last = None
-        for payload in payloads:
-            try:
-                return self._try_candidates(candidates, payload)
-            except ApiError as e:
-                last = e
-        raise last or ApiError("Registration failed.")
-
-    def login(self, username, password):
-        payloads = [
-            {"username": username, "password": password},
-            {"name": username, "password": password},
-        ]
-        candidates = [("/auth/login", "POST"), ("/login", "POST"), ("/users/login", "POST")]
-        candidates += self._discover(["login"], ("post",))
-        last = None
-        for payload in payloads:
-            try:
-                result = self._try_candidates(candidates, payload)
-                token = result.get("access_token") or result.get("token") or result.get("session_token")
-                if token:
-                    self.token = token
-                return result
-            except ApiError as e:
-                last = e
-        raise last or ApiError("Login failed.")
-
-    def chat(self, username, message):
-        payloads = [
-            {"username": username, "message": message},
-            {"user": username, "message": message},
-            {"username": username, "text": message},
+            {"username": profile_id, "message": message},
+            {"user": profile_id, "message": message},
+            {"username": profile_id, "text": message},
             {"message": message},
         ]
-        candidates = [("/chat", "POST"), ("/conversation", "POST"), ("/message", "POST"), ("/talk", "POST")]
+        candidates = [
+            ("/chat", "POST"),
+            ("/conversation", "POST"),
+            ("/message", "POST"),
+            ("/talk", "POST"),
+        ]
         candidates += self._discover(["chat", "message", "conversation"], ("post",))
         last = None
         for payload in payloads:
@@ -136,20 +109,19 @@ class JanusAPI:
                 last = e
         raise last or ApiError("Chat endpoint unavailable.")
 
-    def get_screen(self, screen, username):
+    def get_screen(self, screen, profile_id):
         known = {
             "observe": ["/observe", "/status", "/state"],
             "cores": ["/cores", "/core-status", "/architecture"],
             "memory": ["/memory", "/memories"],
             "activity": ["/activity", "/events", "/history"],
             "settings": ["/settings", "/preferences"],
-            "account": ["/account", "/me", "/profile"],
         }
         candidates = [(p, "GET") for p in known.get(screen, [])]
         candidates += self._discover([screen], ("get",))
         last = None
         for p, m in candidates:
-            for suffix in ("", f"?username={username}"):
+            for suffix in (f"?username={profile_id}", ""):
                 try:
                     return self.request(m, p + suffix)
                 except ApiError as e:
@@ -176,8 +148,20 @@ class JanusClient(tk.Tk):
         super().__init__()
         self.cfg = load_config()
         self.api = JanusAPI(self.cfg.get("server", DEFAULT_SERVER))
-        self.username = self.cfg.get("username", "")
-        self.logged_in = False
+
+        # No JANUS username/password gate. Keep the old username value only as
+        # an internal continuity key so existing server-side memories still map
+        # to the same user. Store/platform identity can replace this later.
+        self.profile_id = (
+            self.cfg.get("profile_id")
+            or self.cfg.get("username")
+            or os.environ.get("USERNAME")
+            or os.environ.get("USER")
+            or "local-user"
+        )
+        self.cfg["profile_id"] = self.profile_id
+        self.cfg.pop("username", None)
+
         self.title(APP_NAME)
         self.geometry("1180x760")
         self.minsize(900, 620)
@@ -190,10 +174,10 @@ class JanusClient(tk.Tk):
             pass
 
         self.status_var = tk.StringVar(value="Checking global server...")
-        self.user_var = tk.StringVar(value="Not logged in")
+        self.user_var = tk.StringVar(value=f"Local profile: {self.profile_id}")
         self._build_shell()
         self.after(150, self.check_health)
-        self.after(350, self.show_login)
+        self.after(350, lambda: self.append_chat("JANUS", "Connected. Ready."))
 
     def _build_shell(self):
         top = ttk.Frame(self, padding=(10, 8))
@@ -221,16 +205,30 @@ class JanusClient(tk.Tk):
             ("Memory", "memory"),
             ("Activity", "activity"),
             ("Settings", "settings"),
-            ("Account", "account"),
         ]
         for label, key in nav_items:
-            ttk.Button(self.nav, text=label, command=lambda k=key: self.show_page(k)).pack(fill="x", pady=3)
+            ttk.Button(
+                self.nav,
+                text=label,
+                command=lambda k=key: self.show_page(k),
+            ).pack(fill="x", pady=3)
+
         ttk.Separator(self.nav).pack(fill="x", pady=10)
-        ttk.Button(self.nav, text="Log in / Register", command=self.show_login).pack(fill="x", pady=3)
-        ttk.Button(self.nav, text="Log out", command=self.logout).pack(fill="x", pady=3)
+        ttk.Label(
+            self.nav,
+            text="Sign-in will be handled by the app store/platform.",
+            wraplength=145,
+            justify="left",
+        ).pack(fill="x", pady=4)
 
         self._build_chat_page()
-        for key, title in [("observe", "Observe"), ("cores", "Cores"), ("memory", "Memory"), ("activity", "Activity"), ("settings", "Settings"), ("account", "Account")]:
+        for key, title in [
+            ("observe", "Observe"),
+            ("cores", "Cores"),
+            ("memory", "Memory"),
+            ("activity", "Activity"),
+            ("settings", "Settings"),
+        ]:
             self._build_data_page(key, title)
         self.show_page("chat")
 
@@ -265,7 +263,7 @@ class JanusClient(tk.Tk):
         for p in self.pages.values():
             p.pack_forget()
         self.pages[key].pack(fill="both", expand=True)
-        if key != "chat" and self.logged_in:
+        if key != "chat":
             self.refresh_page(key)
 
     def _set_text(self, widget, value):
@@ -294,6 +292,7 @@ class JanusClient(tk.Tk):
                     self.after(0, lambda: failure(e))
                 else:
                     self.after(0, lambda: messagebox.showerror("JANUS", str(e)))
+
         threading.Thread(target=worker, daemon=True).start()
 
     def check_health(self):
@@ -303,77 +302,12 @@ class JanusClient(tk.Tk):
             lambda e: self.status_var.set("Global server unavailable"),
         )
 
-    def show_login(self):
-        win = tk.Toplevel(self)
-        win.title("JANUS Account")
-        win.transient(self)
-        win.grab_set()
-        win.resizable(False, False)
-        frm = ttk.Frame(win, padding=18)
-        frm.pack(fill="both", expand=True)
-        ttk.Label(frm, text="JANUS Account", font=("Segoe UI", 16, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
-        ttk.Label(frm, text="Username").grid(row=1, column=0, sticky="w", pady=5)
-        u = ttk.Entry(frm, width=34)
-        u.grid(row=1, column=1, pady=5)
-        u.insert(0, self.username)
-        ttk.Label(frm, text="Password").grid(row=2, column=0, sticky="w", pady=5)
-        p = ttk.Entry(frm, width=34, show="*")
-        p.grid(row=2, column=1, pady=5)
-        msg = tk.StringVar(value="Use an existing account or create a new one.")
-        ttk.Label(frm, textvariable=msg, wraplength=330).grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 10))
-
-        def perform(mode):
-            username = u.get().strip()
-            password = p.get()
-            if not username or not password:
-                msg.set("Enter both username and password.")
-                return
-            msg.set("Contacting JANUS global server...")
-            action = self.api.login if mode == "login" else self.api.register
-
-            def ok(result):
-                if mode == "register":
-                    msg.set("Account created. Logging in...")
-                    self.run_async(lambda: self.api.login(username, password), lambda r: finish(r, username), lambda e: msg.set(str(e)))
-                else:
-                    finish(result, username)
-
-            def finish(result, name):
-                self.username = name
-                self.logged_in = True
-                self.user_var.set(f"Logged in: {name}")
-                self.cfg["username"] = name
-                self.cfg["server"] = self.api.base_url
-                save_config(self.cfg)
-                win.destroy()
-                self.append_chat("JANUS", f"Connected as {name}. Ready.")
-                self.show_page("chat")
-
-            self.run_async(lambda: action(username, password), ok, lambda e: msg.set(str(e)))
-
-        buttons = ttk.Frame(frm)
-        buttons.grid(row=4, column=0, columnspan=2, sticky="ew")
-        ttk.Button(buttons, text="Log in", command=lambda: perform("login")).pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ttk.Button(buttons, text="Create account", command=lambda: perform("register")).pack(side="left", fill="x", expand=True, padx=(4, 0))
-        p.bind("<Return>", lambda e: perform("login"))
-        u.focus_set()
-
-    def logout(self):
-        self.api.token = ""
-        self.logged_in = False
-        self.user_var.set("Not logged in")
-        self.append_chat("JANUS", "Logged out locally.")
-        self.show_login()
-
     def send_chat(self):
-        if not self.logged_in:
-            self.show_login()
-            return
         msg = self.message_entry.get("1.0", "end").strip()
         if not msg:
             return
         self.message_entry.delete("1.0", "end")
-        self.append_chat(self.username, msg)
+        self.append_chat("You", msg)
         self.status_var.set("JANUS is thinking...")
 
         def ok(result):
@@ -383,22 +317,31 @@ class JanusClient(tk.Tk):
                 reply = json.dumps(reply, indent=2, ensure_ascii=False)
             self.append_chat("JANUS", reply)
 
-        self.run_async(lambda: self.api.chat(self.username, msg), ok, lambda e: (self.status_var.set("Request failed"), self.append_chat("System", str(e))))
+        self.run_async(
+            lambda: self.api.chat(self.profile_id, msg),
+            ok,
+            lambda e: (
+                self.status_var.set("Request failed"),
+                self.append_chat("System", str(e)),
+            ),
+        )
 
     def refresh_page(self, key):
-        if not self.logged_in:
-            self._set_text(self.pages[key].data_text, "Log in to view this screen.")
-            return
         self._set_text(self.pages[key].data_text, "Loading...")
         self.run_async(
-            lambda: self.api.get_screen(key, self.username),
+            lambda: self.api.get_screen(key, self.profile_id),
             lambda r: self._set_text(self.pages[key].data_text, r),
-            lambda e: self._set_text(self.pages[key].data_text, f"This screen is ready in the client, but the server did not expose a compatible endpoint yet.\n\n{e}"),
+            lambda e: self._set_text(
+                self.pages[key].data_text,
+                "This screen is ready in the client, but the server did not expose "
+                f"a compatible endpoint yet.\n\n{e}",
+            ),
         )
 
     def on_close(self):
-        self.cfg["username"] = self.username
+        self.cfg["profile_id"] = self.profile_id
         self.cfg["server"] = self.api.base_url
+        self.cfg.pop("username", None)
         save_config(self.cfg)
         self.destroy()
 
