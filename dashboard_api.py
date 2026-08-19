@@ -1,6 +1,6 @@
 """Dashboard/API compatibility layer for the JANUS desktop client.
 
-The deployed service reconstructs ``server.py`` during the Render build.  This
+The deployed service reconstructs ``server.py`` during the Render build. This
 module imports that application and adds safe, read-only dashboard endpoints
 without changing the compressed core source.
 """
@@ -12,7 +12,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import Query
+from fastapi import HTTPException, Query
 
 from server import app
 
@@ -80,7 +80,7 @@ def _matching_tables(conn: sqlite3.Connection, keywords: tuple[str, ...]) -> lis
 
 def _profile_clause(columns: list[str], profile: str | None) -> tuple[str, list[Any]]:
     if not profile:
-        return "", []
+        return " WHERE 1=0", []
     by_lower = {c.lower(): c for c in columns}
     for candidate in PROFILE_COLUMNS:
         if candidate in by_lower:
@@ -216,13 +216,18 @@ def dashboard_memory(
     username: str | None = Query(default=None), limit: int = Query(default=40, ge=1, le=100)
 ) -> dict[str, Any]:
     """Return recent profile-scoped persistent memory records."""
+    if not username:
+        # The current desktop client first probes /memory and then retries with
+        # ?username=. Reject the unscoped probe so no cross-profile data can be
+        # returned and the client automatically performs its scoped retry.
+        raise HTTPException(status_code=400, detail="profile scope required")
     data = _recent_rows(
         ("memory", "memories", "episod", "working", "trace", "identity", "core_memory"),
         username,
         limit,
     )
     return {
-        "profile": username or "unspecified",
+        "profile": username,
         "promotion_ladder": ["trace", "working", "episodic", "core"],
         **data,
     }
@@ -233,12 +238,14 @@ def dashboard_activity(
     username: str | None = Query(default=None), limit: int = Query(default=40, ge=1, le=100)
 ) -> dict[str, Any]:
     """Return recent profile-scoped background/activity records."""
+    if not username:
+        raise HTTPException(status_code=400, detail="profile scope required")
     data = _recent_rows(
         ("activity", "event", "history", "thought", "queue", "cycle", "audit", "log"),
         username,
         limit,
     )
-    return {"profile": username or "unspecified", **data}
+    return {"profile": username, **data}
 
 
 @app.get("/settings", tags=["dashboard"])
