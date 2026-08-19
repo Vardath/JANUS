@@ -31,12 +31,12 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v015.py
           Copy-Item client/JANUS.bat dist/JANUS.bat
-          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.15`r`n`r`n1. Double-click JANUS.bat or JANUS.exe.`r`n2. Chat remains one running conversation.`r`n3. User messages appear on the right; JANUS messages appear on the left.`r`n4. Enter sends; Shift+Enter adds a new line.`r`n5. Use Chat, Observe, Cores, Memory, Activity and Settings from the left navigation.`r`n`r`nServer: https://janus-global-core.onrender.com"
+          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.16`r`n`r`n1. Double-click JANUS.bat or JANUS.exe.`r`n2. Chat remains one running conversation.`r`n3. User messages appear on the right; JANUS messages appear on the left.`r`n4. The message input box is pinned to the bottom and always visible.`r`n5. Enter sends; Shift+Enter adds a new line.`r`n6. Use Chat, Observe, Cores, Memory, Activity and Settings from the left navigation.`r`n`r`nServer: https://janus-global-core.onrender.com"
 
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Windows-v0.15
+          name: JANUS-Windows-v0.16
           path: |
             dist/JANUS.exe
             dist/JANUS.bat
