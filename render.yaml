@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: janus-global-core
+    runtime: python
+    plan: starter
+    region: singapore
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 30
+    disk:
+      name: janus-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: JANUS_ACCESS_TOKEN
+        generateValue: true
+      - key: JANUS_MODEL
+        value: gpt-5.6
+      - key: JANUS_DB_PATH
+        value: /data/janus.sqlite3
+      - key: JANUS_INTERVAL_MINUTES
+        value: "15"
+      - key: JANUS_DORMANCY_PERCENT
+        value: "67"
+      - key: JANUS_THOUGHT_COUNT
+        value: "1"
+      - key: JANUS_MEMORY_PROCESSING
+        value: "1"
+      - key: JANUS_SELF_EVALUATION
+        value: "1"
+      - key: JANUS_EXTERNAL_ACCESS
+        value: "1"
+      - key: JANUS_SUPERVISOR_CONSULTATION
+        value: "0"
+      - key: JANUS_MESSAGE_QUEUE
+        value: "1"
+      - key: JANUS_THOUGHT_HISTORY
+        value: "1"
+      - key: JANUS_COMPUTE_BUDGET
+        value: balanced
+      - key: JANUS_ALLOW_LEGACY_BRIDGE_AUTH
+        value: "0"
+      - key: JANUS_AUTH_DEV_TOKENS
+        value: "0"
