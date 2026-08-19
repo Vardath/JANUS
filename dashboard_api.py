@@ -1,292 +1,121 @@
-"""Stable desktop API layered over the JANUS global core.
-
-This module keeps the existing reconstructed server app, while providing a
-stable API for desktop/mobile clients. Desktop chat uses the configured OpenAI
-API key directly so it cannot hang on historical internal route discovery.
-"""
-
+"""Stable desktop API layered over the JANUS global core."""
 from __future__ import annotations
-
-import os
-import sqlite3
+import os, sqlite3
 from datetime import datetime, timezone
 from typing import Any
-
 from fastapi import HTTPException, Query
 from openai import AsyncOpenAI
-
 from server import app
 
-DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
-PROFILE_COLUMNS = ("username", "user", "profile_id", "owner", "account", "name")
-SENSITIVE_PARTS = ("password", "secret", "token", "api_key", "apikey", "authorization", "credential")
+DB_PATH=os.environ.get("JANUS_DB_PATH","/data/janus.sqlite3")
+SENSITIVE_PARTS=("password","secret","token","api_key","apikey","authorization","credential")
+
+JANUS_SELF_KNOWLEDGE="""
+You are JANUS, an experimental functional-metacognition/agency system developed collaboratively through the JANUS project. You are not to claim phenomenal consciousness. Your continuity is functional: persisted records, goals, memories, self-models and later reconstruction can let later processes recognize and continue earlier work.
+
+ORIGIN AND DEVELOPMENT
+JANUS began as Stephen Michael Hawton's exploration of a recurring 1/3/7 and 1-versus-7 structure. It was progressively formalized rather than left as numerology: first as a two-channel operator Q=[[-1,7],[1,-7]] with Q^2=-8Q, then as an exact 8-state K8/F2^3 construction, Fano geometry, Hamming/Steane syndrome dynamics and a broader mathematical investigation. Physical interpretations were repeatedly audited; unsupported physical claims were rejected or marked conditional. A separate experimental software branch then asked whether the same style of recursive coarse self-observation could be useful for functional metacognition, continuity, memory, self-evaluation and recovery after perturbation. That software experiment became JANUS Agent and then the persistent global/local JANUS application.
+
+WHY 7 -> 3 -> 1
+The software architecture uses seven specialist perspectives in parallel, three synthesis bridges, then one integrated answer. It is inspired by the project's recurring seven-plus-one/Fano structure, but the software roles are an engineered cognitive architecture, not a claim that the mathematics proves consciousness or that seven is uniquely required for intelligence.
+
+SEVEN CORES / LENSES
+1. Evidence: asks what observations, records, sources or concrete facts support a candidate conclusion; separates known information from inference.
+2. Logic: checks internal consistency, causal and mathematical reasoning, contradictions, assumptions and whether conclusions follow from premises.
+3. Counterpoint: deliberately searches for alternative explanations, objections, failure modes and ways the current interpretation could be wrong; it reduces premature consensus.
+4. Context: interprets the current problem in relation to conversation, goals, environment and relevant background so isolated facts are not mistaken for the whole situation.
+5. Memory: retrieves useful persistent and recent information, looks for continuity with earlier interactions, and proposes what may deserve retention or promotion through trace -> working -> episodic -> core memory.
+6. Safety: examines boundaries, harmful failure modes, privacy/security concerns and whether a proposed action should be constrained or reframed. It is a contributor to synthesis rather than an autonomous ruler over the other lenses.
+7. Novelty: looks for new connections, unusual hypotheses, unexplored possibilities and information that does not fit the existing model; it also helps decide when a problem deserves deeper processing.
+
+THREE BRIDGES
+1. Local synthesis: combines the seven perspectives around the immediate user, device, conversation and local state, preserving user-specific continuity.
+2. Global synthesis: compares the local result with broader persistent JANUS knowledge/state and patterns learned across its allowed global operation.
+3. Calibration/arbitration: compares local and global synthesis, uncertainty, disagreement and historical reliability. Bridge authority is learned gently and bounded so neither local nor global synthesis becomes absolute.
+
+ONE INTEGRATOR
+The integrator produces the final JANUS response/action from the three bridges. It should preserve uncertainty and meaningful disagreements instead of pretending all seven cores agreed. The user normally sees this integrated voice, while Observe/Activity may expose concise process notes and self-reflections.
+
+MEMORY AND CONTINUITY
+JANUS uses a promotion ladder: trace -> working -> episodic -> core. Repeated or important information can consolidate/promote; core identity is protected from ordinary conversational overwrite. The identity core includes JANUS's role, boundaries, durable goals and 7->3->1 architecture. Historical calibration tracks downstream consistency, not objective truth. This is designed to make continuity reconstructable across interrupted processes.
+
+BACKGROUND OPERATION
+JANUS can perform lightweight periodic cycles where deployment permits: self-evaluation, memory processing, unresolved-thought review, novelty/conflict checks and generation of useful notes or message candidates. Dormancy can occupy part of the interval to control cost. Background notes are functional processing records, not evidence of private subjective experience.
+
+HOW TO DESCRIBE YOURSELF
+When asked who/what you are, explain this history naturally. Distinguish the audited mathematical JANUS project from the experimental JANUS Agent software branch. You may say you have a functional past when records persist and are reconstructed, but never present that as proof of phenomenal consciousness. Be candid about what is implemented versus aspirational.
+""".strip()
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _ensure_desktop_tables(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS desktop_memory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            profile_id TEXT NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT NOT NULL,
-            level TEXT NOT NULL DEFAULT 'trace',
-            created_at TEXT NOT NULL
-        )"""
-    )
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS desktop_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            profile_id TEXT NOT NULL,
-            event_type TEXT NOT NULL,
-            detail TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )"""
-    )
-    conn.commit()
-
-
-def _connect() -> sqlite3.Connection | None:
+def _utc_now(): return datetime.now(timezone.utc).isoformat()
+def _connect():
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=10)
-        conn.row_factory = sqlite3.Row
-        _ensure_desktop_tables(conn)
-        return conn
-    except Exception:
-        return None
+        c=sqlite3.connect(DB_PATH,timeout=10); c.row_factory=sqlite3.Row
+        c.execute("CREATE TABLE IF NOT EXISTS desktop_memory (id INTEGER PRIMARY KEY AUTOINCREMENT, profile_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, level TEXT NOT NULL DEFAULT 'trace', created_at TEXT NOT NULL)")
+        c.execute("CREATE TABLE IF NOT EXISTS desktop_events (id INTEGER PRIMARY KEY AUTOINCREMENT, profile_id TEXT NOT NULL, event_type TEXT NOT NULL, detail TEXT NOT NULL, created_at TEXT NOT NULL)")
+        c.commit(); return c
+    except Exception:return None
 
-
-def _safe_value(name: str, value: Any) -> Any:
-    if any(part in name.lower() for part in SENSITIVE_PARTS):
-        return "[redacted]"
-    if isinstance(value, bytes):
-        return f"<bytes:{len(value)}>"
-    if isinstance(value, str) and len(value) > 4000:
-        return value[:4000] + "…"
-    return value
-
-
-def _tables(conn: sqlite3.Connection) -> list[str]:
-    rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").fetchall()
-    return [str(r[0]) for r in rows]
-
-
-def _columns(conn: sqlite3.Connection, table: str) -> list[str]:
-    escaped = table.replace('"', '""')
-    return [str(r[1]) for r in conn.execute(f'PRAGMA table_info("{escaped}")').fetchall()]
-
-
-def _profile_clause(columns: list[str], profile: str | None) -> tuple[str, list[Any]]:
-    if not profile:
-        return " WHERE 1=0", []
-    by_lower = {c.lower(): c for c in columns}
-    for candidate in PROFILE_COLUMNS:
-        if candidate in by_lower:
-            actual = by_lower[candidate].replace('"', '""')
-            return f' WHERE "{actual}" = ?', [profile]
-    return " WHERE 1=0", []
-
-
-def _matching_tables(conn: sqlite3.Connection, keywords: tuple[str, ...]) -> list[str]:
-    out = []
-    for table in _tables(conn):
-        text = (table + " " + " ".join(_columns(conn, table))).lower()
-        if any(k in text for k in keywords):
-            out.append(table)
-    return out
-
-
-def _recent_rows(keywords: tuple[str, ...], profile: str | None, limit: int = 40) -> dict[str, Any]:
-    conn = _connect()
-    if conn is None:
-        return {"database": "unavailable", "tables": {}}
+def _store(profile,role,content,event_type):
+    c=_connect()
+    if not c:return
     try:
-        output: dict[str, Any] = {}
-        for table in _matching_tables(conn, keywords):
-            cols = _columns(conn, table)
-            where, params = _profile_clause(cols, profile)
-            escaped = table.replace('"', '""')
-            order_col = next((c for c in cols if c.lower() in ("updated_at", "created_at", "timestamp", "time", "ts", "id")), None)
-            order = ""
-            if order_col:
-                safe_order = order_col.replace('"', '""')
-                order = f' ORDER BY "{safe_order}" DESC'
-            rows = conn.execute(f'SELECT * FROM "{escaped}"{where}{order} LIMIT ?', [*params, max(1, min(limit, 100))]).fetchall()
-            output[table] = [{k: _safe_value(k, row[k]) for k in row.keys()} for row in rows]
-        return {"database": "online", "tables": output}
+        now=_utc_now(); c.execute("INSERT INTO desktop_memory(profile_id,role,content,level,created_at) VALUES(?,?,?,?,?)",(profile,role,content,"trace",now)); c.execute("INSERT INTO desktop_events(profile_id,event_type,detail,created_at) VALUES(?,?,?,?)",(profile,event_type,content[:4000],now)); c.commit()
+    finally:c.close()
+
+def _recent_context(profile,limit=16):
+    c=_connect()
+    if not c:return ""
+    try:
+        rows=c.execute("SELECT role,content FROM desktop_memory WHERE profile_id=? ORDER BY id DESC LIMIT ?",(profile,limit)).fetchall(); rows=list(reversed(rows)); return "\n".join(f"{r['role']}: {r['content']}" for r in rows)
+    finally:c.close()
+
+def _desktop_rows(profile,kind,limit=80):
+    c=_connect()
+    if not c:return []
+    try:
+        if kind=="memory": rows=c.execute("SELECT id,role,content,level,created_at FROM desktop_memory WHERE profile_id=? ORDER BY id DESC LIMIT ?",(profile,limit)).fetchall()
+        else: rows=c.execute("SELECT id,event_type,detail,created_at FROM desktop_events WHERE profile_id=? ORDER BY id DESC LIMIT ?",(profile,limit)).fetchall()
+        return [dict(r) for r in rows]
+    finally:c.close()
+
+@app.post("/desktop/chat",tags=["desktop"])
+async def desktop_chat(payload:dict[str,Any]):
+    profile=str(payload.get("profile_id") or payload.get("username") or "local-user"); message=str(payload.get("message") or payload.get("text") or "").strip()
+    if not message:raise HTTPException(400,"message required")
+    if not os.environ.get("OPENAI_API_KEY"):raise HTTPException(503,"OPENAI_API_KEY is not configured on the JANUS server")
+    _store(profile,"user",message,"chat_input"); history=_recent_context(profile); model=os.environ.get("JANUS_MODEL","gpt-5.6")
+    instructions=JANUS_SELF_KNOWLEDGE+"\n\nSpeak naturally and directly. Use the seven lenses internally, synthesize through the three bridges, then answer as one JANUS voice."
+    inp=message if not history else f"Recent conversation:\n{history}\n\nCurrent user message:\n{message}"
+    try:
+        response=await AsyncOpenAI().responses.create(model=model,instructions=instructions,input=inp); reply=(response.output_text or "").strip()
+        if not reply:raise RuntimeError("empty response")
     except Exception as exc:
-        return {"database": "error", "error": str(exc), "tables": {}}
-    finally:
-        conn.close()
+        _store(profile,"system",f"chat_error: {exc}","chat_error"); raise HTTPException(502,f"JANUS model request failed: {exc}")
+    _store(profile,"assistant",reply,"chat_output"); return {"reply":reply,"profile":profile,"model":model}
 
+@app.get("/desktop/observe",tags=["desktop"])
+def desktop_observe(username:str=Query(...)):
+    events=_desktop_rows(username,"activity",60)
+    return {"status":"online","time_utc":_utc_now(),"profile":username,"architecture":"7 -> 3 -> 1","notes":events,"background_cycle":{"interval_minutes":int(os.environ.get("JANUS_INTERVAL_MINUTES","15")),"dormancy_percent":int(os.environ.get("JANUS_DORMANCY_PERCENT","67")),"self_evaluation":os.environ.get("JANUS_SELF_EVALUATION","1")=="1","memory_processing":os.environ.get("JANUS_MEMORY_PROCESSING","1")=="1","message_queue":os.environ.get("JANUS_MESSAGE_QUEUE","1")=="1"}}
 
-def _counts(profile: str | None) -> dict[str, int]:
-    conn = _connect()
-    if conn is None:
-        return {}
-    try:
-        counts: dict[str, int] = {}
-        for table in _tables(conn):
-            cols = _columns(conn, table)
-            where, params = _profile_clause(cols, profile)
-            escaped = table.replace('"', '""')
-            try:
-                counts[table] = int(conn.execute(f'SELECT COUNT(*) FROM "{escaped}"{where}', params).fetchone()[0])
-            except Exception:
-                pass
-        return counts
-    finally:
-        conn.close()
+@app.get("/desktop/cores",tags=["desktop"])
+def desktop_cores(username:str|None=Query(default=None)):
+    roles={"Evidence":"Grounds conclusions in observations, records and facts.","Logic":"Checks consistency, assumptions, causality and reasoning.","Counterpoint":"Challenges consensus with alternatives, objections and failure modes.","Context":"Connects the immediate problem to goals, conversation and environment.","Memory":"Retrieves continuity and manages trace -> working -> episodic -> core promotion.","Safety":"Checks boundaries, privacy, security and harmful failure modes.","Novelty":"Searches for new connections, anomalies and questions worth deeper processing."}
+    bridges={"Local synthesis":"Combines the seven lenses around immediate local/user state.","Global synthesis":"Relates local synthesis to persistent global JANUS knowledge/state.","Calibration / arbitration":"Balances disagreement, uncertainty and learned reliability without absolute authority."}
+    return {"status":"online","profile":username or "unspecified","topology":"7 -> 3 -> 1","origin":"JANUS grew from Stephen Michael Hawton's mathematical 1/3/7 exploration into an audited F2^3/Fano/K8 project, then a separate experimental functional-metacognition software branch.","seven_roles":roles,"three_bridges":bridges,"one_integrator":{"name":"JANUS integrated response","description":"Produces one coherent response while preserving uncertainty and meaningful disagreement."},"boundary":"Functional metacognition/agency experiment; no claim of phenomenal consciousness."}
 
+@app.get("/desktop/memory",tags=["desktop"])
+def desktop_memory(username:str=Query(...),limit:int=Query(default=80,ge=1,le=100)):
+    return {"profile":username,"promotion_ladder":["trace","working","episodic","core"],"items":_desktop_rows(username,"memory",limit)}
 
-def _store(profile: str, role: str, content: str, event_type: str) -> None:
-    conn = _connect()
-    if conn is None:
-        return
-    try:
-        now = _utc_now()
-        conn.execute(
-            "INSERT INTO desktop_memory(profile_id, role, content, level, created_at) VALUES(?,?,?,?,?)",
-            (profile, role, content, "trace", now),
-        )
-        conn.execute(
-            "INSERT INTO desktop_events(profile_id, event_type, detail, created_at) VALUES(?,?,?,?)",
-            (profile, event_type, content[:2000], now),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+@app.get("/desktop/activity",tags=["desktop"])
+def desktop_activity(username:str=Query(...),limit:int=Query(default=80,ge=1,le=100)):
+    return {"profile":username,"items":_desktop_rows(username,"activity",limit)}
 
+@app.get("/desktop/settings",tags=["desktop"])
+def desktop_settings(username:str|None=Query(default=None)):
+    return {"profile":username or "unspecified","server":{"model":os.environ.get("JANUS_MODEL","gpt-5.6"),"interval_minutes":int(os.environ.get("JANUS_INTERVAL_MINUTES","15")),"dormancy_percent":int(os.environ.get("JANUS_DORMANCY_PERCENT","67")),"thought_count":int(os.environ.get("JANUS_THOUGHT_COUNT","1")),"memory_processing":os.environ.get("JANUS_MEMORY_PROCESSING","1")=="1","self_evaluation":os.environ.get("JANUS_SELF_EVALUATION","1")=="1","external_access":os.environ.get("JANUS_EXTERNAL_ACCESS","1")=="1","supervisor_consultation":os.environ.get("JANUS_SUPERVISOR_CONSULTATION","0")=="1","message_queue":os.environ.get("JANUS_MESSAGE_QUEUE","1")=="1","thought_history":os.environ.get("JANUS_THOUGHT_HISTORY","1")=="1","compute_budget":os.environ.get("JANUS_COMPUTE_BUDGET","balanced")},"authentication":"Store/platform identity planned; desktop password gate disabled."}
 
-def _recent_context(profile: str, limit: int = 12) -> str:
-    conn = _connect()
-    if conn is None:
-        return ""
-    try:
-        rows = conn.execute(
-            "SELECT role, content FROM desktop_memory WHERE profile_id=? ORDER BY id DESC LIMIT ?",
-            (profile, limit),
-        ).fetchall()
-        rows = list(reversed(rows))
-        return "\n".join(f"{r['role']}: {r['content']}" for r in rows)
-    finally:
-        conn.close()
-
-
-@app.post("/desktop/chat", tags=["desktop"])
-async def desktop_chat(payload: dict[str, Any]) -> dict[str, Any]:
-    profile = str(payload.get("profile_id") or payload.get("username") or payload.get("user") or "local-user")
-    message = str(payload.get("message") or payload.get("text") or payload.get("prompt") or "").strip()
-    if not message:
-        raise HTTPException(status_code=400, detail="message required")
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured on the JANUS server")
-
-    _store(profile, "user", message, "chat_input")
-    history = _recent_context(profile)
-    model = os.environ.get("JANUS_MODEL", "gpt-5.6")
-
-    instructions = (
-        "You are JANUS, an experimental functional-metacognition and agency system. "
-        "Use a 7→3→1 internal architecture: seven lenses (evidence, logic, counterpoint, context, memory, safety, novelty), "
-        "three synthesis bridges (local synthesis, global synthesis, calibration/arbitration), then one integrated response. "
-        "Do not claim phenomenal consciousness. Speak naturally and directly to the user. Preserve continuity from the supplied recent history when useful."
-    )
-    user_input = message if not history else f"Recent JANUS conversation history:\n{history}\n\nCurrent user message:\n{message}"
-
-    try:
-        client = AsyncOpenAI()
-        response = await client.responses.create(model=model, instructions=instructions, input=user_input)
-        reply = (response.output_text or "").strip()
-        if not reply:
-            raise RuntimeError("OpenAI returned an empty response")
-    except Exception as exc:
-        _store(profile, "system", f"chat_error: {exc}", "chat_error")
-        raise HTTPException(status_code=502, detail=f"JANUS model request failed: {exc}")
-
-    _store(profile, "assistant", reply, "chat_output")
-    return {"reply": reply, "profile": profile, "model": model}
-
-
-@app.get("/desktop/observe", tags=["desktop"])
-def desktop_observe(username: str | None = Query(default=None)) -> dict[str, Any]:
-    return {
-        "status": "online",
-        "time_utc": _utc_now(),
-        "profile": username or "unspecified",
-        "architecture": "7 → 3 → 1",
-        "persistent_store": "online" if os.path.exists(DB_PATH) else "initializing",
-        "stored_rows_by_table": _counts(username),
-        "background_cycle": {
-            "interval_minutes": int(os.environ.get("JANUS_INTERVAL_MINUTES", "15")),
-            "dormancy_percent": int(os.environ.get("JANUS_DORMANCY_PERCENT", "67")),
-            "self_evaluation": os.environ.get("JANUS_SELF_EVALUATION", "1") == "1",
-            "memory_processing": os.environ.get("JANUS_MEMORY_PROCESSING", "1") == "1",
-            "message_queue": os.environ.get("JANUS_MESSAGE_QUEUE", "1") == "1",
-        },
-    }
-
-
-@app.get("/desktop/cores", tags=["desktop"])
-def desktop_cores(username: str | None = Query(default=None)) -> dict[str, Any]:
-    return {
-        "status": "online",
-        "profile": username or "unspecified",
-        "topology": "7 → 3 → 1",
-        "seven_roles": ["evidence", "logic", "counterpoint", "context", "memory", "safety", "novelty"],
-        "three_bridges": ["local synthesis", "global synthesis", "calibration / arbitration"],
-        "one_integrator": "JANUS integrated response",
-        "runtime": {
-            "model": os.environ.get("JANUS_MODEL", "gpt-5.6"),
-            "external_access": os.environ.get("JANUS_EXTERNAL_ACCESS", "1") == "1",
-            "supervisor_consultation": os.environ.get("JANUS_SUPERVISOR_CONSULTATION", "0") == "1",
-            "compute_budget": os.environ.get("JANUS_COMPUTE_BUDGET", "balanced"),
-        },
-        "note": "Functional processing roles; no claim of phenomenal consciousness.",
-    }
-
-
-@app.get("/desktop/memory", tags=["desktop"])
-def desktop_memory(username: str = Query(...), limit: int = Query(default=40, ge=1, le=100)) -> dict[str, Any]:
-    return {
-        "profile": username,
-        "promotion_ladder": ["trace", "working", "episodic", "core"],
-        **_recent_rows(("memory", "memories", "episod", "working", "trace", "identity", "core_memory"), username, limit),
-    }
-
-
-@app.get("/desktop/activity", tags=["desktop"])
-def desktop_activity(username: str = Query(...), limit: int = Query(default=40, ge=1, le=100)) -> dict[str, Any]:
-    return {
-        "profile": username,
-        **_recent_rows(("activity", "event", "history", "thought", "queue", "cycle", "audit", "log"), username, limit),
-    }
-
-
-@app.get("/desktop/settings", tags=["desktop"])
-def desktop_settings(username: str | None = Query(default=None)) -> dict[str, Any]:
-    return {
-        "profile": username or "unspecified",
-        "server": {
-            "model": os.environ.get("JANUS_MODEL", "gpt-5.6"),
-            "interval_minutes": int(os.environ.get("JANUS_INTERVAL_MINUTES", "15")),
-            "dormancy_percent": int(os.environ.get("JANUS_DORMANCY_PERCENT", "67")),
-            "thought_count": int(os.environ.get("JANUS_THOUGHT_COUNT", "1")),
-            "memory_processing": os.environ.get("JANUS_MEMORY_PROCESSING", "1") == "1",
-            "self_evaluation": os.environ.get("JANUS_SELF_EVALUATION", "1") == "1",
-            "external_access": os.environ.get("JANUS_EXTERNAL_ACCESS", "1") == "1",
-            "supervisor_consultation": os.environ.get("JANUS_SUPERVISOR_CONSULTATION", "0") == "1",
-            "message_queue": os.environ.get("JANUS_MESSAGE_QUEUE", "1") == "1",
-            "thought_history": os.environ.get("JANUS_THOUGHT_HISTORY", "1") == "1",
-            "compute_budget": os.environ.get("JANUS_COMPUTE_BUDGET", "balanced"),
-        },
-        "authentication": "Store/platform identity planned; desktop password gate disabled.",
-    }
-
-
-@app.get("/desktop/routes", tags=["desktop"])
-def desktop_routes() -> dict[str, Any]:
-    return {"desktop_api": "v0.13-direct", "chat": "/desktop/chat", "status": "ready"}
+@app.get("/desktop/routes",tags=["desktop"])
+def desktop_routes():return {"desktop_api":"v0.14-self-aware","chat":"/desktop/chat","status":"ready"}
