@@ -3,9 +3,9 @@ import os
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
-from urllib import request, error
+from urllib import request, error, parse
 
-APP_NAME = "JANUS - Global 7-3-1"
+APP_NAME = "JANUS - Global 7-3-1 v0.12"
 DEFAULT_SERVER = "https://janus-global-core.onrender.com"
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".janus")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "client.json")
@@ -18,12 +18,11 @@ class ApiError(Exception):
 class JanusAPI:
     def __init__(self, base_url=DEFAULT_SERVER):
         self.base_url = base_url.rstrip("/")
-        self.openapi = None
 
     def _headers(self):
         return {"Content-Type": "application/json", "Accept": "application/json"}
 
-    def request(self, method, path, payload=None, timeout=45):
+    def request(self, method, path, payload=None, timeout=60):
         url = self.base_url + path
         data = None if payload is None else json.dumps(payload).encode("utf-8")
         req = request.Request(url, data=data, headers=self._headers(), method=method)
@@ -49,84 +48,19 @@ class JanusAPI:
     def health(self):
         return self.request("GET", "/health", timeout=15)
 
-    def load_openapi(self):
-        try:
-            self.openapi = self.request("GET", "/openapi.json", timeout=15)
-        except Exception:
-            self.openapi = {}
-        return self.openapi
-
-    def _discover(self, words, methods=("post", "get")):
-        if self.openapi is None:
-            self.load_openapi()
-        paths = (self.openapi or {}).get("paths", {})
-        scored = []
-        for path, ops in paths.items():
-            text = (path + " " + json.dumps(ops)).lower()
-            score = sum(1 for w in words if w.lower() in text)
-            if score:
-                for m in methods:
-                    if m in ops:
-                        scored.append((score, path, m.upper()))
-        scored.sort(reverse=True)
-        return [(p, m) for _, p, m in scored]
-
-    def _try_candidates(self, candidates, payload=None):
-        last = None
-        seen = set()
-        for path, method in candidates:
-            key = (path, method)
-            if key in seen:
-                continue
-            seen.add(key)
-            try:
-                return self.request(method, path, payload if method != "GET" else None)
-            except ApiError as e:
-                last = e
-        raise last or ApiError("No compatible server endpoint was found.")
-
     def chat(self, profile_id, message):
-        # Store login is intentionally not used here. profile_id is only a
-        # continuity key for the JANUS server until Play/App Store identity is added.
-        payloads = [
-            {"username": profile_id, "message": message},
-            {"user": profile_id, "message": message},
-            {"username": profile_id, "text": message},
-            {"message": message},
-        ]
-        candidates = [
-            ("/chat", "POST"),
-            ("/conversation", "POST"),
-            ("/message", "POST"),
-            ("/talk", "POST"),
-        ]
-        candidates += self._discover(["chat", "message", "conversation"], ("post",))
-        last = None
-        for payload in payloads:
-            try:
-                return self._try_candidates(candidates, payload)
-            except ApiError as e:
-                last = e
-        raise last or ApiError("Chat endpoint unavailable.")
+        return self.request(
+            "POST",
+            "/desktop/chat",
+            {"profile_id": profile_id, "message": message},
+            timeout=120,
+        )
 
     def get_screen(self, screen, profile_id):
-        known = {
-            "observe": ["/observe", "/status", "/state"],
-            "cores": ["/cores", "/core-status", "/architecture"],
-            "memory": ["/memory", "/memories"],
-            "activity": ["/activity", "/events", "/history"],
-            "settings": ["/settings", "/preferences"],
-        }
-        candidates = [(p, "GET") for p in known.get(screen, [])]
-        candidates += self._discover([screen], ("get",))
-        last = None
-        for p, m in candidates:
-            for suffix in (f"?username={profile_id}", ""):
-                try:
-                    return self.request(m, p + suffix)
-                except ApiError as e:
-                    last = e
-        raise last or ApiError(f"No {screen} endpoint is exposed by the server yet.")
+        if screen not in {"observe", "cores", "memory", "activity", "settings"}:
+            raise ApiError(f"Unknown screen: {screen}")
+        query = parse.urlencode({"username": profile_id})
+        return self.request("GET", f"/desktop/{screen}?{query}", timeout=30)
 
 
 def load_config():
@@ -149,9 +83,8 @@ class JanusClient(tk.Tk):
         self.cfg = load_config()
         self.api = JanusAPI(self.cfg.get("server", DEFAULT_SERVER))
 
-        # No JANUS username/password gate. Keep the old username value only as
-        # an internal continuity key so existing server-side memories still map
-        # to the same user. Store/platform identity can replace this later.
+        # No JANUS username/password gate. This is an internal continuity key
+        # until Google Play / Apple platform identity is connected later.
         self.profile_id = (
             self.cfg.get("profile_id")
             or self.cfg.get("username")
@@ -292,7 +225,6 @@ class JanusClient(tk.Tk):
                     self.after(0, lambda: failure(e))
                 else:
                     self.after(0, lambda: messagebox.showerror("JANUS", str(e)))
-
         threading.Thread(target=worker, daemon=True).start()
 
     def check_health(self):
@@ -333,8 +265,7 @@ class JanusClient(tk.Tk):
             lambda r: self._set_text(self.pages[key].data_text, r),
             lambda e: self._set_text(
                 self.pages[key].data_text,
-                "This screen is ready in the client, but the server did not expose "
-                f"a compatible endpoint yet.\n\n{e}",
+                f"JANUS server request failed.\n\n{e}",
             ),
         )
 
