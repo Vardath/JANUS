@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from urllib import request, error, parse
 
-APP_NAME = "JANUS - Global 7-3-1 v0.12"
+APP_NAME = "JANUS - Global 7-3-1 v0.13"
 DEFAULT_SERVER = "https://janus-global-core.onrender.com"
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".janus")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "client.json")
@@ -49,12 +49,7 @@ class JanusAPI:
         return self.request("GET", "/health", timeout=15)
 
     def chat(self, profile_id, message):
-        return self.request(
-            "POST",
-            "/desktop/chat",
-            {"profile_id": profile_id, "message": message},
-            timeout=120,
-        )
+        return self.request("POST", "/desktop/chat", {"profile_id": profile_id, "message": message}, timeout=120)
 
     def get_screen(self, screen, profile_id):
         if screen not in {"observe", "cores", "memory", "activity", "settings"}:
@@ -82,30 +77,18 @@ class JanusClient(tk.Tk):
         super().__init__()
         self.cfg = load_config()
         self.api = JanusAPI(self.cfg.get("server", DEFAULT_SERVER))
-
-        # No JANUS username/password gate. This is an internal continuity key
-        # until Google Play / Apple platform identity is connected later.
-        self.profile_id = (
-            self.cfg.get("profile_id")
-            or self.cfg.get("username")
-            or os.environ.get("USERNAME")
-            or os.environ.get("USER")
-            or "local-user"
-        )
+        self.profile_id = self.cfg.get("profile_id") or self.cfg.get("username") or os.environ.get("USERNAME") or os.environ.get("USER") or "local-user"
         self.cfg["profile_id"] = self.profile_id
         self.cfg.pop("username", None)
-
         self.title(APP_NAME)
         self.geometry("1180x760")
         self.minsize(900, 620)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
-
         self.style = ttk.Style(self)
         try:
             self.style.theme_use("vista")
         except Exception:
             pass
-
         self.status_var = tk.StringVar(value="Checking global server...")
         self.user_var = tk.StringVar(value=f"Local profile: {self.profile_id}")
         self._build_shell()
@@ -113,169 +96,91 @@ class JanusClient(tk.Tk):
         self.after(350, lambda: self.append_chat("JANUS", "Connected. Ready."))
 
     def _build_shell(self):
-        top = ttk.Frame(self, padding=(10, 8))
-        top.pack(fill="x")
+        top = ttk.Frame(self, padding=(10, 8)); top.pack(fill="x")
         ttk.Label(top, text="JANUS", font=("Segoe UI", 16, "bold")).pack(side="left")
         ttk.Label(top, text="Global 7-3-1", font=("Segoe UI", 11)).pack(side="left", padx=(8, 0))
         ttk.Label(top, textvariable=self.user_var).pack(side="right")
         ttk.Label(top, textvariable=self.status_var).pack(side="right", padx=(0, 20))
-
-        body = ttk.Frame(self)
-        body.pack(fill="both", expand=True)
-
-        self.nav = ttk.Frame(body, padding=(8, 10), width=165)
-        self.nav.pack(side="left", fill="y")
-        self.nav.pack_propagate(False)
-
-        self.content = ttk.Frame(body, padding=(10, 8))
-        self.content.pack(side="left", fill="both", expand=True)
-
+        body = ttk.Frame(self); body.pack(fill="both", expand=True)
+        self.nav = ttk.Frame(body, padding=(8, 10), width=165); self.nav.pack(side="left", fill="y"); self.nav.pack_propagate(False)
+        self.content = ttk.Frame(body, padding=(10, 8)); self.content.pack(side="left", fill="both", expand=True)
         self.pages = {}
-        nav_items = [
-            ("Chat", "chat"),
-            ("Observe", "observe"),
-            ("Cores", "cores"),
-            ("Memory", "memory"),
-            ("Activity", "activity"),
-            ("Settings", "settings"),
-        ]
-        for label, key in nav_items:
-            ttk.Button(
-                self.nav,
-                text=label,
-                command=lambda k=key: self.show_page(k),
-            ).pack(fill="x", pady=3)
-
+        for label, key in [("Chat","chat"),("Observe","observe"),("Cores","cores"),("Memory","memory"),("Activity","activity"),("Settings","settings")]:
+            ttk.Button(self.nav, text=label, command=lambda k=key: self.show_page(k)).pack(fill="x", pady=3)
         ttk.Separator(self.nav).pack(fill="x", pady=10)
-        ttk.Label(
-            self.nav,
-            text="Sign-in will be handled by the app store/platform.",
-            wraplength=145,
-            justify="left",
-        ).pack(fill="x", pady=4)
-
+        ttk.Label(self.nav, text="Sign-in will be handled by the app store/platform.", wraplength=145, justify="left").pack(fill="x", pady=4)
         self._build_chat_page()
-        for key, title in [
-            ("observe", "Observe"),
-            ("cores", "Cores"),
-            ("memory", "Memory"),
-            ("activity", "Activity"),
-            ("settings", "Settings"),
-        ]:
-            self._build_data_page(key, title)
+        for key, title in [("observe","Observe"),("cores","Cores"),("memory","Memory"),("activity","Activity"),("settings","Settings")]: self._build_data_page(key,title)
         self.show_page("chat")
 
     def _new_page(self, key):
-        f = ttk.Frame(self.content)
-        self.pages[key] = f
-        return f
+        f=ttk.Frame(self.content); self.pages[key]=f; return f
 
     def _build_chat_page(self):
-        page = self._new_page("chat")
-        ttk.Label(page, text="Conversation", font=("Segoe UI", 18, "bold")).pack(anchor="w", pady=(0, 8))
-        self.chat_log = tk.Text(page, wrap="word", state="disabled", font=("Segoe UI", 11))
-        self.chat_log.pack(fill="both", expand=True)
-        bottom = ttk.Frame(page)
-        bottom.pack(fill="x", pady=(8, 0))
-        self.message_entry = tk.Text(bottom, height=4, wrap="word", font=("Segoe UI", 11))
-        self.message_entry.pack(side="left", fill="x", expand=True)
-        self.message_entry.bind("<Control-Return>", lambda e: self.send_chat())
-        ttk.Button(bottom, text="Send", command=self.send_chat).pack(side="left", padx=(8, 0), fill="y")
+        page=self._new_page("chat")
+        ttk.Label(page,text="Conversation",font=("Segoe UI",18,"bold")).pack(anchor="w",pady=(0,8))
+        self.chat_log=tk.Text(page,wrap="word",state="disabled",font=("Segoe UI",11)); self.chat_log.pack(fill="both",expand=True)
+        bottom=ttk.Frame(page); bottom.pack(fill="x",pady=(8,0))
+        self.message_entry=tk.Text(bottom,height=4,wrap="word",font=("Segoe UI",11)); self.message_entry.pack(side="left",fill="x",expand=True)
+        self.message_entry.bind("<Return>", self._enter_send)
+        self.message_entry.bind("<Shift-Return>", self._shift_enter)
+        ttk.Button(bottom,text="Send",command=self.send_chat).pack(side="left",padx=(8,0),fill="y")
 
-    def _build_data_page(self, key, title):
-        page = self._new_page(key)
-        header = ttk.Frame(page)
-        header.pack(fill="x")
-        ttk.Label(header, text=title, font=("Segoe UI", 18, "bold")).pack(side="left")
-        ttk.Button(header, text="Refresh", command=lambda k=key: self.refresh_page(k)).pack(side="right")
-        text = tk.Text(page, wrap="word", state="disabled", font=("Consolas", 10))
-        text.pack(fill="both", expand=True, pady=(8, 0))
-        page.data_text = text
+    def _enter_send(self, event=None):
+        self.send_chat()
+        return "break"
 
-    def show_page(self, key):
-        for p in self.pages.values():
-            p.pack_forget()
-        self.pages[key].pack(fill="both", expand=True)
-        if key != "chat":
-            self.refresh_page(key)
+    def _shift_enter(self, event=None):
+        self.message_entry.insert("insert", "\n")
+        return "break"
 
-    def _set_text(self, widget, value):
-        widget.config(state="normal")
-        widget.delete("1.0", "end")
-        if isinstance(value, (dict, list)):
-            widget.insert("end", json.dumps(value, indent=2, ensure_ascii=False))
-        else:
-            widget.insert("end", str(value))
-        widget.config(state="disabled")
+    def _build_data_page(self,key,title):
+        page=self._new_page(key); header=ttk.Frame(page); header.pack(fill="x")
+        ttk.Label(header,text=title,font=("Segoe UI",18,"bold")).pack(side="left")
+        ttk.Button(header,text="Refresh",command=lambda k=key:self.refresh_page(k)).pack(side="right")
+        text=tk.Text(page,wrap="word",state="disabled",font=("Consolas",10)); text.pack(fill="both",expand=True,pady=(8,0)); page.data_text=text
 
-    def append_chat(self, speaker, text):
-        self.chat_log.config(state="normal")
-        self.chat_log.insert("end", f"{speaker}: {text}\n\n")
-        self.chat_log.see("end")
-        self.chat_log.config(state="disabled")
+    def show_page(self,key):
+        for p in self.pages.values(): p.pack_forget()
+        self.pages[key].pack(fill="both",expand=True)
+        if key != "chat": self.refresh_page(key)
 
-    def run_async(self, fn, success=None, failure=None):
+    def _set_text(self,widget,value):
+        widget.config(state="normal"); widget.delete("1.0","end")
+        widget.insert("end",json.dumps(value,indent=2,ensure_ascii=False) if isinstance(value,(dict,list)) else str(value)); widget.config(state="disabled")
+
+    def append_chat(self,speaker,text):
+        self.chat_log.config(state="normal"); self.chat_log.insert("end",f"{speaker}: {text}\n\n"); self.chat_log.see("end"); self.chat_log.config(state="disabled")
+
+    def run_async(self,fn,success=None,failure=None):
         def worker():
             try:
-                result = fn()
-                if success:
-                    self.after(0, lambda: success(result))
+                result=fn()
+                if success:self.after(0,lambda:success(result))
             except Exception as e:
-                if failure:
-                    self.after(0, lambda: failure(e))
-                else:
-                    self.after(0, lambda: messagebox.showerror("JANUS", str(e)))
-        threading.Thread(target=worker, daemon=True).start()
+                if failure:self.after(0,lambda:failure(e))
+                else:self.after(0,lambda:messagebox.showerror("JANUS",str(e)))
+        threading.Thread(target=worker,daemon=True).start()
 
-    def check_health(self):
-        self.run_async(
-            self.api.health,
-            lambda r: self.status_var.set("Global server online"),
-            lambda e: self.status_var.set("Global server unavailable"),
-        )
+    def check_health(self): self.run_async(self.api.health,lambda r:self.status_var.set("Global server online"),lambda e:self.status_var.set("Global server unavailable"))
 
     def send_chat(self):
-        msg = self.message_entry.get("1.0", "end").strip()
-        if not msg:
-            return
-        self.message_entry.delete("1.0", "end")
-        self.append_chat("You", msg)
-        self.status_var.set("JANUS is thinking...")
-
+        msg=self.message_entry.get("1.0","end").strip()
+        if not msg:return
+        self.message_entry.delete("1.0","end"); self.append_chat("You",msg); self.status_var.set("JANUS is thinking...")
         def ok(result):
             self.status_var.set("Global server online")
-            reply = result.get("reply") or result.get("response") or result.get("message") or result.get("text") or result
-            if isinstance(reply, (dict, list)):
-                reply = json.dumps(reply, indent=2, ensure_ascii=False)
-            self.append_chat("JANUS", reply)
+            reply=result.get("reply") or result.get("response") or result.get("message") or result.get("text") or result
+            if isinstance(reply,(dict,list)):reply=json.dumps(reply,indent=2,ensure_ascii=False)
+            self.append_chat("JANUS",reply)
+        self.run_async(lambda:self.api.chat(self.profile_id,msg),ok,lambda e:(self.status_var.set("Request failed"),self.append_chat("System",str(e))))
 
-        self.run_async(
-            lambda: self.api.chat(self.profile_id, msg),
-            ok,
-            lambda e: (
-                self.status_var.set("Request failed"),
-                self.append_chat("System", str(e)),
-            ),
-        )
-
-    def refresh_page(self, key):
-        self._set_text(self.pages[key].data_text, "Loading...")
-        self.run_async(
-            lambda: self.api.get_screen(key, self.profile_id),
-            lambda r: self._set_text(self.pages[key].data_text, r),
-            lambda e: self._set_text(
-                self.pages[key].data_text,
-                f"JANUS server request failed.\n\n{e}",
-            ),
-        )
+    def refresh_page(self,key):
+        self._set_text(self.pages[key].data_text,"Loading...")
+        self.run_async(lambda:self.api.get_screen(key,self.profile_id),lambda r:self._set_text(self.pages[key].data_text,r),lambda e:self._set_text(self.pages[key].data_text,f"JANUS server request failed.\n\n{e}"))
 
     def on_close(self):
-        self.cfg["profile_id"] = self.profile_id
-        self.cfg["server"] = self.api.base_url
-        self.cfg.pop("username", None)
-        save_config(self.cfg)
-        self.destroy()
+        self.cfg["profile_id"]=self.profile_id; self.cfg["server"]=self.api.base_url; self.cfg.pop("username",None); save_config(self.cfg); self.destroy()
 
 
-if __name__ == "__main__":
-    JanusClient().mainloop()
+if __name__ == "__main__": JanusClient().mainloop()
