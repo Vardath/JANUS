@@ -1,0 +1,44 @@
+name: Build JANUS Windows Client
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'client/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Build JANUS.exe
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client.py
+          Copy-Item client/JANUS.bat dist/JANUS.bat
+          Set-Content -Path dist/README.txt -Value "JANUS Windows Client`r`n`r`n1. Double-click JANUS.bat or JANUS.exe.`r`n2. Register or log in.`r`n3. Use the left navigation tabs for Chat, Observe, Cores, Memory, Activity, Settings and Account.`r`n`r`nServer: https://janus-global-core.onrender.com"
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: JANUS-Windows
+          path: |
+            dist/JANUS.exe
+            dist/JANUS.bat
+            dist/README.txt
+          if-no-files-found: error
