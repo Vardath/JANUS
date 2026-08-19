@@ -31,12 +31,12 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client.py
           Copy-Item client/JANUS.bat dist/JANUS.bat
-          Set-Content -Path dist/README.txt -Value "JANUS Windows Client`r`n`r`n1. Double-click JANUS.bat or JANUS.exe.`r`n2. Register or log in.`r`n3. Use the left navigation tabs for Chat, Observe, Cores, Memory, Activity, Settings and Account.`r`n`r`nServer: https://janus-global-core.onrender.com"
+          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.12`r`n`r`n1. Double-click JANUS.bat or JANUS.exe.`r`n2. No JANUS username/password is required.`r`n3. Use Chat, Observe, Cores, Memory, Activity and Settings from the left navigation.`r`n4. Store/platform identity will be connected later for mobile distribution.`r`n`r`nServer: https://janus-global-core.onrender.com"
 
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Windows
+          name: JANUS-Windows-v0.12
           path: |
             dist/JANUS.exe
             dist/JANUS.bat
