@@ -64,12 +64,6 @@ jobs:
           JANUS_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}
         run: gradle :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
 
-      - name: Verify APK signing fingerprints
-        shell: bash
-        run: |
-          echo "Fingerprints from the finished APK:"
-          keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'SHA1:|SHA256:'
-
       - name: Copy APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk JANUS-Android-v0.22.apk
 
