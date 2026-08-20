@@ -94,5 +94,11 @@ def desktop_home(username:str=Query(...)):
     finally: c.close()
     runtime=janus_sleep_cycle.status(); return {'profile':username,'status':_presence(username,latest),'architecture':'11-core','unread_messages':sum(1 for x in messages if x['state']=='unread'),'latest_activity':latest,'background_interval_minutes':int(os.environ.get('JANUS_INTERVAL_MINUTES','15')),'core_phase':runtime.get('phase'),'core_runtime':runtime,'external_api_budget_used_by_core_cycle':0,'messaging_action':True}
 
+# The reconstructed core still carries an older /auth/google endpoint. FastAPI
+# resolves routes in registration order, so that legacy handler would otherwise
+# intercept requests before the current account-system router below. Remove only
+# that duplicate route and make auth.py the single authoritative Google handler.
+app.router.routes = [route for route in app.router.routes if getattr(route, 'path', None) != '/auth/google']
+
 app.include_router(auth_router); app.include_router(account_deletion_router); app.include_router(privacy_policy_router); app.include_router(terms_router); app.include_router(ai_reports_router); app.include_router(core_sync_router)
 install_runtime_messaging(app); install_secure_desktop(app); install_retention(app)
