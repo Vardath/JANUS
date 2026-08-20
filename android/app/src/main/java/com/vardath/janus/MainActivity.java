@@ -1,12 +1,18 @@
 package com.vardath.janus;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -15,15 +21,19 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
-    private static final String SERVER = "https://janus-global-core.onrender.com";
+    static final String SERVER = "https://janus-global-core.onrender.com";
     private WebView web;
     private final ExecutorService pool = Executors.newCachedThreadPool();
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 137);
+        }
         web = new WebView(this);
         setContentView(web);
         WebSettings s = web.getSettings();
@@ -32,12 +42,25 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         web.addJavascriptInterface(new Bridge(), "Android");
         web.loadUrl("file:///android_asset/index.html");
+        scheduleMessageChecks();
+    }
+
+    private void scheduleMessageChecks() {
+        PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(JanusMessageWorker.class, 15, TimeUnit.MINUTES).build();
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork("janus-message-check", ExistingPeriodicWorkPolicy.UPDATE, req);
     }
 
     public class Bridge {
         @JavascriptInterface public String profileId() {
+            String saved = getSharedPreferences("janus", MODE_PRIVATE).getString("profile_id", "");
+            if (saved != null && !saved.isEmpty()) return saved;
             String id = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
             return "android-" + (id == null ? "local" : id);
+        }
+        @JavascriptInterface public void setProfile(String profile) {
+            if (profile == null || profile.trim().isEmpty()) return;
+            getSharedPreferences("janus", MODE_PRIVATE).edit().putString("profile_id", profile.trim()).apply();
+            scheduleMessageChecks();
         }
         @JavascriptInterface public String serverUrl() { return SERVER; }
         @JavascriptInterface public void request(String id, String method, String path, String json) {
@@ -75,5 +98,9 @@ public class MainActivity extends Activity {
         return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\"";
     }
 
-    @Override protected void onDestroy() { pool.shutdownNow(); if (web != null) web.destroy(); super.onDestroy(); }
+    @Override protected void onDestroy() {
+        pool.shutdownNow();
+        if (web != null) web.destroy();
+        super.onDestroy();
+    }
 }
