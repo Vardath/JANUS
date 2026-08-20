@@ -1,11 +1,13 @@
 """JANUS dashboard extensions: persistent proactive outbox over the global core."""
 from __future__ import annotations
+import json
 import os
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 from fastapi import HTTPException, Query
 from dashboard_api import app
+from runtime_messaging import install as install_runtime_messaging
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
 
@@ -29,9 +31,25 @@ def _message_type(event_type: str, detail: str) -> str:
         return "Question"
     if "memory" in text or "remember" in text:
         return "Memory"
-    if event_type == "background_reflection" or "reflection" in text or "noticed" in text:
+    if "reflection" in text or "noticed" in text:
         return "Observation"
     return "Follow-up"
+
+
+def _decode_message(event_type: str, detail: str) -> tuple[str, str, str]:
+    raw = str(detail or "")
+    if event_type == "proactive_message":
+        try:
+            payload = json.loads(raw)
+            if isinstance(payload, dict):
+                message_type = str(payload.get("message_type") or "Follow-up")
+                text = str(payload.get("text") or "").strip()
+                source = str(payload.get("source") or "janus")
+                if text:
+                    return message_type, text, source
+        except Exception:
+            pass
+    return _message_type(event_type, raw), raw, "legacy"
 
 
 def _message_rows(profile: str, limit: int = 50, include_dismissed: bool = False):
@@ -41,7 +59,7 @@ def _message_rows(profile: str, limit: int = 50, include_dismissed: bool = False
             SELECT e.id,e.event_type,e.detail,e.created_at,COALESCE(s.state,'unread') AS state
             FROM desktop_events e
             LEFT JOIN janus_message_state s ON s.profile_id=e.profile_id AND s.event_id=e.id
-            WHERE e.profile_id=? AND e.event_type IN ('background_reflection','message_candidate','proactive_message','question')
+            WHERE e.profile_id=? AND e.event_type IN ('message_candidate','proactive_message','question')
             ORDER BY e.id DESC LIMIT ?
         """, (profile, limit * 2 if not include_dismissed else limit)).fetchall()
         items = []
@@ -49,7 +67,10 @@ def _message_rows(profile: str, limit: int = 50, include_dismissed: bool = False
             item = dict(row)
             if not include_dismissed and item["state"] == "dismissed":
                 continue
-            item["message_type"] = _message_type(item["event_type"], item["detail"])
+            message_type, text, source = _decode_message(item["event_type"], item["detail"])
+            item["message_type"] = message_type
+            item["detail"] = text
+            item["source"] = source
             items.append(item)
             if len(items) >= limit:
                 break
@@ -83,6 +104,7 @@ def desktop_messages(
         'unread': sum(1 for x in items if x['state'] == 'unread'),
         'message_types': ['Question', 'Observation', 'Memory', 'Follow-up'],
         'purpose': "JANUS's persistent outbox to the user.",
+        'runtime_action': True,
     }
 
 
@@ -124,4 +146,8 @@ def desktop_home(username: str = Query(...)):
         'unread_messages': sum(1 for x in messages if x['state'] == 'unread'),
         'latest_activity': latest,
         'background_interval_minutes': int(os.environ.get('JANUS_INTERVAL_MINUTES', '15')),
+        'messaging_action': True,
     }
+
+
+install_runtime_messaging(app)
