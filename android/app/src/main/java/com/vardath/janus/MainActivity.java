@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -13,6 +14,7 @@ import android.webkit.WebView;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
+import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -50,6 +52,23 @@ public class MainActivity extends Activity {
         WorkManager.getInstance(this).enqueueUniquePeriodicWork("janus-message-check", ExistingPeriodicWorkPolicy.UPDATE, req);
     }
 
+    private void persistProfile(String profile) {
+        if (profile == null || profile.trim().isEmpty()) return;
+        getSharedPreferences("janus", MODE_PRIVATE).edit().putString("profile_id", profile.trim()).apply();
+    }
+
+    private void learnProfile(String path, String json) {
+        try {
+            String p = Uri.parse("https://janus.local" + path).getQueryParameter("username");
+            if (p != null && !p.trim().isEmpty()) { persistProfile(p); return; }
+        } catch (Exception ignored) {}
+        try {
+            JSONObject body = new JSONObject(json == null ? "{}" : json);
+            String p = body.optString("profile_id", body.optString("username", ""));
+            persistProfile(p);
+        } catch (Exception ignored) {}
+    }
+
     public class Bridge {
         @JavascriptInterface public String profileId() {
             String saved = getSharedPreferences("janus", MODE_PRIVATE).getString("profile_id", "");
@@ -58,12 +77,12 @@ public class MainActivity extends Activity {
             return "android-" + (id == null ? "local" : id);
         }
         @JavascriptInterface public void setProfile(String profile) {
-            if (profile == null || profile.trim().isEmpty()) return;
-            getSharedPreferences("janus", MODE_PRIVATE).edit().putString("profile_id", profile.trim()).apply();
+            persistProfile(profile);
             scheduleMessageChecks();
         }
         @JavascriptInterface public String serverUrl() { return SERVER; }
         @JavascriptInterface public void request(String id, String method, String path, String json) {
+            learnProfile(path, json);
             pool.submit(() -> {
                 String result;
                 try {
