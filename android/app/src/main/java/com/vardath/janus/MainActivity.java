@@ -3,6 +3,7 @@ package com.vardath.janus;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -27,6 +28,12 @@ import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.tasks.Task;
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
@@ -44,8 +51,10 @@ import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
     static final String SERVER = "https://janus-global-core.onrender.com";
+    private static final int RC_GOOGLE_COMPAT = 731;
     private WebView web;
     private CredentialManager credentialManager;
+    private GoogleSignInClient legacyGoogleClient;
     private final ExecutorService pool = Executors.newCachedThreadPool();
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
@@ -140,8 +149,12 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> web.evaluateJavascript(js, null));
     }
 
+    private String googleClientId() {
+        return BuildConfig.GOOGLE_WEB_CLIENT_ID == null ? "" : BuildConfig.GOOGLE_WEB_CLIENT_ID.trim();
+    }
+
     private void requestGoogleCredential(boolean retryAfterClear) {
-        String clientId = BuildConfig.GOOGLE_WEB_CLIENT_ID == null ? "" : BuildConfig.GOOGLE_WEB_CLIENT_ID.trim();
+        String clientId = googleClientId();
         if (clientId.isEmpty()) {
             googleResult(false, "Google sign-in needs the JANUS Google OAuth client ID configured in the release build.");
             return;
@@ -179,7 +192,7 @@ public class MainActivity extends Activity {
                                 return;
                             }
                             if (reauth) {
-                                googleResult(false, "Google needs this account to be re-authenticated on the device. Open Android Settings → Accounts/Google, confirm the Google account is signed in, then tap Continue with Google again.");
+                                startLegacyGoogleFallback();
                             } else {
                                 googleResult(false, message == null || message.isBlank() ? "Google sign-in was cancelled or unavailable." : message);
                             }
@@ -187,6 +200,26 @@ public class MainActivity extends Activity {
                     });
         } catch (Exception e) {
             googleResult(false, "Unable to start Google sign-in: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void startLegacyGoogleFallback() {
+        String clientId = googleClientId();
+        if (clientId.isEmpty()) {
+            googleResult(false, "Google sign-in is not configured for this build.");
+            return;
+        }
+        try {
+            GoogleSignInOptions options = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken(clientId)
+                    .requestEmail()
+                    .build();
+            legacyGoogleClient = GoogleSignIn.getClient(this, options);
+            googleResult(false, "Credential Manager could not reauthenticate this device; trying Google compatibility sign-in…");
+            startActivityForResult(legacyGoogleClient.getSignInIntent(), RC_GOOGLE_COMPAT);
+        } catch (Exception e) {
+            googleResult(false, "Google compatibility sign-in could not start: " + e.getMessage());
         }
     }
 
@@ -203,6 +236,26 @@ public class MainActivity extends Activity {
     }
 
     private void startGoogleSignIn() { requestGoogleCredential(false); }
+
+    @Override @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != RC_GOOGLE_COMPAT) return;
+        try {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            GoogleSignInAccount account = task.getResult(ApiException.class);
+            String token = account == null ? null : account.getIdToken();
+            if (token == null || token.isBlank()) {
+                googleResult(false, "Google compatibility sign-in returned no identity token.");
+                return;
+            }
+            googleResult(true, token);
+        } catch (ApiException e) {
+            googleResult(false, "Google compatibility sign-in failed (code " + e.getStatusCode() + "). If this persists, the Android OAuth client and Web client must be checked in the same Google Cloud project.");
+        } catch (Exception e) {
+            googleResult(false, "Google compatibility sign-in failed: " + e.getMessage());
+        }
+    }
 
     public class Bridge {
         @JavascriptInterface public String profileId() {
@@ -221,6 +274,7 @@ public class MainActivity extends Activity {
                     @Override public void onResult(Void result) {}
                     @Override public void onError(@NonNull ClearCredentialException e) {}
                 }); } catch (Exception ignored) {}
+                try { if (legacyGoogleClient != null) legacyGoogleClient.signOut(); } catch (Exception ignored) {}
             });
         }
         @JavascriptInterface public String localCoreStatus() {
