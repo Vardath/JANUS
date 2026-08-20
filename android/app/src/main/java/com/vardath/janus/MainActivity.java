@@ -7,14 +7,30 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
+
+import androidx.annotation.NonNull;
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialException;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
+
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+
 import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -28,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends Activity {
     static final String SERVER = "https://janus-global-core.onrender.com";
     private WebView web;
+    private CredentialManager credentialManager;
     private final ExecutorService pool = Executors.newCachedThreadPool();
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
@@ -36,6 +53,7 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 137);
         }
+        credentialManager = CredentialManager.create(this);
         web = new WebView(this);
         setContentView(web);
         WebSettings s = web.getSettings();
@@ -43,6 +61,17 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
         web.addJavascriptInterface(new Bridge(), "Android");
+        web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                String js = "window.googleComingSoon=function(){Android.googleSignIn();};" +
+                        "window.__janusGoogleResult=function(ok,msg){" +
+                        "if(ok){authMessage.textContent='Signing in with Google…';" +
+                        "api('POST','/auth/google',{id_token:msg},false).then(storeSession).catch(function(e){authMessage.textContent='Google sign-in failed. '+e.message;});}" +
+                        "else{authMessage.textContent=msg||'Google sign-in was cancelled.';}};";
+                view.evaluateJavascript(js, null);
+            }
+        });
         web.loadUrl("file:///android_asset/index.html");
         scheduleMessageChecks();
     }
@@ -69,6 +98,60 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {}
     }
 
+    private void googleResult(boolean ok, String message) {
+        if (web == null) return;
+        final String js = "window.__janusGoogleResult(" + ok + "," + quote(message) + ")";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
+    }
+
+    private void startGoogleSignIn() {
+        String clientId = BuildConfig.GOOGLE_WEB_CLIENT_ID == null ? "" : BuildConfig.GOOGLE_WEB_CLIENT_ID.trim();
+        if (clientId.isEmpty()) {
+            googleResult(false, "Google sign-in needs the JANUS Google OAuth client ID configured in the release build.");
+            return;
+        }
+        try {
+            GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(clientId).build();
+            GetCredentialRequest request = new GetCredentialRequest.Builder()
+                    .addCredentialOption(option)
+                    .build();
+            credentialManager.getCredentialAsync(
+                    this,
+                    request,
+                    new CancellationSignal(),
+                    getMainExecutor(),
+                    new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                        @Override public void onResult(GetCredentialResponse result) {
+                            Credential credential = result.getCredential();
+                            if (credential instanceof CustomCredential) {
+                                CustomCredential custom = (CustomCredential) credential;
+                                String type = custom.getType();
+                                if (GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(type)
+                                        || GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL.equals(type)) {
+                                    try {
+                                        GoogleIdTokenCredential google = GoogleIdTokenCredential.createFrom(custom.getData());
+                                        googleResult(true, google.getIdToken());
+                                        return;
+                                    } catch (Exception e) {
+                                        googleResult(false, "Google returned an unreadable identity token.");
+                                        return;
+                                    }
+                                }
+                            }
+                            googleResult(false, "Google did not return a supported identity credential.");
+                        }
+
+                        @Override public void onError(@NonNull GetCredentialException e) {
+                            String message = e.getLocalizedMessage();
+                            googleResult(false, message == null || message.isBlank() ? "Google sign-in was cancelled or unavailable." : message);
+                        }
+                    }
+            );
+        } catch (Exception e) {
+            googleResult(false, "Unable to start Google sign-in: " + e.getMessage());
+        }
+    }
+
     public class Bridge {
         @JavascriptInterface public String profileId() {
             String saved = getSharedPreferences("janus", MODE_PRIVATE).getString("profile_id", "");
@@ -80,6 +163,7 @@ public class MainActivity extends Activity {
             persistProfile(profile);
             scheduleMessageChecks();
         }
+        @JavascriptInterface public void googleSignIn() { runOnUiThread(MainActivity.this::startGoogleSignIn); }
         @JavascriptInterface public String serverUrl() { return SERVER; }
         @JavascriptInterface public void request(String id, String method, String path, String json) {
             learnProfile(path, json);
