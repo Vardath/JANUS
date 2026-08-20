@@ -27,7 +27,7 @@ services:
       - key: JANUS_CORE_CHECKPOINT_SECONDS
         value: "30"
       - key: JANUS_GOOGLE_CLIENT_ID
-        value: 236215282074-iej25m43ghoonhnm02qdvha2l57mosh9.apps.googleusercontent.com
+        value: 236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com
       - key: JANUS_SMTP_HOST
         value: smtp.resend.com
       - key: JANUS_SMTP_PORT
