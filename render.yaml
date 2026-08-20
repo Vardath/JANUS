@@ -25,7 +25,7 @@ services:
       - key: JANUS_DB_PATH
         value: /data/janus.sqlite3
       - key: JANUS_GOOGLE_CLIENT_ID
-        sync: false
+        value: 236215282074-iej25m43ghoonhnm02qdvha2l57mosh9.apps.googleusercontent.com
       - key: JANUS_INTERVAL_MINUTES
         value: "15"
       - key: JANUS_DORMANCY_PERCENT
