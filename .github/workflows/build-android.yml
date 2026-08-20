@@ -58,6 +58,19 @@ jobs:
             -storepass android \
             -keypass android | grep -E 'SHA1:|SHA256:'
 
+      - name: Read app version
+        id: app_version
+        shell: bash
+        run: |
+          VERSION=$(sed -n "s/^[[:space:]]*versionName[[:space:]]*'\([^']*\)'.*/\1/p" android/app/build.gradle | head -n1)
+          if [ -z "$VERSION" ]; then
+            echo "Could not determine Android versionName" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "apk_name=JANUS-Android-v$VERSION.apk" >> "$GITHUB_OUTPUT"
+          echo "Building JANUS Android v$VERSION"
+
       - name: Build debug APK
         working-directory: android
         env:
@@ -65,26 +78,29 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
 
       - name: Copy APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk JANUS-Android-v0.22.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "${{ steps.app_version.outputs.apk_name }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Android-v0.22
-          path: JANUS-Android-v0.22.apk
+          name: JANUS-Android-v${{ steps.app_version.outputs.version }}
+          path: ${{ steps.app_version.outputs.apk_name }}
           if-no-files-found: error
 
       - name: Publish direct-download APK branch
         shell: bash
+        env:
+          VERSION: ${{ steps.app_version.outputs.version }}
+          APK_NAME: ${{ steps.app_version.outputs.apk_name }}
         run: |
           mkdir -p /tmp/janus-apk
-          cp JANUS-Android-v0.22.apk /tmp/janus-apk/
+          cp "$APK_NAME" /tmp/janus-apk/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan apk-download
           git rm -rf .
           mkdir -p downloads
-          cp /tmp/janus-apk/JANUS-Android-v0.22.apk downloads/
-          printf '# JANUS Android downloads\n\nLatest debug APK: JANUS-Android-v0.22.apk\n' > README.md
-          git add README.md downloads/JANUS-Android-v0.22.apk
-          git commit -m "Publish JANUS Android v0.22 APK"
+          cp "/tmp/janus-apk/$APK_NAME" downloads/
+          printf '# JANUS Android downloads\n\nLatest debug APK: %s\n' "$APK_NAME" > README.md
+          git add README.md "downloads/$APK_NAME"
+          git commit -m "Publish JANUS Android v$VERSION APK"
           git push --force origin HEAD:apk-download
