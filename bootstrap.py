@@ -14,6 +14,13 @@ _startup_error = None
 _startup_trace = None
 
 try:
+    # Normalize incompatible persistent auth schemas before auth.py is imported.
+    # This preserves old tables under *_legacy_normalized names rather than
+    # deleting user data, then lets the current auth module create fresh
+    # sessions/token tables against the normalized accounts schema.
+    from auth_db_normalizer import normalize_legacy_accounts
+    _auth_normalization = normalize_legacy_accounts()
+
     from janus_dashboard import app as real_app
     import auth as auth_module
     app = real_app
@@ -44,6 +51,7 @@ try:
             "auth_module_google_client_configured": bool(getattr(auth_module, "GOOGLE_CLIENT_ID", "").strip()),
             "google_route_present": "/auth/google" in routes,
             "health_route_present": "/health" in routes,
+            "auth_schema_normalization": _auth_normalization,
         }
 except Exception as exc:  # keep Render reachable for diagnosis
     _startup_error = f"{type(exc).__name__}: {exc}"
