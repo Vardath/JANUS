@@ -12,3 +12,7 @@ android {
         versionName '0.20'
     }
 }
+
+dependencies {
+    implementation 'androidx.work:work-runtime:2.9.1'
+}
