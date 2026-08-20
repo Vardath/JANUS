@@ -7,7 +7,7 @@ services:
     branch: main
     autoDeployTrigger: commit
     buildCommand: cat src/server.py.gz.b64.* | base64 -d | gzip -d > server.py && pip install -r requirements.txt
-    startCommand: uvicorn dashboard_api:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn janus_dashboard:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     disk:
       name: janus-data

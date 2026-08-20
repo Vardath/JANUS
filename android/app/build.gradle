@@ -8,7 +8,11 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 35
-        versionCode 18
-        versionName '0.18'
+        versionCode 20
+        versionName '0.20'
     }
+}
+
+dependencies {
+    implementation 'androidx.work:work-runtime:2.9.1'
 }
