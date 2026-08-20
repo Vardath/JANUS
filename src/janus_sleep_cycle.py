@@ -1,4 +1,4 @@
-"""JANUS zero-API-cost 11-core sleep/wake runtime.
+"""JANUS zero-API-cost persistent 11-core sleep/wake runtime.
 
 Architecture:
 - 7 specialist cores: evidence, logic, counterpoint, context, memory, safety, novelty
@@ -7,14 +7,19 @@ Architecture:
 - 1 interface core: interface
 
 All eleven cores are active software processes inside the runtime. They may message
-individual peers, named groups, or broadcast. This local loop deliberately performs
-no paid/cloud model calls; external model use is dispatched elsewhere.
+individual peers, named groups, or broadcast. The background loop deliberately
+performs no paid/cloud model calls. Runtime state is checkpointed to the persistent
+JANUS SQLite database (normally /data/janus.sqlite3 on Render) so server restarts do
+not reset core cycle counts, outputs, pending messages, consensus or interface state.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Callable, Dict, Iterable, List, Optional
+from typing import Callable, Dict, List, Optional
+import json
+import os
+import sqlite3
 import threading
 import time
 
@@ -36,6 +41,9 @@ CORE_GROUPS = {
     "all": set(CORE_NAMES),
 }
 
+DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
+CHECKPOINT_SECONDS = max(10, int(os.environ.get("JANUS_CORE_CHECKPOINT_SECONDS", "30")))
+
 @dataclass
 class CoreMessage:
     sender: str
@@ -56,7 +64,7 @@ class CoreState:
     last_output: str = ""
 
 class JanusSleepCycle:
-    """Zero-API-cost eleven-core communicating sleep/wake cycle."""
+    """Zero-API-cost persistent eleven-core communicating sleep/wake cycle."""
 
     def __init__(self, wake_seconds: int = 300, sleep_seconds: int = 600,
                  local_thinker: Optional[Callable[[CoreState, List[CoreMessage]], str]] = None) -> None:
@@ -67,39 +75,172 @@ class JanusSleepCycle:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._phase = "sleep"
+        self._phase_started_at = time.time()
         self._lock = threading.RLock()
         self._last_consensus = ""
         self._last_interface = ""
         self._remote_summaries: Dict[str, dict] = {}
+        self._last_checkpoint = 0.0
+        self._persistence_ready = False
+        self._init_persistence()
+        self._restore_state()
+
+    def _db(self):
+        c = sqlite3.connect(DB_PATH, timeout=10)
+        c.row_factory = sqlite3.Row
+        c.execute("PRAGMA journal_mode=WAL")
+        return c
+
+    def _init_persistence(self) -> None:
+        try:
+            os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+            with self._db() as c:
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS janus_core_runtime_state (
+                    core_name TEXT PRIMARY KEY,
+                    cycle_count INTEGER NOT NULL DEFAULT 0,
+                    awake INTEGER NOT NULL DEFAULT 0,
+                    thoughts_json TEXT NOT NULL DEFAULT '[]',
+                    inbox_json TEXT NOT NULL DEFAULT '[]',
+                    last_cycle_at TEXT,
+                    last_output TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS janus_core_runtime_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS janus_core_remote_summary (
+                    device_id TEXT PRIMARY KEY,
+                    summary_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                """)
+            self._persistence_ready = True
+        except Exception:
+            self._persistence_ready = False
+
+    def _restore_state(self) -> None:
+        if not self._persistence_ready:
+            return
+        try:
+            with self._db() as c:
+                for row in c.execute("SELECT * FROM janus_core_runtime_state"):
+                    name = str(row["core_name"])
+                    if name not in self.cores:
+                        continue
+                    core = self.cores[name]
+                    core.cycle_count = int(row["cycle_count"] or 0)
+                    core.awake = bool(row["awake"])
+                    core.last_cycle_at = row["last_cycle_at"]
+                    core.last_output = str(row["last_output"] or "")
+                    try:
+                        core.thoughts = [str(x) for x in json.loads(row["thoughts_json"] or "[]")][-64:]
+                    except Exception:
+                        core.thoughts = []
+                    try:
+                        restored = []
+                        for item in json.loads(row["inbox_json"] or "[]")[-128:]:
+                            if isinstance(item, dict):
+                                restored.append(CoreMessage(
+                                    sender=str(item.get("sender") or "unknown")[:64],
+                                    recipient=name,
+                                    kind=str(item.get("kind") or "restored")[:64],
+                                    content=str(item.get("content") or "")[:4000],
+                                    group=(str(item.get("group"))[:64] if item.get("group") is not None else None),
+                                    created_at=str(item.get("created_at") or datetime.now(timezone.utc).isoformat()),
+                                ))
+                        core.inbox = restored
+                    except Exception:
+                        core.inbox = []
+                meta = {r["key"]: r["value"] for r in c.execute("SELECT key,value FROM janus_core_runtime_meta")}
+                self._phase = str(meta.get("phase") or "sleep")
+                self._last_consensus = str(meta.get("last_consensus") or "")
+                self._last_interface = str(meta.get("last_interface") or "")
+                try:
+                    self._phase_started_at = float(meta.get("phase_started_at") or time.time())
+                except Exception:
+                    self._phase_started_at = time.time()
+                for row in c.execute("SELECT device_id,summary_json FROM janus_core_remote_summary"):
+                    try:
+                        self._remote_summaries[str(row["device_id"])] = json.loads(row["summary_json"])
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    def checkpoint(self, force: bool = False) -> bool:
+        if not self._persistence_ready:
+            return False
+        now_mono = time.monotonic()
+        if not force and now_mono - self._last_checkpoint < CHECKPOINT_SECONDS:
+            return True
+        stamp = datetime.now(timezone.utc).isoformat()
+        try:
+            with self._lock, self._db() as c:
+                for name, core in self.cores.items():
+                    inbox_json = json.dumps([asdict(m) for m in core.inbox[-128:]], separators=(",", ":"))
+                    thoughts_json = json.dumps(core.thoughts[-64:], separators=(",", ":"))
+                    c.execute("""INSERT INTO janus_core_runtime_state
+                        (core_name,cycle_count,awake,thoughts_json,inbox_json,last_cycle_at,last_output,updated_at)
+                        VALUES(?,?,?,?,?,?,?,?)
+                        ON CONFLICT(core_name) DO UPDATE SET
+                        cycle_count=excluded.cycle_count,awake=excluded.awake,thoughts_json=excluded.thoughts_json,
+                        inbox_json=excluded.inbox_json,last_cycle_at=excluded.last_cycle_at,last_output=excluded.last_output,
+                        updated_at=excluded.updated_at""",
+                        (name, core.cycle_count, 1 if core.awake else 0, thoughts_json, inbox_json,
+                         core.last_cycle_at, core.last_output[-4000:], stamp))
+                for key, value in {
+                    "phase": self._phase,
+                    "phase_started_at": str(self._phase_started_at),
+                    "last_consensus": self._last_consensus[-4000:],
+                    "last_interface": self._last_interface[-4000:],
+                }.items():
+                    c.execute("""INSERT INTO janus_core_runtime_meta(key,value,updated_at) VALUES(?,?,?)
+                               ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at""",
+                              (key, value, stamp))
+                for device_id, summary in list(self._remote_summaries.items())[-100:]:
+                    c.execute("""INSERT INTO janus_core_remote_summary(device_id,summary_json,updated_at) VALUES(?,?,?)
+                               ON CONFLICT(device_id) DO UPDATE SET summary_json=excluded.summary_json,updated_at=excluded.updated_at""",
+                              (device_id, json.dumps(summary, separators=(",", ":")), stamp))
+            self._last_checkpoint = now_mono
+            return True
+        except Exception:
+            return False
 
     @property
-    def phase(self) -> str: return self._phase
+    def phase(self) -> str:
+        return self._phase
 
     def start(self) -> None:
-        if self._thread and self._thread.is_alive(): return
+        if self._thread and self._thread.is_alive():
+            return
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="janus-11core-cycle", daemon=True)
         self._thread.start()
 
-    def stop(self) -> None: self._stop.set()
+    def stop(self) -> None:
+        self._stop.set()
+        self.checkpoint(force=True)
 
     def send(self, sender: str, recipient: str, content: str, kind: str = "peer") -> None:
-        if sender not in self.cores or recipient not in self.cores: return
+        if sender not in self.cores or recipient not in self.cores:
+            return
         with self._lock:
-            self.cores[recipient].inbox.append(CoreMessage(sender, recipient, kind, content))
+            self.cores[recipient].inbox.append(CoreMessage(sender, recipient, kind, str(content)[:4000]))
 
     def send_group(self, sender: str, group: str, content: str, kind: str = "group") -> None:
         members = CORE_GROUPS.get(group, set())
         with self._lock:
             for recipient in members:
                 if recipient != sender and recipient in self.cores:
-                    self.cores[recipient].inbox.append(CoreMessage(sender, recipient, kind, content, group=group))
+                    self.cores[recipient].inbox.append(CoreMessage(sender, recipient, kind, str(content)[:4000], group=group))
 
     def broadcast(self, sender: str, content: str, kind: str = "broadcast") -> None:
         self.send_group(sender, "all", content, kind)
 
     def accept_remote_summary(self, device_id: str, summary: dict) -> None:
-        """Accept a compact authenticated client-core summary; never executes remote code."""
         clean = {
             "received_at": datetime.now(timezone.utc).isoformat(),
             "phase": str(summary.get("phase") or "unknown")[:32],
@@ -110,6 +251,7 @@ class JanusSleepCycle:
         with self._lock:
             self._remote_summaries[str(device_id)[:128]] = clean
             self.send("interface", "consensus", f"client-sync {device_id}: {clean['consensus']}", "client_sync")
+        self.checkpoint()
 
     def compact_summary(self) -> dict:
         with self._lock:
@@ -119,17 +261,23 @@ class JanusSleepCycle:
                 "consensus": self._last_consensus,
                 "interface": self._last_interface,
                 "cycles": {name: core.cycle_count for name, core in self.cores.items()},
+                "persistent": self._persistence_ready,
             }
 
     def status(self) -> dict:
         with self._lock:
             return {
                 "architecture": "11-core",
+                "topology": "7 -> 2 -> 1 -> 1",
                 "core_count": 11,
                 "phase": self._phase,
                 "wake_seconds": self.wake_seconds,
                 "sleep_seconds": self.sleep_seconds,
                 "external_api_budget_used": 0,
+                "persistent_storage": self._persistence_ready,
+                "storage_backend": "sqlite-render-disk" if self._persistence_ready else "memory-only",
+                "database_path": DB_PATH,
+                "checkpoint_seconds": CHECKPOINT_SECONDS,
                 "last_consensus": self._last_consensus,
                 "last_interface": self._last_interface,
                 "remote_clients": len(self._remote_summaries),
@@ -145,14 +293,22 @@ class JanusSleepCycle:
 
     def _run(self) -> None:
         while not self._stop.is_set():
-            self._enter_phase("wake"); self._run_wake_window()
-            if self._stop.is_set(): break
-            self._enter_phase("sleep"); self._run_sleep_window()
+            self._enter_phase("wake")
+            self._run_wake_window()
+            if self._stop.is_set():
+                break
+            self._enter_phase("sleep")
+            self._run_sleep_window()
+        self.checkpoint(force=True)
 
     def _enter_phase(self, phase: str) -> None:
-        self._phase = phase; awake = phase == "wake"
+        self._phase = phase
+        self._phase_started_at = time.time()
+        awake = phase == "wake"
         with self._lock:
-            for core in self.cores.values(): core.awake = awake
+            for core in self.cores.values():
+                core.awake = awake
+        self.checkpoint(force=True)
 
     def _run_wake_window(self) -> None:
         deadline = time.monotonic() + self.wake_seconds
@@ -160,21 +316,28 @@ class JanusSleepCycle:
             with self._lock:
                 for name in CORE_NAMES:
                     core = self.cores[name]
-                    incoming = list(core.inbox); core.inbox.clear()
+                    incoming = list(core.inbox)
+                    core.inbox.clear()
                     thought = self.local_thinker(core, incoming)
                     if thought:
-                        core.thoughts.append(thought); core.thoughts[:] = core.thoughts[-64:]
+                        core.thoughts.append(thought)
+                        core.thoughts[:] = core.thoughts[-64:]
                         core.last_output = thought
                         self._route_output(core.name, thought)
                     core.cycle_count += 1
                     core.last_cycle_at = datetime.now(timezone.utc).isoformat()
+            self.checkpoint()
             time.sleep(5)
 
     def _run_sleep_window(self) -> None:
         with self._lock:
-            for core in self.cores.values(): core.thoughts[:] = core.thoughts[-16:]
+            for core in self.cores.values():
+                core.thoughts[:] = core.thoughts[-16:]
+        self.checkpoint(force=True)
         deadline = time.monotonic() + self.sleep_seconds
-        while time.monotonic() < deadline and not self._stop.is_set(): time.sleep(5)
+        while time.monotonic() < deadline and not self._stop.is_set():
+            self.checkpoint()
+            time.sleep(5)
 
     def _route_output(self, sender: str, content: str) -> None:
         if sender in {"evidence", "logic", "counterpoint"}:
