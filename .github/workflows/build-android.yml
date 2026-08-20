@@ -28,11 +28,32 @@ jobs:
         with:
           path: ~/.android/debug.keystore
           key: janus-android-debug-keystore-v1
+      - name: Show Google OAuth signing fingerprints
+        shell: bash
+        run: |
+          if [ -f "$HOME/.android/debug.keystore" ]; then
+            echo "JANUS Android debug signing certificate:"
+            keytool -list -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -alias androiddebugkey \
+              -storepass android \
+              -keypass android | grep -E 'SHA1:|SHA256:'
+          else
+            echo "Debug keystore will be generated during the build; rerun this workflow once if no fingerprint appears."
+          fi
       - name: Build debug APK
         working-directory: android
         env:
           JANUS_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}
         run: gradle :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
+      - name: Show generated signing fingerprints
+        shell: bash
+        run: |
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -alias androiddebugkey \
+            -storepass android \
+            -keypass android | grep -E 'SHA1:|SHA256:'
       - name: Copy APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk JANUS-Android-v0.22.apk
       - uses: actions/upload-artifact@v4
