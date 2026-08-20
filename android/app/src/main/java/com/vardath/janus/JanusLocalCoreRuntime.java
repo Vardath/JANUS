@@ -40,10 +40,21 @@ public final class JanusLocalCoreRuntime {
     private void tickSafe(){try{tick();}catch(Exception ignored){}}
     private synchronized void tick(){
         long now=System.currentTimeMillis(),elapsed=now-phaseStarted;
-        if("wake".equals(phase)&&elapsed>=5*60_000L){phase="sleep";phaseStarted=now;persist();return;}
-        if("sleep".equals(phase)&&elapsed>=10*60_000L){phase="wake";phaseStarted=now;}
-        if(!"wake".equals(phase))return;
-        for(String n:NAMES){Core c=cores.get(n);String t=think(c);c.last=t;c.cycles++;route(n,t);} persist();
+        if("wake".equals(phase)&&elapsed>=5*60_000L){phase="sleep";phaseStarted=now;persist();}
+        else if("sleep".equals(phase)&&elapsed>=10*60_000L){phase="wake";phaseStarted=now;}
+
+        // The interface core never sleeps. It remains available to the user and
+        // can queue feedback for consensus while the rest of the society rests.
+        Core interfaceCore=cores.get("interface");
+        if(interfaceCore!=null){String t=think(interfaceCore);interfaceCore.last=t;interfaceCore.cycles++;route("interface",t);}
+
+        if("wake".equals(phase)){
+            for(String n:NAMES){
+                if("interface".equals(n))continue;
+                Core c=cores.get(n);String t=think(c);c.last=t;c.cycles++;route(n,t);
+            }
+        }
+        persist();
     }
 
     private void fanoIngest(Core c,List<String> texts){
@@ -79,11 +90,11 @@ public final class JanusLocalCoreRuntime {
     private void persist(){SharedPreferences.Editor e=prefs.edit().putString("core_phase",phase).putString("core_consensus",lastConsensus).putString("core_interface",lastInterface);for(Core c:cores.values()){e.putLong("core_cycles_"+c.name,c.cycles).putString("core_last_"+c.name,c.last);JSONArray a=new JSONArray();for(long v:c.fano)a.put(v);e.putString("core_fano_"+c.name,a.toString()).putLong("core_fano_steps_"+c.name,c.fanoSteps).putInt("core_fano_active_"+c.name,c.activeDirection);}e.apply();}
 
     synchronized JSONObject statusJson() throws Exception{
-        JSONObject root=new JSONObject().put("architecture","11 Fano/JANUS cores").put("topology","7 -> 2 -> 1 -> 1").put("phase",phase).put("running",started).put("installation_id",installationId).put("consensus",lastConsensus).put("interface",lastInterface).put("last_sync_at",lastSyncAt).put("sync_state",lastSyncState).put("persistent_storage",true).put("storage_backend","Android app-private SharedPreferences");
-        JSONObject cj=new JSONObject();for(Core c:cores.values()){JSONObject x=new JSONObject().put("cycle_count",c.cycles).put("pending_messages",c.inbox.size()).put("last_output",c.last);JSONArray w=new JSONArray();for(long v:c.fano)w.put(v);long line=c.fano[1]+c.fano[2]+c.fano[3],off=c.fano[4]+c.fano[5]+c.fano[6]+c.fano[7];x.put("fano",new JSONObject().put("weights",w).put("step_count",c.fanoSteps).put("active_direction",c.activeDirection).put("projection_1_3_4",new JSONObject().put("origin",c.fano[0]).put("line",line).put("off_line",off)));cj.put(c.name,x);}root.put("cores",cj);return root;
+        JSONObject root=new JSONObject().put("architecture","11 Fano/JANUS cores").put("topology","7 -> 2 -> 1 -> 1").put("phase",phase).put("background_phase",phase).put("interface_available",true).put("running",started).put("installation_id",installationId).put("consensus",lastConsensus).put("interface",lastInterface).put("last_sync_at",lastSyncAt).put("sync_state",lastSyncState).put("persistent_storage",true).put("storage_backend","Android app-private SharedPreferences");
+        JSONObject cj=new JSONObject();for(Core c:cores.values()){JSONObject x=new JSONObject().put("awake","interface".equals(c.name)||"wake".equals(phase)).put("cycle_count",c.cycles).put("pending_messages",c.inbox.size()).put("last_output",c.last);JSONArray w=new JSONArray();for(long v:c.fano)w.put(v);long line=c.fano[1]+c.fano[2]+c.fano[3],off=c.fano[4]+c.fano[5]+c.fano[6]+c.fano[7];x.put("fano",new JSONObject().put("weights",w).put("step_count",c.fanoSteps).put("active_direction",c.activeDirection).put("projection_1_3_4",new JSONObject().put("origin",c.fano[0]).put("line",line).put("off_line",off)));cj.put(c.name,x);}root.put("cores",cj);return root;
     }
 
-    private JSONObject summary() throws Exception{JSONObject cycles=new JSONObject();for(Core c:cores.values())cycles.put(c.name,c.cycles);return new JSONObject().put("device_id",installationId).put("phase",phase).put("consensus",lastConsensus).put("interface",lastInterface).put("cycles",cycles);}
+    private JSONObject summary() throws Exception{JSONObject cycles=new JSONObject();for(Core c:cores.values())cycles.put(c.name,c.cycles);return new JSONObject().put("device_id",installationId).put("phase",phase).put("background_phase",phase).put("interface_available",true).put("consensus",lastConsensus).put("interface",lastInterface).put("cycles",cycles);}
     private void syncSafe(){try{sync();}catch(Exception e){lastSyncState="offline";}}
     private void sync() throws Exception{
         String token=prefs.getString("access_token","");if(token==null||token.trim().isEmpty()){lastSyncState="not-signed-in";return;}
