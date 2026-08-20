@@ -14,12 +14,14 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import androidx.annotation.NonNull;
+import androidx.credentials.ClearCredentialStateRequest;
 import androidx.credentials.Credential;
 import androidx.credentials.CredentialManager;
 import androidx.credentials.CredentialManagerCallback;
 import androidx.credentials.CustomCredential;
 import androidx.credentials.GetCredentialRequest;
 import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.ClearCredentialException;
 import androidx.credentials.exceptions.GetCredentialException;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
@@ -138,7 +140,7 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> web.evaluateJavascript(js, null));
     }
 
-    private void startGoogleSignIn() {
+    private void requestGoogleCredential(boolean retryAfterClear) {
         String clientId = BuildConfig.GOOGLE_WEB_CLIENT_ID == null ? "" : BuildConfig.GOOGLE_WEB_CLIENT_ID.trim();
         if (clientId.isEmpty()) {
             googleResult(false, "Google sign-in needs the JANUS Google OAuth client ID configured in the release build.");
@@ -161,7 +163,7 @@ public class MainActivity extends Activity {
                                         googleResult(true, google.getIdToken());
                                         return;
                                     } catch (Exception e) {
-                                        googleResult(false, "Google returned an unreadable identity token.");
+                                        googleResult(false, "Google returned an unreadable identity token. Please try again.");
                                         return;
                                     }
                                 }
@@ -170,13 +172,37 @@ public class MainActivity extends Activity {
                         }
                         @Override public void onError(@NonNull GetCredentialException e) {
                             String message = e.getLocalizedMessage();
-                            googleResult(false, message == null || message.isBlank() ? "Google sign-in was cancelled or unavailable." : message);
+                            String lower = message == null ? "" : message.toLowerCase();
+                            boolean reauth = lower.contains("reauth") || lower.contains("[16]") || lower.contains("account reauth");
+                            if (reauth && !retryAfterClear) {
+                                clearGoogleCredentialStateAndRetry();
+                                return;
+                            }
+                            if (reauth) {
+                                googleResult(false, "Google needs this account to be re-authenticated on the device. Open Android Settings → Accounts/Google, confirm the Google account is signed in, then tap Continue with Google again.");
+                            } else {
+                                googleResult(false, message == null || message.isBlank() ? "Google sign-in was cancelled or unavailable." : message);
+                            }
                         }
                     });
         } catch (Exception e) {
             googleResult(false, "Unable to start Google sign-in: " + e.getMessage());
         }
     }
+
+    private void clearGoogleCredentialStateAndRetry() {
+        try {
+            credentialManager.clearCredentialStateAsync(new ClearCredentialStateRequest(), new CancellationSignal(), getMainExecutor(),
+                    new CredentialManagerCallback<Void, ClearCredentialException>() {
+                        @Override public void onResult(Void result) { requestGoogleCredential(true); }
+                        @Override public void onError(@NonNull ClearCredentialException e) { requestGoogleCredential(true); }
+                    });
+        } catch (Exception ignored) {
+            requestGoogleCredential(true);
+        }
+    }
+
+    private void startGoogleSignIn() { requestGoogleCredential(false); }
 
     public class Bridge {
         @JavascriptInterface public String profileId() {
@@ -190,6 +216,12 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void clearSession() {
             getSharedPreferences("janus", MODE_PRIVATE).edit()
                     .remove("access_token").remove("profile_id").remove("last_notified_message").apply();
+            runOnUiThread(() -> {
+                try { credentialManager.clearCredentialStateAsync(new ClearCredentialStateRequest(), new CancellationSignal(), getMainExecutor(), new CredentialManagerCallback<Void, ClearCredentialException>() {
+                    @Override public void onResult(Void result) {}
+                    @Override public void onError(@NonNull ClearCredentialException e) {}
+                }); } catch (Exception ignored) {}
+            });
         }
         @JavascriptInterface public String localCoreStatus() {
             try { return JanusLocalCoreRuntime.get(MainActivity.this).statusJson().toString(); }
