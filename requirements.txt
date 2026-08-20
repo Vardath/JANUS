@@ -4,3 +4,4 @@ pydantic[email]>=2.11,<3
 python-multipart>=0.0.20
 httpx>=0.28,<1
 google-auth>=2.40,<3
+openai>=1.99,<2
