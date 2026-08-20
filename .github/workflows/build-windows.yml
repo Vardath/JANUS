@@ -29,14 +29,14 @@ jobs:
       - name: Build JANUS.exe
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v015.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v017.py
           Copy-Item client/JANUS.bat dist/JANUS.bat
-          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.16`r`n`r`n1. Double-click JANUS.bat or JANUS.exe.`r`n2. Chat remains one running conversation.`r`n3. User messages appear on the right; JANUS messages appear on the left.`r`n4. The message input box is pinned to the bottom and always visible.`r`n5. Enter sends; Shift+Enter adds a new line.`r`n6. Use Chat, Observe, Cores, Memory, Activity and Settings from the left navigation.`r`n`r`nServer: https://janus-global-core.onrender.com"
+          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.17`r`n`r`n1. Double-click JANUS.bat or JANUS.exe.`r`n2. Messenger-style running chat remains enabled.`r`n3. Observe, Memory and Activity now read the current server response format.`r`n4. Cores has Server and Client sub-tabs.`r`n5. Server background reflections can populate Observe/Activity over time while the service is awake.`r`n6. Enter sends; Shift+Enter adds a new line.`r`n`r`nServer: https://janus-global-core.onrender.com"
 
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Windows-v0.16
+          name: JANUS-Windows-v0.17
           path: |
             dist/JANUS.exe
             dist/JANUS.bat
