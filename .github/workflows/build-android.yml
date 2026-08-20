@@ -80,10 +80,28 @@ jobs:
       - name: Copy APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk "${{ steps.app_version.outputs.apk_name }}"
 
+      - name: Record exact OAuth identity in finished APK
+        shell: bash
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "apksigner not found" >&2
+            exit 1
+          fi
+          {
+            echo "JANUS Android OAuth build identity"
+            echo "Version: ${{ steps.app_version.outputs.version }}"
+            echo "Package: com.vardath.janus"
+            "$APKSIGNER" verify --print-certs "${{ steps.app_version.outputs.apk_name }}" | grep -E 'Signer #1 certificate SHA-1 digest:|Signer #1 certificate SHA-256 digest:'
+            grep 'GOOGLE_WEB_CLIENT_ID' android/app/build/generated/source/buildConfig/debug/com/vardath/janus/BuildConfig.java | sed 's/^[[:space:]]*//'
+          } | tee oauth-build-info.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}
-          path: ${{ steps.app_version.outputs.apk_name }}
+          path: |
+            ${{ steps.app_version.outputs.apk_name }}
+            oauth-build-info.txt
           if-no-files-found: error
 
       - name: Publish direct-download APK branch
@@ -94,13 +112,17 @@ jobs:
         run: |
           mkdir -p /tmp/janus-apk
           cp "$APK_NAME" /tmp/janus-apk/
+          cp oauth-build-info.txt /tmp/janus-apk/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan apk-download
           git rm -rf .
           mkdir -p downloads
           cp "/tmp/janus-apk/$APK_NAME" downloads/
-          printf '# JANUS Android downloads\n\nLatest debug APK: %s\n' "$APK_NAME" > README.md
-          git add README.md "downloads/$APK_NAME"
+          cp /tmp/janus-apk/oauth-build-info.txt downloads/
+          printf '# JANUS Android downloads\n\nLatest debug APK: %s\n\n## OAuth build identity\n\n```text\n' "$APK_NAME" > README.md
+          cat /tmp/janus-apk/oauth-build-info.txt >> README.md
+          printf '\n```\n' >> README.md
+          git add README.md "downloads/$APK_NAME" downloads/oauth-build-info.txt
           git commit -m "Publish JANUS Android v$VERSION APK"
           git push --force origin HEAD:apk-download
