@@ -26,13 +26,13 @@ jobs:
       - name: Build JANUS.exe
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v020.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v021.py
           Copy-Item client/JANUS.bat dist/JANUS.bat
-          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.20`r`n`r`nHome shows persistent JANUS status and unread messages.`r`nMessages surfaces background reflections/message candidates with Read and Dismiss controls.`r`nNavigation: Home, Chat, Messages, Observe, Cores, Memory, Activity, Settings.`r`nEnter sends; Shift+Enter adds a new line.`r`n`r`nServer: https://janus-global-core.onrender.com"
+          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.21`r`n`r`nCores now shows the live seven-core runtime: wake/sleep phase, per-core state, cycle count, inbox backlog and last activity.`r`nThe local wake/sleep core cycle makes no external model/API calls.`r`nNormal user-triggered chat can still use the configured cloud model.`r`n`r`nNavigation: Chat, Messages, Observe Thoughts, Options, Cores, Memory, Activity, Settings.`r`nEnter sends; Shift+Enter adds a new line.`r`n`r`nServer: https://janus-global-core.onrender.com"
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Windows-v0.20
+          name: JANUS-Windows-v0.21
           path: |
             dist/JANUS.exe
             dist/JANUS.bat
