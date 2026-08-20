@@ -8,9 +8,9 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 26
-        versionName '0.26'
-        def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-iej25m43ghoonhnm02qdvha2l57mosh9.apps.googleusercontent.com'
+        versionCode 27
+        versionName '0.27'
+        def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
 
