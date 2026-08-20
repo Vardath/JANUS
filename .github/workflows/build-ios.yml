@@ -1,0 +1,50 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/build-ios.yml'
+
+jobs:
+  build-ios-simulator:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build unsigned simulator app
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -project JANUS.xcodeproj \
+            -scheme JANUS \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Package simulator app
+        run: |
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -path '*Build/Products/Release-iphonesimulator/JANUS.app' -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "JANUS.app was not found"
+            exit 1
+          fi
+          mkdir -p artifacts
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" artifacts/JANUS-iOS-simulator.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JANUS-iOS-simulator
+          path: artifacts/JANUS-iOS-simulator.zip
