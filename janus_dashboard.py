@@ -8,7 +8,7 @@ from dashboard_api import app
 from runtime_messaging import install as install_runtime_messaging
 from secure_desktop import install as install_secure_desktop
 from retention import install as install_retention
-from auth import router as auth_router
+from auth import router as auth_router, google_auth as current_google_auth, GoogleRequest
 from account_deletion import router as account_deletion_router
 from privacy_policy import router as privacy_policy_router
 from terms_of_service import router as terms_router
@@ -95,10 +95,22 @@ def desktop_home(username:str=Query(...)):
     runtime=janus_sleep_cycle.status(); return {'profile':username,'status':_presence(username,latest),'architecture':'11-core','unread_messages':sum(1 for x in messages if x['state']=='unread'),'latest_activity':latest,'background_interval_minutes':int(os.environ.get('JANUS_INTERVAL_MINUTES','15')),'core_phase':runtime.get('phase'),'core_runtime':runtime,'external_api_budget_used_by_core_cycle':0,'messaging_action':True}
 
 # The reconstructed core still carries an older /auth/google endpoint. FastAPI
-# resolves routes in registration order, so that legacy handler would otherwise
-# intercept requests before the current account-system router below. Remove only
-# that duplicate route and make auth.py the single authoritative Google handler.
+# resolves routes in registration order, so remove all existing Google handlers,
+# then register a compatibility wrapper before the current auth router.
 app.router.routes = [route for route in app.router.routes if getattr(route, 'path', None) != '/auth/google']
+
+@app.post('/auth/google', tags=['auth'])
+def google_auth_android_compat(req: GoogleRequest):
+    result = current_google_auth(req)
+    account = result.get('account') or {}
+    username = str(account.get('username') or '').strip()
+    account_id = account.get('id')
+    # Older Android builds expect these identity/session fields at top level.
+    result['username'] = username
+    result['profile_id'] = username
+    result['account_id'] = account_id
+    result['user_id'] = account_id
+    return result
 
 app.include_router(auth_router); app.include_router(account_deletion_router); app.include_router(privacy_policy_router); app.include_router(terms_router); app.include_router(ai_reports_router); app.include_router(core_sync_router)
 install_runtime_messaging(app); install_secure_desktop(app); install_retention(app)
