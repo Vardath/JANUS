@@ -257,6 +257,33 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static boolean isTransientGateway(int code) {
+        return code == 502 || code == 503 || code == 504;
+    }
+
+    private static String readBody(HttpURLConnection c, int code) throws Exception {
+        if (code >= 400 && c.getErrorStream() == null) return "";
+        BufferedReader r = new BufferedReader(new InputStreamReader(code >= 400 ? c.getErrorStream() : c.getInputStream(), StandardCharsets.UTF_8));
+        StringBuilder b = new StringBuilder();
+        String line;
+        while ((line = r.readLine()) != null) {
+            if (b.length() < 8192) b.append(line);
+        }
+        r.close();
+        return b.toString();
+    }
+
+    private static String safeServerBody(int code, String body) {
+        String raw = body == null ? "" : body.trim();
+        String lower = raw.toLowerCase();
+        boolean html = lower.startsWith("<!doctype html") || lower.startsWith("<html") || lower.contains("<body") || lower.contains("bad gateway") || lower.contains("service unavailable");
+        if (isTransientGateway(code) || html) {
+            return "{\"detail\":\"JANUS server is temporarily unavailable. Please try again shortly.\"}";
+        }
+        if (raw.length() > 8192) raw = raw.substring(0, 8192);
+        return raw;
+    }
+
     public class Bridge {
         @JavascriptInterface public String profileId() {
             String saved = getSharedPreferences("janus", MODE_PRIVATE).getString("profile_id", "");
@@ -287,28 +314,44 @@ public class MainActivity extends Activity {
             learnProfile(path, json);
             final String accessToken = learnAccessToken(json);
             pool.submit(() -> {
-                String result;
-                try {
-                    HttpURLConnection c = (HttpURLConnection) new URL(SERVER + path).openConnection();
-                    c.setRequestMethod(method);
-                    c.setConnectTimeout(20000);
-                    c.setReadTimeout(120000);
-                    c.setRequestProperty("Accept", "application/json");
-                    if (!accessToken.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + accessToken);
-                    if (!"GET".equals(method)) {
-                        c.setDoOutput(true);
-                        c.setRequestProperty("Content-Type", "application/json");
-                        byte[] body = (json == null ? "{}" : json).getBytes(StandardCharsets.UTF_8);
-                        try (OutputStream os = c.getOutputStream()) { os.write(body); }
+                String result = null;
+                Exception lastException = null;
+                for (int attempt = 1; attempt <= 3; attempt++) {
+                    HttpURLConnection c = null;
+                    try {
+                        c = (HttpURLConnection) new URL(SERVER + path).openConnection();
+                        c.setRequestMethod(method);
+                        c.setConnectTimeout(20000);
+                        c.setReadTimeout(120000);
+                        c.setRequestProperty("Accept", "application/json");
+                        if (!accessToken.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + accessToken);
+                        if (!"GET".equals(method)) {
+                            c.setDoOutput(true);
+                            c.setRequestProperty("Content-Type", "application/json");
+                            byte[] body = (json == null ? "{}" : json).getBytes(StandardCharsets.UTF_8);
+                            try (OutputStream os = c.getOutputStream()) { os.write(body); }
+                        }
+                        int code = c.getResponseCode();
+                        String body = safeServerBody(code, readBody(c, code));
+                        if (isTransientGateway(code) && attempt < 3) {
+                            try { Thread.sleep(1500L * attempt); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                            continue;
+                        }
+                        result = "{\"ok\":" + (code < 400) + ",\"status\":" + code + ",\"body\":" + quote(body) + "}";
+                        break;
+                    } catch (Exception e) {
+                        lastException = e;
+                        if (attempt < 3) {
+                            try { Thread.sleep(1500L * attempt); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                            continue;
+                        }
+                    } finally {
+                        if (c != null) c.disconnect();
                     }
-                    int code = c.getResponseCode();
-                    BufferedReader r = new BufferedReader(new InputStreamReader(code >= 400 ? c.getErrorStream() : c.getInputStream(), StandardCharsets.UTF_8));
-                    StringBuilder b = new StringBuilder(); String line;
-                    while ((line = r.readLine()) != null) b.append(line);
-                    r.close();
-                    result = "{\"ok\":" + (code < 400) + ",\"status\":" + code + ",\"body\":" + quote(b.toString()) + "}";
-                } catch (Exception e) {
-                    result = "{\"ok\":false,\"status\":0,\"body\":" + quote(e.toString()) + "}";
+                }
+                if (result == null) {
+                    String message = lastException == null ? "JANUS server is temporarily unavailable. Please try again shortly." : "JANUS server connection failed. Please try again shortly.";
+                    result = "{\"ok\":false,\"status\":0,\"body\":" + quote("{\"detail\":\"" + message + "\"}") + "}";
                 }
                 final String js = "window.__janusResult(" + quote(id) + "," + result + ")";
                 runOnUiThread(() -> web.evaluateJavascript(js, null));
