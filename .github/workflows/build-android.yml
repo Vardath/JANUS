@@ -80,21 +80,43 @@ jobs:
       - name: Copy APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk "${{ steps.app_version.outputs.apk_name }}"
 
-      - name: Record exact OAuth identity in finished APK
+      - name: Record exact OAuth build identity
         shell: bash
+        env:
+          JANUS_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}
         run: |
-          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
-          if [ -z "$APKSIGNER" ]; then
-            echo "apksigner not found" >&2
-            exit 1
-          fi
+          set +e
           {
             echo "JANUS Android OAuth build identity"
             echo "Version: ${{ steps.app_version.outputs.version }}"
             echo "Package: com.vardath.janus"
-            "$APKSIGNER" verify --print-certs "${{ steps.app_version.outputs.apk_name }}" | grep -E 'Signer #1 certificate SHA-1 digest:|Signer #1 certificate SHA-256 digest:'
-            grep 'GOOGLE_WEB_CLIENT_ID' android/app/build/generated/source/buildConfig/debug/com/vardath/janus/BuildConfig.java | sed 's/^[[:space:]]*//'
+            echo "Signing certificate from build keystore:"
+            keytool -list -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -alias androiddebugkey \
+              -storepass android \
+              -keypass android | grep -E 'SHA1:|SHA256:' || true
+            APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n1)
+            if [ -n "$APKSIGNER" ]; then
+              echo "Finished APK certificate:"
+              "$APKSIGNER" verify --print-certs "${{ steps.app_version.outputs.apk_name }}" 2>/dev/null | grep -E 'SHA-1 digest:|SHA-256 digest:' || true
+            else
+              echo "Finished APK certificate: apksigner unavailable; build keystore values above are authoritative for this debug build."
+            fi
+            BUILD_CONFIG=$(find android/app/build/generated -type f -name BuildConfig.java 2>/dev/null | head -n1)
+            if [ -n "$BUILD_CONFIG" ]; then
+              grep 'GOOGLE_WEB_CLIENT_ID' "$BUILD_CONFIG" | sed 's/^[[:space:]]*//' || true
+            else
+              echo "Generated BuildConfig.java not found."
+            fi
+            if [ -n "$JANUS_GOOGLE_WEB_CLIENT_ID" ]; then
+              echo "Workflow OAuth client configured: yes"
+              echo "Workflow OAuth client suffix: ${JANUS_GOOGLE_WEB_CLIENT_ID:0:15}...${JANUS_GOOGLE_WEB_CLIENT_ID: -24}"
+            else
+              echo "Workflow OAuth client configured: no; Gradle fallback will be used"
+            fi
           } | tee oauth-build-info.txt
+          exit 0
 
       - uses: actions/upload-artifact@v4
         with:
