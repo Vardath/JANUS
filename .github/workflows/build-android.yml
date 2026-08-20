@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -33,3 +33,18 @@ jobs:
           name: JANUS-Android-v0.17
           path: JANUS-Android-v0.17.apk
           if-no-files-found: error
+      - name: Publish direct-download APK branch
+        shell: bash
+        run: |
+          mkdir -p /tmp/janus-apk
+          cp JANUS-Android-v0.17.apk /tmp/janus-apk/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan apk-download
+          git rm -rf .
+          mkdir -p downloads
+          cp /tmp/janus-apk/JANUS-Android-v0.17.apk downloads/
+          printf '# JANUS Android downloads\n\nLatest debug APK: JANUS-Android-v0.17.apk\n' > README.md
+          git add README.md downloads/JANUS-Android-v0.17.apk
+          git commit -m "Publish JANUS Android v0.17 APK"
+          git push --force origin HEAD:apk-download
