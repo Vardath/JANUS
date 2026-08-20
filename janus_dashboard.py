@@ -13,6 +13,7 @@ from retention import install as install_retention
 from auth import router as auth_router
 from account_deletion import router as account_deletion_router
 from privacy_policy import router as privacy_policy_router
+from terms_of_service import router as terms_router
 from src.janus_sleep_cycle import janus_sleep_cycle
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
@@ -134,6 +135,7 @@ def desktop_home(username: str = Query(...)):
 app.include_router(auth_router)
 app.include_router(account_deletion_router)
 app.include_router(privacy_policy_router)
+app.include_router(terms_router)
 install_runtime_messaging(app)
 install_secure_desktop(app)
 install_retention(app)
