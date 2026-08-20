@@ -30,12 +30,16 @@ services:
         value: "15"
       - key: JANUS_DORMANCY_PERCENT
         value: "67"
+      - key: JANUS_WAKE_SECONDS
+        value: "300"
+      - key: JANUS_SLEEP_SECONDS
+        value: "600"
       - key: JANUS_THOUGHT_COUNT
         value: "1"
       - key: JANUS_MEMORY_PROCESSING
         value: "1"
       - key: JANUS_SELF_EVALUATION
-        value: "1"
+        value: "0"
       - key: JANUS_EXTERNAL_ACCESS
         value: "1"
       - key: JANUS_SUPERVISOR_CONSULTATION
