@@ -8,7 +8,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
-import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -133,14 +132,8 @@ public class MainActivity extends Activity {
         }
         try {
             GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(clientId).build();
-            GetCredentialRequest request = new GetCredentialRequest.Builder()
-                    .addCredentialOption(option)
-                    .build();
-            credentialManager.getCredentialAsync(
-                    this,
-                    request,
-                    new CancellationSignal(),
-                    getMainExecutor(),
+            GetCredentialRequest request = new GetCredentialRequest.Builder().addCredentialOption(option).build();
+            credentialManager.getCredentialAsync(this, request, new CancellationSignal(), getMainExecutor(),
                     new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
                         @Override public void onResult(GetCredentialResponse result) {
                             Credential credential = result.getCredential();
@@ -161,13 +154,11 @@ public class MainActivity extends Activity {
                             }
                             googleResult(false, "Google did not return a supported identity credential.");
                         }
-
                         @Override public void onError(@NonNull GetCredentialException e) {
                             String message = e.getLocalizedMessage();
                             googleResult(false, message == null || message.isBlank() ? "Google sign-in was cancelled or unavailable." : message);
                         }
-                    }
-            );
+                    });
         } catch (Exception e) {
             googleResult(false, "Unable to start Google sign-in: " + e.getMessage());
         }
@@ -176,9 +167,7 @@ public class MainActivity extends Activity {
     public class Bridge {
         @JavascriptInterface public String profileId() {
             String saved = getSharedPreferences("janus", MODE_PRIVATE).getString("profile_id", "");
-            if (saved != null && !saved.isEmpty()) return saved;
-            String id = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-            return "android-" + (id == null ? "local" : id);
+            return saved == null ? "" : saved;
         }
         @JavascriptInterface public void setProfile(String profile) {
             persistProfile(profile);
@@ -186,10 +175,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void clearSession() {
             getSharedPreferences("janus", MODE_PRIVATE).edit()
-                    .remove("access_token")
-                    .remove("profile_id")
-                    .remove("last_notified_message")
-                    .apply();
+                    .remove("access_token").remove("profile_id").remove("last_notified_message").apply();
         }
         @JavascriptInterface public void googleSignIn() { runOnUiThread(MainActivity.this::startGoogleSignIn); }
         @JavascriptInterface public String serverUrl() { return SERVER; }
@@ -204,9 +190,7 @@ public class MainActivity extends Activity {
                     c.setConnectTimeout(20000);
                     c.setReadTimeout(120000);
                     c.setRequestProperty("Accept", "application/json");
-                    if (!accessToken.isEmpty()) {
-                        c.setRequestProperty("Authorization", "Bearer " + accessToken);
-                    }
+                    if (!accessToken.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + accessToken);
                     if (!"GET".equals(method)) {
                         c.setDoOutput(true);
                         c.setRequestProperty("Content-Type", "application/json");
