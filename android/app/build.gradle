@@ -8,9 +8,12 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 21
-        versionName '0.21'
+        versionCode 22
+        versionName '0.22'
+        buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + (project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '') + '"'
     }
+
+    buildFeatures { buildConfig true }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -22,4 +25,7 @@ dependencies {
     implementation 'androidx.annotation:annotation:1.8.2'
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.work:work-runtime:2.9.1'
+    implementation 'androidx.credentials:credentials:1.6.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.6.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
 }
