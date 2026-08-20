@@ -32,24 +32,24 @@ jobs:
         working-directory: android
         run: gradle :app:assembleDebug --stacktrace
       - name: Copy APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk JANUS-Android-v0.18.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk JANUS-Android-v0.20.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Android-v0.18
-          path: JANUS-Android-v0.18.apk
+          name: JANUS-Android-v0.20
+          path: JANUS-Android-v0.20.apk
           if-no-files-found: error
       - name: Publish direct-download APK branch
         shell: bash
         run: |
           mkdir -p /tmp/janus-apk
-          cp JANUS-Android-v0.18.apk /tmp/janus-apk/
+          cp JANUS-Android-v0.20.apk /tmp/janus-apk/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan apk-download
           git rm -rf .
           mkdir -p downloads
-          cp /tmp/janus-apk/JANUS-Android-v0.18.apk downloads/
-          printf '# JANUS Android downloads\n\nLatest debug APK: JANUS-Android-v0.18.apk\n' > README.md
-          git add README.md downloads/JANUS-Android-v0.18.apk
-          git commit -m "Publish JANUS Android v0.18 APK"
+          cp /tmp/janus-apk/JANUS-Android-v0.20.apk downloads/
+          printf '# JANUS Android downloads\n\nLatest debug APK: JANUS-Android-v0.20.apk\n' > README.md
+          git add README.md downloads/JANUS-Android-v0.20.apk
+          git commit -m "Publish JANUS Android v0.20 APK"
           git push --force origin HEAD:apk-download
