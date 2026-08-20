@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException, Query
 from dashboard_api import app
 from runtime_messaging import install as install_runtime_messaging
+from auth import router as auth_router
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
 
@@ -150,4 +151,5 @@ def desktop_home(username: str = Query(...)):
     }
 
 
+app.include_router(auth_router)
 install_runtime_messaging(app)
