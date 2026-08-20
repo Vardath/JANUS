@@ -11,12 +11,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, field_validator
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-DB_PATH = Path(os.getenv("JANUS_AUTH_DB", "janus_auth.db"))
+DB_PATH = Path(os.getenv("JANUS_AUTH_DB") or os.getenv("JANUS_DB_PATH") or "janus_auth.db")
 SESSION_TTL = 60 * 60 * 24 * 30
 PBKDF2_ITERATIONS = 600_000
 
 
 def _db():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
