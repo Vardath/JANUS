@@ -26,4 +26,3 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vardath.janus
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
