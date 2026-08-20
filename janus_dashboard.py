@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException, Query
 from dashboard_api import app
 from runtime_messaging import install as install_runtime_messaging
+from secure_desktop import install as install_secure_desktop
 from auth import router as auth_router
 from src.janus_sleep_cycle import janus_sleep_cycle
 
@@ -188,3 +189,4 @@ def desktop_home(username: str = Query(...)):
 
 app.include_router(auth_router)
 install_runtime_messaging(app)
+install_secure_desktop(app)
