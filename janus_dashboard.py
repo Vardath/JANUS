@@ -10,6 +10,7 @@ from dashboard_api import app
 from runtime_messaging import install as install_runtime_messaging
 from secure_desktop import install as install_secure_desktop
 from auth import router as auth_router
+from account_deletion import router as account_deletion_router
 from src.janus_sleep_cycle import janus_sleep_cycle
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
@@ -188,5 +189,6 @@ def desktop_home(username: str = Query(...)):
 
 
 app.include_router(auth_router)
+app.include_router(account_deletion_router)
 install_runtime_messaging(app)
 install_secure_desktop(app)
