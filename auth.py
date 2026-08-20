@@ -65,6 +65,7 @@ def init_auth_db():
                 email TEXT NOT NULL COLLATE NOCASE UNIQUE,
                 password_hash TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
                 disabled INTEGER NOT NULL DEFAULT 0
             )
         """)
@@ -73,6 +74,11 @@ def init_auth_db():
             c.execute("ALTER TABLE accounts ADD COLUMN google_sub TEXT")
         if not _has_column(c, "accounts", "email_verified"):
             c.execute("ALTER TABLE accounts ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0")
+        if not _has_column(c, "accounts", "updated_at"):
+            # SQLite requires a default when adding a NOT NULL column to an
+            # existing table. Backfill from created_at immediately afterwards.
+            c.execute("ALTER TABLE accounts ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0")
+            c.execute("UPDATE accounts SET updated_at=created_at WHERE updated_at=0")
 
         # Stage 2: old JANUS builds used different auth/session token schemas.
         # Preserve incompatible tables instead of dropping them, then create the
@@ -197,7 +203,7 @@ def register(req:RegisterRequest):
     now=int(time.time())
     with _db() as c:
         try:
-            cur=c.execute("INSERT INTO accounts(username,email,password_hash,created_at,email_verified) VALUES(?,?,?,?,0)",(req.username.strip(),str(req.email).lower(),_hash_password(req.password),now)); account_id=cur.lastrowid
+            cur=c.execute("INSERT INTO accounts(username,email,password_hash,created_at,updated_at,email_verified) VALUES(?,?,?,?,?,0)",(req.username.strip(),str(req.email).lower(),_hash_password(req.password),now,now)); account_id=cur.lastrowid
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=409,detail="Username or email already exists")
         _send_verification(c,account_id,str(req.email).lower()); row=c.execute("SELECT * FROM accounts WHERE id=?",(account_id,)).fetchone(); token=_new_session(c,account_id)
@@ -226,10 +232,10 @@ def google_auth(req:GoogleRequest):
         if row is None:
             row=c.execute("SELECT * FROM accounts WHERE email=? COLLATE NOCASE",(email,)).fetchone()
             if row is None:
-                username=_unique_username(c,email,name); random_password=_hash_password(secrets.token_urlsafe(48)); cur=c.execute("INSERT INTO accounts(username,email,password_hash,created_at,google_sub,email_verified) VALUES(?,?,?,?,?,1)",(username,email,random_password,now,sub)); row=c.execute("SELECT * FROM accounts WHERE id=?",(cur.lastrowid,)).fetchone()
+                username=_unique_username(c,email,name); random_password=_hash_password(secrets.token_urlsafe(48)); cur=c.execute("INSERT INTO accounts(username,email,password_hash,created_at,updated_at,google_sub,email_verified) VALUES(?,?,?,?,?,?,1)",(username,email,random_password,now,now,sub)); row=c.execute("SELECT * FROM accounts WHERE id=?",(cur.lastrowid,)).fetchone()
             else:
                 if row["google_sub"] and row["google_sub"]!=sub: raise HTTPException(status_code=409,detail="Email is already linked to another Google account")
-                c.execute("UPDATE accounts SET google_sub=?,email_verified=1 WHERE id=?",(sub,row["id"])); row=c.execute("SELECT * FROM accounts WHERE id=?",(row["id"],)).fetchone()
+                c.execute("UPDATE accounts SET google_sub=?,email_verified=1,updated_at=? WHERE id=?",(sub,now,row["id"])); row=c.execute("SELECT * FROM accounts WHERE id=?",(row["id"],)).fetchone()
         if row["disabled"]: raise HTTPException(status_code=403,detail="Account is disabled")
         token=_new_session(c,row["id"])
     return {"ok":True,"access_token":token,"account":_account_dict(row),"verification_required":False}
@@ -244,7 +250,7 @@ def verify_email(req:VerifyEmailRequest):
     with _db() as c:
         row=c.execute("SELECT * FROM auth_tokens WHERE token_hash=? AND purpose='verify_email' AND used_at IS NULL AND expires_at>?",(digest,now)).fetchone()
         if row is None: raise HTTPException(status_code=400,detail="Verification token is invalid or expired")
-        c.execute("UPDATE accounts SET email_verified=1 WHERE id=?",(row["account_id"],)); c.execute("UPDATE auth_tokens SET used_at=? WHERE token_hash=?",(now,digest))
+        c.execute("UPDATE accounts SET email_verified=1,updated_at=? WHERE id=?",(now,row["account_id"])); c.execute("UPDATE auth_tokens SET used_at=? WHERE token_hash=?",(now,digest))
     return {"ok":True}
 
 @router.post("/resend-verification")
@@ -268,7 +274,7 @@ def reset_password(req:ResetPasswordRequest):
     with _db() as c:
         row=c.execute("SELECT * FROM auth_tokens WHERE token_hash=? AND purpose='reset_password' AND used_at IS NULL AND expires_at>?",(digest,now)).fetchone()
         if row is None: raise HTTPException(status_code=400,detail="Reset token is invalid or expired")
-        c.execute("UPDATE accounts SET password_hash=? WHERE id=?",(_hash_password(req.new_password),row["account_id"])); c.execute("UPDATE auth_tokens SET used_at=? WHERE token_hash=?",(now,digest)); c.execute("DELETE FROM sessions WHERE account_id=?",(row["account_id"],))
+        c.execute("UPDATE accounts SET password_hash=?,updated_at=? WHERE id=?",(_hash_password(req.new_password),now,row["account_id"])); c.execute("UPDATE auth_tokens SET used_at=? WHERE token_hash=?",(now,digest)); c.execute("DELETE FROM sessions WHERE account_id=?",(row["account_id"],))
     return {"ok":True}
 
 @router.delete("/account")
