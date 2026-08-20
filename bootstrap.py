@@ -18,6 +18,22 @@ try:
     import auth as auth_module
     app = real_app
 
+    @app.middleware("http")
+    async def preserve_google_auth_error(request, call_next):
+        """Keep useful JANUS auth JSON visible to older Android builds.
+
+        Android v0.31 intentionally masks every 502/503/504 as a generic
+        gateway outage. For /auth/google only, convert an application-level
+        503 to 409 while preserving its JSON body. A real Render 503 happens
+        before this middleware and therefore remains 503, which lets us tell
+        infrastructure failures from JANUS auth/configuration failures.
+        """
+        response = await call_next(request)
+        if request.url.path == "/auth/google" and response.status_code == 503:
+            response.status_code = 409
+            response.headers["X-JANUS-Original-Status"] = "503"
+        return response
+
     @app.get("/diagnostics/auth-config")
     def auth_config():
         routes = {getattr(route, "path", "") for route in app.routes}
