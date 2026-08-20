@@ -24,6 +24,8 @@ services:
         value: gpt-5.6
       - key: JANUS_DB_PATH
         value: /data/janus.sqlite3
+      - key: JANUS_CORE_CHECKPOINT_SECONDS
+        value: "30"
       - key: JANUS_GOOGLE_CLIENT_ID
         value: 236215282074-iej25m43ghoonhnm02qdvha2l57mosh9.apps.googleusercontent.com
       - key: JANUS_SMTP_HOST
