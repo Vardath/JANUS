@@ -98,6 +98,19 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {}
     }
 
+    private String learnAccessToken(String json) {
+        try {
+            JSONObject body = new JSONObject(json == null ? "{}" : json);
+            String token = body.optString("_janus_token", "").trim();
+            if (!token.isEmpty()) {
+                getSharedPreferences("janus", MODE_PRIVATE).edit().putString("access_token", token).apply();
+                return token;
+            }
+        } catch (Exception ignored) {}
+        String saved = getSharedPreferences("janus", MODE_PRIVATE).getString("access_token", "");
+        return saved == null ? "" : saved.trim();
+    }
+
     private void googleResult(boolean ok, String message) {
         if (web == null) return;
         final String js = "window.__janusGoogleResult(" + ok + "," + quote(message) + ")";
@@ -167,6 +180,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String serverUrl() { return SERVER; }
         @JavascriptInterface public void request(String id, String method, String path, String json) {
             learnProfile(path, json);
+            final String accessToken = learnAccessToken(json);
             pool.submit(() -> {
                 String result;
                 try {
@@ -175,6 +189,9 @@ public class MainActivity extends Activity {
                     c.setConnectTimeout(20000);
                     c.setReadTimeout(120000);
                     c.setRequestProperty("Accept", "application/json");
+                    if (!accessToken.isEmpty()) {
+                        c.setRequestProperty("Authorization", "Bearer " + accessToken);
+                    }
                     if (!"GET".equals(method)) {
                         c.setDoOutput(true);
                         c.setRequestProperty("Content-Type", "application/json");
