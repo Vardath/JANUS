@@ -9,8 +9,14 @@ from fastapi import HTTPException, Query
 from dashboard_api import app
 from runtime_messaging import install as install_runtime_messaging
 from auth import router as auth_router
+from src.janus_sleep_cycle import janus_sleep_cycle
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
+
+# Configure the local seven-core cycle from deployment settings. This runtime never
+# calls a cloud model; it only performs local state transitions/message passing.
+janus_sleep_cycle.wake_seconds = max(10, int(os.environ.get("JANUS_WAKE_SECONDS", "300")))
+janus_sleep_cycle.sleep_seconds = max(10, int(os.environ.get("JANUS_SLEEP_SECONDS", "600")))
 
 
 def _connect():
@@ -81,6 +87,9 @@ def _message_rows(profile: str, limit: int = 50, include_dismissed: bool = False
 
 
 def _presence(profile: str, latest: dict[str, Any] | None) -> str:
+    runtime = janus_sleep_cycle.status()
+    if runtime.get("phase") == "wake":
+        return "Active"
     if not latest or not latest.get("created_at"):
         return "Dormant"
     try:
@@ -89,7 +98,29 @@ def _presence(profile: str, latest: dict[str, Any] | None) -> str:
         interval = max(1, int(os.environ.get("JANUS_INTERVAL_MINUTES", "15"))) * 60
         return "Active" if age <= interval * 2 else "Dormant"
     except Exception:
-        return "Active"
+        return "Dormant"
+
+
+@app.on_event("startup")
+async def _start_local_core_cycle():
+    janus_sleep_cycle.start()
+
+
+@app.on_event("shutdown")
+async def _stop_local_core_cycle():
+    janus_sleep_cycle.stop()
+
+
+@app.get('/desktop/runtime-cores', tags=['desktop'])
+def desktop_runtime_cores(username: str | None = Query(default=None)):
+    status = janus_sleep_cycle.status()
+    return {
+        'profile': username or 'unspecified',
+        'architecture': '7 -> 3 -> 1',
+        'runtime': status,
+        'paid_background_api_enabled': os.environ.get('JANUS_SELF_EVALUATION', '0') == '1',
+        'note': 'Seven local cores communicate during wake windows and consolidate during sleep. The local cycle makes no external model/API calls.',
+    }
 
 
 @app.get('/desktop/messages', tags=['desktop'])
@@ -140,6 +171,7 @@ def desktop_home(username: str = Query(...)):
         latest = dict(row) if row else None
     finally:
         c.close()
+    runtime = janus_sleep_cycle.status()
     return {
         'profile': username,
         'status': _presence(username, latest),
@@ -147,6 +179,9 @@ def desktop_home(username: str = Query(...)):
         'unread_messages': sum(1 for x in messages if x['state'] == 'unread'),
         'latest_activity': latest,
         'background_interval_minutes': int(os.environ.get('JANUS_INTERVAL_MINUTES', '15')),
+        'core_phase': runtime.get('phase'),
+        'core_runtime': runtime,
+        'external_api_budget_used_by_core_cycle': 0,
         'messaging_action': True,
     }
 
