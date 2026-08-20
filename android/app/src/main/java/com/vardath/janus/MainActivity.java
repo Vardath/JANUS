@@ -68,7 +68,15 @@ public class MainActivity extends Activity {
                         "window.__janusGoogleResult=function(ok,msg){" +
                         "if(ok){authMessage.textContent='Signing in with Google…';" +
                         "api('POST','/auth/google',{id_token:msg},false).then(storeSession).catch(function(e){authMessage.textContent='Google sign-in failed. '+e.message;});}" +
-                        "else{authMessage.textContent=msg||'Google sign-in was cancelled.';}};";
+                        "else{authMessage.textContent=msg||'Google sign-in was cancelled.';}};" +
+                        "window.janusDeleteAccount=async function(){" +
+                        "if(!confirm('Permanently delete your JANUS account, memories, messages and account data? This cannot be undone.'))return;" +
+                        "var word=prompt('Type DELETE to confirm permanent account deletion.');if(word!=='DELETE')return;" +
+                        "var pwd=prompt('Enter your current JANUS password. If this is a Google-only account, leave this blank.');" +
+                        "try{await api('DELETE','/auth/account',{confirmation:'DELETE',current_password:pwd||null});" +
+                        "localStorage.removeItem('janusToken');localStorage.removeItem('janusAccountId');localStorage.removeItem('janusProfile');Android.clearSession();alert('Your JANUS account has been deleted.');location.reload();" +
+                        "}catch(e){alert('Account deletion failed. '+e.message);}};" +
+                        "(function(){var box=document.querySelector('#options .options');if(box&&!document.getElementById('deleteAccountBtn')){var b=document.createElement('button');b.id='deleteAccountBtn';b.style.borderColor='#b00020';b.style.color='#b00020';b.innerHTML='<b>Delete account</b><br><span class=\"small\">Permanently delete this JANUS account and associated data</span>';b.onclick=window.janusDeleteAccount;box.appendChild(b);}})();";
                 view.evaluateJavascript(js, null);
             }
         });
@@ -175,6 +183,13 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void setProfile(String profile) {
             persistProfile(profile);
             scheduleMessageChecks();
+        }
+        @JavascriptInterface public void clearSession() {
+            getSharedPreferences("janus", MODE_PRIVATE).edit()
+                    .remove("access_token")
+                    .remove("profile_id")
+                    .remove("last_notified_message")
+                    .apply();
         }
         @JavascriptInterface public void googleSignIn() { runOnUiThread(MainActivity.this::startGoogleSignIn); }
         @JavascriptInterface public String serverUrl() { return SERVER; }
