@@ -10,7 +10,8 @@ android {
         targetSdk 36
         versionCode 22
         versionName '0.22'
-        buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + (project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '') + '"'
+        def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-iej25m43ghoonhnm02qdvha2l57mosh9.apps.googleusercontent.com'
+        buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
 
     buildFeatures { buildConfig true }
