@@ -1,7 +1,7 @@
 """Resilient JANUS bootstrap for Render.
 
-Always exposes /health even if the full JANUS application fails during import.
-This prevents opaque gateway 502s and provides a minimal safe diagnostic.
+Always exposes /health if the full JANUS application fails during import.
+Also exposes a minimal non-secret auth diagnostic when the main app loads.
 """
 from __future__ import annotations
 
@@ -16,6 +16,17 @@ _startup_trace = None
 try:
     from janus_dashboard import app as real_app
     app = real_app
+
+    @app.get("/diagnostics/auth-config")
+    def auth_config():
+        routes = {getattr(route, "path", "") for route in app.routes}
+        return {
+            "status": "ok",
+            "main_app_loaded": True,
+            "google_client_configured": bool(os.getenv("JANUS_GOOGLE_CLIENT_ID", "").strip()),
+            "google_route_present": "/auth/google" in routes,
+            "health_route_present": "/health" in routes,
+        }
 except Exception as exc:  # keep Render reachable for diagnosis
     _startup_error = f"{type(exc).__name__}: {exc}"
     _startup_trace = traceback.format_exc(limit=12)
@@ -41,6 +52,16 @@ except Exception as exc:  # keep Render reachable for diagnosis
             "error": _startup_error,
             "traceback": _startup_trace,
             "python_version": os.sys.version.split()[0],
+        }
+
+    @app.get("/diagnostics/auth-config")
+    def auth_config_degraded():
+        return {
+            "status": "degraded",
+            "main_app_loaded": False,
+            "google_client_configured": bool(os.getenv("JANUS_GOOGLE_CLIENT_ID", "").strip()),
+            "google_route_present": False,
+            "health_route_present": True,
         }
 
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
