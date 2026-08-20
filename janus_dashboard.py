@@ -15,10 +15,13 @@ from terms_of_service import router as terms_router
 from ai_reports import router as ai_reports_router
 from core_sync import router as core_sync_router
 from src.janus_sleep_cycle import janus_sleep_cycle
+from interface_runtime_policy import install as install_interface_runtime_policy
+from interface_chat import install as install_interface_chat
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
 janus_sleep_cycle.wake_seconds = max(10, int(os.environ.get("JANUS_WAKE_SECONDS", "300")))
 janus_sleep_cycle.sleep_seconds = max(10, int(os.environ.get("JANUS_SLEEP_SECONDS", "600")))
+install_interface_runtime_policy(janus_sleep_cycle)
 
 def _connect():
     c=sqlite3.connect(DB_PATH,timeout=10); c.row_factory=sqlite3.Row
@@ -54,6 +57,7 @@ def _message_rows(profile:str,limit:int=50,include_dismissed:bool=False):
 
 def _presence(profile,latest):
     runtime=janus_sleep_cycle.status()
+    if runtime.get('interface_awake'): return 'Active'
     if runtime.get('phase')=='wake': return 'Active'
     if not latest or not latest.get('created_at'): return 'Dormant'
     try:
@@ -68,7 +72,7 @@ async def _stop_local_core_cycle(): janus_sleep_cycle.stop()
 
 @app.get('/desktop/runtime-cores',tags=['desktop'])
 def desktop_runtime_cores(username:str|None=Query(default=None)):
-    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':janus_sleep_cycle.status(),'paid_background_api_enabled':os.environ.get('JANUS_SELF_EVALUATION','0')=='1','note':'All 11 local runtime cores communicate during wake windows; this loop makes no external model/API calls.'}
+    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':janus_sleep_cycle.status(),'paid_background_api_enabled':os.environ.get('JANUS_SELF_EVALUATION','0')=='1','note':'The interface core remains available continuously; the other ten cores may rest and publish updates asynchronously. The zero-cost core cycle makes no external model/API calls.'}
 
 @app.get('/desktop/messages',tags=['desktop'])
 def desktop_messages(username:str=Query(...),limit:int=Query(default=50,ge=1,le=100),include_dismissed:bool=Query(default=False)):
@@ -113,4 +117,5 @@ def google_auth_android_compat(req: GoogleRequest):
     return result
 
 app.include_router(auth_router); app.include_router(account_deletion_router); app.include_router(privacy_policy_router); app.include_router(terms_router); app.include_router(ai_reports_router); app.include_router(core_sync_router)
+install_interface_chat(app)
 install_runtime_messaging(app); install_secure_desktop(app); install_retention(app)
