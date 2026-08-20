@@ -26,6 +26,18 @@ services:
         value: /data/janus.sqlite3
       - key: JANUS_GOOGLE_CLIENT_ID
         value: 236215282074-iej25m43ghoonhnm02qdvha2l57mosh9.apps.googleusercontent.com
+      - key: JANUS_SMTP_HOST
+        sync: false
+      - key: JANUS_SMTP_PORT
+        value: "587"
+      - key: JANUS_SMTP_USER
+        sync: false
+      - key: JANUS_SMTP_PASSWORD
+        sync: false
+      - key: JANUS_SMTP_FROM
+        sync: false
+      - key: JANUS_SMTP_TLS
+        value: "1"
       - key: JANUS_INTERVAL_MINUTES
         value: "15"
       - key: JANUS_DORMANCY_PERCENT
