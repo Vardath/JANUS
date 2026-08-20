@@ -75,6 +75,15 @@ public class MainActivity extends Activity {
                         "try{await api('DELETE','/auth/account',{confirmation:'DELETE',current_password:pwd||null});" +
                         "localStorage.removeItem('janusToken');localStorage.removeItem('janusAccountId');localStorage.removeItem('janusProfile');Android.clearSession();alert('Your JANUS account has been deleted.');location.reload();" +
                         "}catch(e){alert('Account deletion failed. '+e.message);}};" +
+                        "window.janusReportResponse=async function(box,text){" +
+                        "var cats='harmful, harassment, sexual, hate, self-harm, illegal, privacy, misinformation, other';" +
+                        "var category=prompt('Report this JANUS response. Choose a category:\\n'+cats,'other');if(category===null)return;category=category.trim().toLowerCase();" +
+                        "if(cats.split(', ').indexOf(category)<0){alert('Please use one of the listed report categories.');return;}" +
+                        "var details=prompt('Optional: tell us what was wrong with this response.','')||'';" +
+                        "var previous=box.previousElementSibling;var context=(previous&&previous.classList.contains('user'))?previous.innerText:'';" +
+                        "try{var r=await api('POST','/safety/report',{category:category,response_text:text,user_context:context,details:details});alert(r.message||'Report submitted. Thank you.');}" +
+                        "catch(e){alert('Unable to submit report. '+e.message);}};" +
+                        "if(window.addMsg&&!window.__janusReportWrapped){window.__janusReportWrapped=true;var originalAddMsg=window.addMsg;window.addMsg=function(who,text){originalAddMsg(who,text);if(who==='JANUS'){var box=chatlog.lastElementChild;if(box&&!box.querySelector('.janus-report')){var b=document.createElement('button');b.className='janus-report';b.textContent='Report';b.style.cssText='margin-top:8px;border:0;background:transparent;color:#666;text-decoration:underline;padding:2px 0;font-size:12px';b.onclick=function(){window.janusReportResponse(box,String(text||''));};box.appendChild(document.createElement('br'));box.appendChild(b);}}};}" +
                         "(function(){var box=document.querySelector('#options .options');if(box&&!document.getElementById('deleteAccountBtn')){var b=document.createElement('button');b.id='deleteAccountBtn';b.style.borderColor='#b00020';b.style.color='#b00020';b.innerHTML='<b>Delete account</b><br><span class=\"small\">Permanently delete this JANUS account and associated data</span>';b.onclick=window.janusDeleteAccount;box.appendChild(b);}})();";
                 view.evaluateJavascript(js, null);
             }
