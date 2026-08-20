@@ -47,7 +47,7 @@ class JanusSleepCycle:
         self._stop=threading.Event(); self._thread=None; self._phase="sleep"; self._phase_started_at=time.time()
         self._lock=threading.RLock(); self._last_consensus=""; self._last_interface=""; self._remote_summaries={}
         self._last_checkpoint=0.0; self._persistence_ready=False
-        self._init_persistence(); self._restore_state()
+        self._init_persistence(); self._restore_state(); self.cores[INTERFACE_CORE].awake=True
 
     def _db(self):
         c=sqlite3.connect(DB_PATH,timeout=10); c.row_factory=sqlite3.Row; c.execute("PRAGMA journal_mode=WAL"); return c
@@ -131,11 +131,11 @@ class JanusSleepCycle:
         self._remote_summaries[str(device_id)[:128]]=clean; self.send("interface","consensus",f"client-sync {device_id}: {clean['consensus']}","client_sync"); self.checkpoint()
 
     def compact_summary(self):
-        return {"architecture":"11 Fano/JANUS cores","topology":"7 -> 2 -> 1 -> 1","phase":self._phase,"consensus":self._last_consensus,"interface":self._last_interface,"cycles":{n:x.cycle_count for n,x in self.cores.items()},"fano":{n:x.fano.summary() for n,x in self.cores.items()},"persistent":self._persistence_ready}
+        return {"architecture":"11 Fano/JANUS cores","topology":"7 -> 2 -> 1 -> 1","phase":self._phase,"background_phase":self._phase,"interface_available":True,"consensus":self._last_consensus,"interface":self._last_interface,"cycles":{n:x.cycle_count for n,x in self.cores.items()},"fano":{n:x.fano.summary() for n,x in self.cores.items()},"persistent":self._persistence_ready}
 
     def status(self):
         with self._lock:
-            return {"architecture":"11 Fano/JANUS cores","topology":"7 -> 2 -> 1 -> 1","core_count":11,"phase":self._phase,"wake_seconds":self.wake_seconds,"sleep_seconds":self.sleep_seconds,"external_api_budget_used":0,"persistent_storage":self._persistence_ready,"storage_backend":"sqlite-render-disk" if self._persistence_ready else "memory-only","database_path":DB_PATH,"checkpoint_seconds":CHECKPOINT_SECONDS,"last_consensus":self._last_consensus,"last_interface":self._last_interface,"remote_clients":len(self._remote_summaries),"groups":{k:sorted(v) for k,v in CORE_GROUPS.items()},"cores":{n:{"awake":x.awake,"cycle_count":x.cycle_count,"pending_messages":len(x.inbox),"last_cycle_at":x.last_cycle_at,"last_output":x.last_output[-300:],"fano":x.fano.summary()} for n,x in self.cores.items()}}
+            return {"architecture":"11 Fano/JANUS cores","topology":"7 -> 2 -> 1 -> 1","core_count":11,"phase":self._phase,"background_phase":self._phase,"interface_available":True,"wake_seconds":self.wake_seconds,"sleep_seconds":self.sleep_seconds,"external_api_budget_used":0,"persistent_storage":self._persistence_ready,"storage_backend":"sqlite-render-disk" if self._persistence_ready else "memory-only","database_path":DB_PATH,"checkpoint_seconds":CHECKPOINT_SECONDS,"last_consensus":self._last_consensus,"last_interface":self._last_interface,"remote_clients":len(self._remote_summaries),"groups":{k:sorted(v) for k,v in CORE_GROUPS.items()},"cores":{n:{"awake":x.awake,"cycle_count":x.cycle_count,"pending_messages":len(x.inbox),"last_cycle_at":x.last_cycle_at,"last_output":x.last_output[-300:],"fano":x.fano.summary()} for n,x in self.cores.items()}}
 
     def _run(self):
         while not self._stop.is_set():
@@ -145,20 +145,24 @@ class JanusSleepCycle:
         self.checkpoint(True)
     def _enter_phase(self,p):
         self._phase=p
-        for x in self.cores.values():x.awake=(p=="wake")
+        for x in self.cores.values():x.awake=(p=="wake" or x.name==INTERFACE_CORE)
         self.checkpoint(True)
+    def _cycle_core(self,n):
+        x=self.cores[n]; incoming=list(x.inbox); x.inbox.clear(); thought=self._think(x,incoming)
+        x.thoughts.append(thought); x.thoughts=x.thoughts[-64:]; x.last_output=thought; x.cycle_count+=1; x.last_cycle_at=datetime.now(timezone.utc).isoformat(); self._route_output(n,thought)
     def _run_wake_window(self):
         deadline=time.monotonic()+self.wake_seconds
         while time.monotonic()<deadline and not self._stop.is_set():
             with self._lock:
-                for n in CORE_NAMES:
-                    x=self.cores[n]; incoming=list(x.inbox); x.inbox.clear(); thought=self._think(x,incoming)
-                    x.thoughts.append(thought); x.thoughts=x.thoughts[-64:]; x.last_output=thought; x.cycle_count+=1; x.last_cycle_at=datetime.now(timezone.utc).isoformat(); self._route_output(n,thought)
+                for n in CORE_NAMES:self._cycle_core(n)
             self.checkpoint(); time.sleep(5)
     def _run_sleep_window(self):
         for x in self.cores.values():x.thoughts=x.thoughts[-16:]
+        self.cores[INTERFACE_CORE].awake=True
         self.checkpoint(True); deadline=time.monotonic()+self.sleep_seconds
-        while time.monotonic()<deadline and not self._stop.is_set():self.checkpoint(); time.sleep(5)
+        while time.monotonic()<deadline and not self._stop.is_set():
+            with self._lock:self._cycle_core(INTERFACE_CORE)
+            self.checkpoint(); time.sleep(5)
 
     def _think(self,x:CoreState,incoming:List[CoreMessage])->str:
         texts=[m.content for m in incoming] or [x.last_output or x.name]
