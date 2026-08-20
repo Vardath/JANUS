@@ -15,6 +15,7 @@ _startup_trace = None
 
 try:
     from janus_dashboard import app as real_app
+    import auth as auth_module
     app = real_app
 
     @app.get("/diagnostics/auth-config")
@@ -24,6 +25,7 @@ try:
             "status": "ok",
             "main_app_loaded": True,
             "google_client_configured": bool(os.getenv("JANUS_GOOGLE_CLIENT_ID", "").strip()),
+            "auth_module_google_client_configured": bool(getattr(auth_module, "GOOGLE_CLIENT_ID", "").strip()),
             "google_route_present": "/auth/google" in routes,
             "health_route_present": "/health" in routes,
         }
@@ -60,6 +62,7 @@ except Exception as exc:  # keep Render reachable for diagnosis
             "status": "degraded",
             "main_app_loaded": False,
             "google_client_configured": bool(os.getenv("JANUS_GOOGLE_CLIENT_ID", "").strip()),
+            "auth_module_google_client_configured": False,
             "google_route_present": False,
             "health_route_present": True,
         }
