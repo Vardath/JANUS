@@ -79,6 +79,50 @@ def _extract_actions(text: str) -> tuple[str, list[dict[str, str]]]:
     return _ACTION_RE.sub("", text or "").strip(), actions
 
 
+def _explicit_outbox_request(message: str) -> bool:
+    text = str(message or "").lower()
+    signals = (
+        "send it through",
+        "send this through",
+        "send that through",
+        "put it in messages",
+        "put this in messages",
+        "put that in messages",
+        "send me a message",
+        "message me",
+        "through messages",
+        "outbox",
+        "notification",
+    )
+    if any(signal in text for signal in signals):
+        return True
+    return "messag" in text and any(word in text for word in ("send", "formulate", "through", "test"))
+
+
+async def _fallback_outbox_payload(model: str, message: str, reply: str) -> dict[str, str] | None:
+    prompt = (
+        "The user explicitly requested a JANUS Messages/outbox item, but the first response omitted the machine action. "
+        "Return ONLY JSON with keys message_type and text. message_type must be Question, Observation, Memory, or Follow-up. "
+        "text must be the standalone message JANUS should actually place in the outbox. Do not say that it was sent.\n\n"
+        f"User request: {message}\n\nDraft chat reply: {reply}"
+    )
+    try:
+        response = await AsyncOpenAI().responses.create(
+            model=model,
+            instructions=core.JANUS_SELF_KNOWLEDGE,
+            input=prompt,
+        )
+        data = _json_object(response.output_text or "")
+        if not data:
+            return None
+        text = str(data.get("text") or "").strip()
+        if not text:
+            return None
+        return {"type": _message_type(data.get("message_type")), "text": text}
+    except Exception:
+        return None
+
+
 def _json_object(text: str) -> dict[str, Any] | None:
     raw = str(text or "").strip()
     if raw.startswith("```"):
@@ -232,8 +276,20 @@ Phrases such as "send it through", "message me", "put that in Messages", and "fo
                 raise RuntimeError("empty response")
             reply, actions = _extract_actions(raw_reply)
             sent = sum(1 for action in actions if _store_outbox(profile, action["type"], action["text"], "chat"))
+
+            if sent == 0 and _explicit_outbox_request(message):
+                fallback = await _fallback_outbox_payload(model, message, reply or raw_reply)
+                if fallback and _store_outbox(profile, fallback["type"], fallback["text"], "chat-fallback"):
+                    sent = 1
+                elif reply:
+                    compact = re.sub(r"\s+", " ", reply).strip()
+                    if compact and _store_outbox(profile, "Follow-up", compact[:700], "chat-fallback-text"):
+                        sent = 1
+
             if not reply:
                 reply = "Sent through Messages." if sent else "I couldn't create the Messages item."
+            elif _explicit_outbox_request(message) and sent == 0:
+                reply = "I couldn't create the Messages item, so I have not claimed it was sent. " + reply
         except Exception as exc:
             core._store(profile, "system", f"chat_error: {exc}", "chat_error")
             raise HTTPException(502, f"JANUS model request failed: {exc}")
