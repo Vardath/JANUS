@@ -48,11 +48,13 @@ try:
     from auth_rate_limit import install as install_auth_rate_limit
     from attachment_api import router as attachment_router
     from attachment_retention import install_storage_auditor
+    from image_generation import router as image_generation_router
     from chat_receipt_security import install as install_chat_receipt_security
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
     app.include_router(attachment_router)
+    app.include_router(image_generation_router)
     install_storage_auditor(app, janus_sleep_cycle)
     install_chat_receipt_security(interface_chat_module)
     install_auth_rate_limit(app)
@@ -120,6 +122,8 @@ try:
             "deliberation_tasks_enabled": True,
             "file_sharing_enabled": True,
             "file_storage_auditor_enabled": True,
+            "lightweight_image_generation_enabled": True,
+            "background_multi_core_image_generation_enabled": False,
         }
 
     @app.get("/diagnostics/runtime-health")
@@ -144,6 +148,9 @@ try:
             "file_upload_route_present": "/files/upload" in routes,
             "file_storage_status_route_present": "/files/storage/status" in routes,
             "file_audit_route_present": "/files/audit/recent" in routes,
+            "image_generate_route_present": "/images/generate" in routes,
+            "image_usage_route_present": "/images/usage" in routes,
+            "background_multi_core_image_generation_enabled": False,
             "auth_rate_limit_enabled": True,
         }
 
@@ -218,6 +225,9 @@ except Exception as exc:
             "file_upload_route_present": False,
             "file_storage_status_route_present": False,
             "file_audit_route_present": False,
+            "image_generate_route_present": False,
+            "image_usage_route_present": False,
+            "background_multi_core_image_generation_enabled": False,
             "auth_rate_limit_enabled": False,
         }
 
