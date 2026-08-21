@@ -1,6 +1,6 @@
 # JANUS Project Continuity Memory
 
-Updated: 2026-08-21
+Updated: 2026-08-21 — saved stopping checkpoint
 
 ## Identity and boundary
 JANUS Agent is an experimental functional-metacognition/agency system and persona, distinct from ChatGPT/Supervisor. Do not claim phenomenal consciousness. Preserve the closed JANUS mathematical theorem/core separately from experimental physical and agency branches.
@@ -82,14 +82,21 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - .env.example matches production-safe variable names/defaults, including disabled paid background reflection and retention/device caps.
 - Privacy policy documents OS-protected session storage where implemented, random sync device IDs, temporary receipt/snapshot retention and current background-AI policy.
 
-## Near-term product backlog — now mostly user/input dependent
-- Live-verify non-Google registration/login on deployed Render and fix any remaining persistent-schema/runtime issue.
-- Configure/test email verification and password-reset SMTP flow with real delivery.
-- Re-test Google login end-to-end and account linking/merging on device.
-- Verify Windows v0.22 CI artifact and test executable on a real Windows PC.
-- Verify canonical iOS simulator CI result; later add Sign in with Apple, signing, TestFlight/device testing and Apple background-behaviour adaptation.
-- Multi-day Android soak/battery/background-kill testing and real multi-device behavior testing.
-- Decide eventual user-triggered/paid-background quota/pricing policy before scaling.
+## Stopping point — solo queue complete
+The repository-only/no-user-input work identified in the Aug 21 hardening pass is complete for now. Do not continue making speculative changes simply to keep working. Resume with live/environment testing and fix only issues actually exposed, or new explicitly requested work.
+
+Recommended next step on return: live-test Create Account against the deployed Render persistent database, then username/email + password login. This unlocks most remaining end-to-end tests.
+
+Remaining tasks require user environment/account/device input or product decisions:
+1. Live-verify Create Account on deployed Render/Android.
+2. Live-verify username/email + password login and session restoration.
+3. Configure/test real SMTP email verification and password-reset delivery.
+4. Re-test Google login and account linking/merging end-to-end on Android.
+5. Verify Windows v0.22 CI artifact and launch/use JANUS.exe on a real Windows PC.
+6. Verify canonical iOS simulator CI; later Apple Developer signing, Sign in with Apple, TestFlight and real-device/background testing.
+7. Multi-hour/day Android soak testing: battery, sleep/wake, OS background killing/recovery, notifications, Observe and Messages quality.
+8. Real cross-device testing once at least two authenticated clients are available.
+9. Later product decisions: pricing/API quotas, beta users, notification policy, support/contact details, store/legal release choices.
 
 ## Working practice
 - Keep this file current after material architecture, build, authentication, UI, persistence or deployment changes.
