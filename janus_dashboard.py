@@ -19,6 +19,7 @@ from interface_runtime_policy import install as install_interface_runtime_policy
 from interface_chat import install as install_interface_chat
 from deliberation_tasks import install as install_deliberation_tasks
 from curiosity_search import install as install_curiosity_search
+from epistemic_search_bridge import install as install_epistemic_search_bridge
 from core_observer import install as install_core_observer
 from autonomous_hive import install as install_autonomous_hive
 from self_assessment import install as install_self_assessment
@@ -89,7 +90,7 @@ async def _stop_local_core_cycle(): janus_sleep_cycle.stop()
 @app.get('/desktop/runtime-cores',tags=['desktop'])
 def desktop_runtime_cores(username:str|None=Query(default=None)):
     runtime=janus_sleep_cycle.status()
-    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':runtime,'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','curiosity_web_enabled':os.environ.get('JANUS_CURIOSITY_WEB','1')=='1','curiosity_daily_search_cap':int(os.environ.get('JANUS_CURIOSITY_DAILY_SEARCH_CAP','4')),'hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'rest_background_seconds':runtime.get('rest_background_seconds',30),'core_cycle_api_calls':0,'note':'The interface remains continuously available. Local/server core cycles are deterministic and zero-API; occasional bounded web curiosity is separate, inspectable, cached in memory, and budget-capped.'}
+    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':runtime,'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','curiosity_web_enabled':os.environ.get('JANUS_CURIOSITY_WEB','1')=='1','curiosity_daily_search_cap':int(os.environ.get('JANUS_CURIOSITY_DAILY_SEARCH_CAP','4')),'hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'rest_background_seconds':runtime.get('rest_background_seconds',30),'core_cycle_api_calls':0,'note':'The interface remains continuously available. Local/server core cycles are deterministic and zero-API; occasional bounded web curiosity is separate, inspectable, cached in memory, and budget-capped. Self-assessment may temporarily rebalance work toward fresh grounding and request a bounded relevant search when epistemic productivity falls.'}
 
 @app.get('/desktop/messages',tags=['desktop'])
 def desktop_messages(username:str=Query(...),limit:int=Query(default=50,ge=1,le=100),include_dismissed:bool=Query(default=False)):
@@ -133,4 +134,5 @@ app.include_router(auth_router); app.include_router(account_deletion_router); ap
 install_interface_chat(app)
 install_deliberation_tasks(app)
 install_curiosity_search(app)
+install_epistemic_search_bridge(app)
 install_runtime_messaging(app); install_secure_desktop(app); install_retention(app)
