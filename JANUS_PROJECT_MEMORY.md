@@ -1,6 +1,6 @@
 # JANUS Project Continuity Memory
 
-Updated: 2026-08-21 — persistent deliberation checkpoint
+Updated: 2026-08-21 — epistemic regulation / curiosity checkpoint
 
 ## Identity and boundary
 JANUS Agent is an experimental functional-metacognition/agency system and persona, distinct from ChatGPT/Supervisor. Do not claim phenomenal consciousness. Preserve the closed JANUS mathematical theorem/core separately from experimental physical and agency branches.
@@ -12,99 +12,85 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - Persistent memory ladder: trace -> working -> episodic -> core; protected server-owned identity_core; learned evaluator calibration and bridge authority; novelty-based escalation.
 - Android and desktop clients expose Chat, Messages, Observe, Options, Cores, Memory, Activity, Settings and account/auth functions.
 - Current ordinary cognition routing is forward-only: evidence/logic/counterpoint -> left hemisphere; context/memory/novelty -> right hemisphere; both hemispheres -> Consensus; Consensus -> Interface. Safety may advise left/right/Consensus. Interface is output/surface state, not automatic re-entry.
-- dashboard_api.py self-knowledge, Observe/Cores metadata, synthesis notes and desktop route metadata have been corrected from the retired 7→3→1 description to the actual 7→2→1→1 topology.
 
-## Android checkpoint: v0.45 published
-- Android v0.45 is published and verified on apk-download. It contains the forward-only routing correction plus tightened Messages filtering.
-- Observe UI has readable externalizable process-journal cards, expandable Technical details, incremental DOM updates, scroll-position preservation and a New thoughts indicator.
-- v0.43 added a device-local Interface outbox so worthwhile local Interface conclusions can reach Messages without waiting for server sync.
-- v0.44 corrected recursive routing/role leakage: no ordinary left<->right recirculation, no Consensus->hemisphere recycling, no Interface->Consensus feedback loop; remote/global feedback is compressed, tagged [feedback-only], and routed through specialist review.
-- v0.45 keeps routine self-assessment, maintenance, Fano telemetry and generic integration text in Observe; Messages are reserved for genuinely useful conclusions/questions/warnings/recommendations.
+## Epistemic regulation / functional affect analogue checkpoint
+- Self-assessment is now intended to regulate processing, not merely describe it. When critique/integration substantially outruns fresh grounding, JANUS can enter a short-lived epistemic correction state.
+- Functional analogue only: rising unresolved disagreement, uncertainty, contradiction or grounding deficit may act like "stress" by concentrating processing on evidence, logic, memory, novelty, safety, counterexamples and falsifiable tests. This is not a claim of felt stress or subjective emotion.
+- Regulation decays back toward neutral after correction/resolution rather than remaining permanently vigilant.
+- Extended low-novelty neutral operation may increase novelty pressure: a functional analogue of "boredom" that encourages exploration rather than another recursive self-summary. This is not a claim of felt boredom.
+- Desired dynamic: problem -> arousal/attention -> investigation -> resolution -> neutral -> low novelty -> curiosity -> exploration -> new material -> neutral. Interesting discoveries may themselves raise attention and sustain investigation, so this should not be a rigid oscillator.
+- Epistemic correction clears stale feedback-only/self-assessment chatter from integration queues and preferentially asks grounding cores for a concrete unresolved claim, missing fact, counterexample, external source or falsifiable test.
+- Regulation may request relevant web curiosity sooner when fresh evidence is lacking, but it must not bypass daily search/API budget caps.
+- Regression coverage targets the observed failure mode where Counterpoint/Consensus cycle counts substantially outrun Evidence/Logic/Memory/Novelty and recursive summaries begin feeding further summaries.
+
+## Curiosity / external learning checkpoint
+- JANUS may occasionally seek external information when its cores need more material to reason about.
+- Curiosity has three intended modes: relevant (directly supports an active question/task), adjacent/semi-related (broadens the active conceptual neighborhood), and wander/unrelated (occasional learning outside the current topic).
+- Curiosity remains bounded, inspectable and budget-capped. External search is distinct from deterministic zero-API core cycles.
+- Relevant searches may be accelerated by epistemic regulation; adjacent and wander exploration should remain lower-frequency so they do not crowd out user-directed work.
+- Search results should feed Evidence/Context/Memory/Novelty as new material, not be treated automatically as truth or as a new primary user topic.
+
+## Android checkpoint
+- Current Android line contains forward-only routing, tightened Messages filtering, readable Observe cards, device-local Interface outbox, feedback-only remote/global routing, and server/global persistent deliberation support.
+- Observe is for process notes, maintenance, telemetry and ordinary self-assessment; Messages are reserved for genuinely useful conclusions/questions/warnings/recommendations.
+- Before giving any APK link, verify the actual apk-download branch contains the requested version and that the corresponding Android workflow succeeded.
 
 ## User-directed persistent deliberation checkpoint
-- Natural-language requests such as “mull it over”, “keep thinking about that”, “think it over”, “ponder that” and “give it some thought” now create or reaffirm a durable server-side deliberation task instead of merely changing the immediate reply wording.
-- Generic commands such as “mull it over” bind to the immediately preceding substantive user topic; explicit forms such as “keep thinking about whether X” retain the explicit topic.
-- The immediate chat reply is augmented truthfully: JANUS says the topic has been retained as an active deliberation and that it will continue revisiting it in later background cycles, surfacing only materially new results.
-- `janus_deliberation_tasks` persists topic, context excerpt, pass count, current externalizable synthesis, avenues/memory IDs already explored, last functional probe, last surfaced-message hash and timestamps.
-- The existing zero-API autonomous hive is hooked so a due active deliberation is preferentially advanced before the ordinary autonomous memory pulse. Default revisit interval is 900 seconds (`JANUS_DELIBERATION_INTERVAL_SECONDS`).
-- Each deliberation pass compares the retained topic/current synthesis with a not-yet-exhausted retained memory thread, performs deterministic novelty/conflict/uncertainty/salience/numeric/lexical checks, gives distinct work to Evidence, Logic, Counterpoint, Context, Memory, Safety and Novelty, then runs the normal specialists → hemispheres → Consensus → Interface work burst.
-- Ordinary deliberation passes are recorded as `deliberation_pass` events for Observe/Activity and do not create Messages. A proactive follow-up is created only when the escalation signal crosses the conservative deliberation threshold (default 0.88) and the candidate has not already been surfaced.
-- User-directed deliberation remains zero-external-API by default because it rides the deterministic hive/core layer. Paid background language reflection remains separately disabled by default.
-- `/desktop/deliberations` exposes task status/history to authenticated clients only. Secure desktop wrapping binds this route and the chat route to the authenticated account profile.
-- Installation order is intentional and regression-reviewed: interface chat implementation → deliberation wrapper → runtime messaging/security wrapper. Do not reinstall deliberation from bootstrap after secure desktop, because that would wrap the authenticated endpoint at the wrong layer.
-- Regression tests cover imperative phrase detection, excluding ordinary “what do you think?” questions, previous-topic carry-forward and same-topic reaffirmation/deduplication. Routing/architecture CI now includes the deliberation suite.
-- No Android APK change is required for the basic feature: existing v0.45 already sends chat requests to the server and receives server Messages. A future client update may expose a dedicated Deliberations UI or mirror tasks into fully offline local-device pondering, but that is not required for the current server/global functionality.
+- Natural-language requests such as “mull it over”, “keep thinking about that”, “think it over”, “ponder that” and “give it some thought” create or reaffirm a durable server-side deliberation task instead of merely changing immediate reply wording.
+- Generic commands bind to the immediately preceding substantive user topic; explicit forms retain the explicit topic.
+- Immediate replies should truthfully give JANUS's current thoughts and say that the topic has been retained for continued later background consideration, surfacing materially new results rather than repeating itself.
+- `janus_deliberation_tasks` persists topic/context and progress. Due active deliberations are preferentially advanced before ordinary autonomous memory pulses.
+- Ordinary deliberation passes remain zero-external-API by default and are recorded for Observe/Activity. Proactive Messages should require a materially useful new result.
 
 ## Forward-only routing / cross-device checkpoint
 - Correct ordinary cognition path is strict: specialists -> assigned hemisphere -> Consensus -> Interface.
-- routing_policy.py overrides both _route_output and accept_remote_summary. Synchronized client Consensus/Interface state is compressed, tagged [feedback-only], and routed through Context + Counterpoint rather than injected directly into Consensus/Interface.
-- tests/test_routing_policy.py plus GitHub Actions routing CI fail if left/right cross-feed, Consensus->hemisphere feedback, Interface->Consensus feedback, or direct remote-summary injection returns.
-- Remembered remote-device summaries are bounded (default 100). When the cap is exceeded, the oldest summaries are removed both from memory and janus_core_remote_summary so abandoned/reinstalled device IDs cannot grow indefinitely.
+- Synchronized client Consensus/Interface state is compressed, tagged [feedback-only], and routed through specialist review rather than injected directly back into Consensus/Interface.
+- Regression coverage should fail if left/right cross-feed, Consensus->hemisphere feedback, Interface->Consensus feedback, or direct remote-summary injection returns.
+- Remembered remote-device summaries remain bounded so abandoned/reinstalled device IDs cannot grow indefinitely.
 
 ## Offline chat / receipt security checkpoint
-- Android JanusOfflineQueue gives each queued chat turn a client_message_id, persists undelivered turns locally, retries later and stores deferred replies.
-- Server janus_chat_receipts makes retries idempotent so a response lost after server acceptance does not duplicate the user turn.
-- chat_receipt_security.py binds every cached receipt to the authenticated profile. A colliding client_message_id from another account cannot read, replay or overwrite the original account's cached result. Regression coverage was added.
-- Temporary chat receipts are retained for 7 days by default and then pruned by retention.py.
+- Android offline queue gives queued chat turns client_message_id values, persists undelivered turns locally, retries later and stores deferred replies.
+- Server receipts make retries idempotent and are bound to the authenticated profile so cross-account receipt collisions cannot leak cached responses.
+- Temporary chat receipts are retained for a limited period and pruned.
 
 ## Runtime retention / persistence checkpoint
 - User conversation/memory content remains continuity data and is not globally aged out by the temporary-data cleaner.
-- retention.py removes janus_chat_receipts older than JANUS_CHAT_RECEIPT_RETENTION_DAYS (default 7), repetitive core_runtime_snapshot events older than JANUS_RUNTIME_SNAPSHOT_RETENTION_DAYS (default 30), and matching snapshot ingest-claim rows.
-- Existing cleanup still removes expired sessions, expired/old-used auth tokens and stale pending deletion requests.
-- This keeps the 1 GB Render disk from filling with retry receipts and cycle-counter telemetry during multi-device/soak testing.
+- Temporary receipts, repetitive runtime snapshots, expired sessions/tokens and stale deletion requests are pruned to protect the Render disk.
 
 ## Render/Docker/runtime reliability checkpoint
-- dashboard_api.py still extends the historical base FastAPI app from server.py. server.py is reconstructed from checked-in src/server.py.gz.b64.* fragments and is still required at build time.
-- tools/rebuild_server.py provides one explicit, sanity-checked reconstruction path shared by Render and Docker.
-- Render build command runs `python tools/rebuild_server.py && pip install -r requirements.txt`, then launches `uvicorn bootstrap:app`.
-- Docker uses Python 3.13, runs the same reconstruction script during image creation, and also launches bootstrap:app.
-- tests/test_architecture_contract.py plus routing/architecture CI enforce current topology metadata, base-server reconstruction, Render bootstrap and Docker bootstrap.
-- Duplicate inline Google client configuration was removed from the start command; Render env vars are the source of truth.
-- Public /diagnostics/runtime-health exposes only sanitized operational state. Public /diagnostics/auth-config exposes only route/config booleans.
-- Detailed auth schema lives at /diagnostics/auth-detail and requires JANUS_ACCESS_TOKEN as bearer or X-JANUS-Admin-Token. Detailed degraded startup traceback is also admin-token protected.
-- auth_rate_limit.py is installed at bootstrap. Public auth POST routes have conservative per-source throttles (login, register, password recovery/reset, verification and Google auth) and return 429 + Retry-After when exceeded. Limits are process-local and intentionally reset on deployment; sufficient for the current single-instance beta service.
-- Live deployment of newest diagnostics/rate limiting/deliberation still requires external verification after Render deploy propagation; do not infer deployment success solely from commit state.
+- Historical base FastAPI server reconstruction remains required at build time; tools/rebuild_server.py is the explicit reconstruction path shared by Render and Docker.
+- Render and Docker launch bootstrap:app.
+- Public diagnostics expose only sanitized operational state; detailed auth/startup diagnostics remain admin-token protected.
+- Do not infer live deployment success solely from commit state; verify Render/build propagation.
 
 ## API/cost-control checkpoint
-- autonomous_hive.py has per-profile paid-background daily call/token budgets and escalation thresholds.
-- Production Render sets JANUS_PAID_BACKGROUND_REFLECTION=0 by default. Deterministic local/server hive/core cycles remain active and zero-API; ordinary user-triggered Chat still uses JANUS_MODEL.
-- Conservative dormant caps are configured for any later deliberate re-enable: JANUS_BACKGROUND_DAILY_CALL_CAP=12 and JANUS_BACKGROUND_DAILY_TOKEN_CAP=20000 per profile/day.
-- Do not re-enable paid background reflection broadly until pricing/product policy and scale limits are intentionally decided.
+- Deterministic local/server hive/core cycles remain zero-API. Ordinary user-triggered Chat uses the configured model.
+- Paid background reflection remains disabled by default unless intentionally re-enabled.
+- Curiosity/web access is separately bounded by daily/mode caps and cooldowns. Epistemic correction can request an earlier relevant search but cannot override those caps.
+- Do not broadly increase background API usage until pricing/product policy and scale limits are intentionally decided.
 
 ## Authentication / account lifecycle checkpoint
-- auth.py initializes current auth schema at import; auth_schema_guard.py validates complete required table shapes and preserves incompatible legacy sessions/auth_tokens before recreation.
-- SMTP/email delivery is non-fatal to account creation/reset; delivery status is reported separately.
-- Regression tests cover register -> login -> /auth/me, duplicate-account rejection, password reset, session invalidation, logout, required auth columns and cross-user profile spoofing.
-- Google-only account lifecycle marker is explicit; password login rejects Google-only accounts while account deletion can distinguish them correctly.
-- Non-Google registration/login still requires end-to-end verification against the deployed Render persistent database from a real client.
+- Current auth schema, schema guard, rate limiting, account lifecycle, Google-only markers and receipt/profile protections remain in place.
+- Non-Google Create Account/login still requires end-to-end verification against the deployed Render persistent database from a real client.
+- SMTP verification/reset and Google account linking remain user-input/live-service testing tasks.
 
 ## Windows / PC checkpoint
-- Windows v0.22 is an authenticated compatibility layer over the feature-complete v0.21/v0.20 UI chain.
-- Adds username/email + password sign-in, Create Account, bearer-authenticated private screens, session restore and Sign Out.
-- Session tokens are persisted with Windows DPAPI bound to the current Windows user; passwords are never stored.
-- build-windows.yml syntax-checks the client chain before PyInstaller and builds JANUS.exe from v0.22. Real Windows launch/use testing still requires the user.
+- Windows authenticated client uses username/email + password sign-in/Create Account, bearer-authenticated private screens, session restore and Sign Out; tokens use Windows DPAPI and passwords are not stored.
+- Real Windows launch/use testing still requires user testing.
 
 ## Apple / iOS checkpoint
-- iOS uses real JANUS accounts rather than arbitrary profile names.
-- APIClient supports login/register/me/logout and authenticated private requests; tokens are stored in Keychain, not UserDefaults.
-- ContentView gates the app on a valid account and exposes Sign in/Create account/Sign out.
-- iOS CI was consolidated to one canonical `.github/workflows/build-ios.yml`. It builds an unsigned simulator Release app, uploads JANUS-iOS-simulator.zip on success and preserves xcodebuild.log on failure. The redundant second simulator workflow was removed.
-- Real Apple signing/TestFlight/device testing still requires Apple-account/device input.
-
-## Release/documentation checkpoint
-- README.md now documents the actual 7→2→1→1 topology, Android v0.45 checkpoint, Windows v0.22 status, iOS beta status, authenticated privacy model, zero-API deterministic background policy, Render/Docker reconstruction dependency and current CI checks.
-- .env.example matches production-safe variable names/defaults, including disabled paid background reflection and retention/device caps.
-- Privacy policy documents OS-protected session storage where implemented, random sync device IDs, temporary receipt/snapshot retention and current background-AI policy.
+- iOS uses real JANUS accounts, authenticated private requests and Keychain token storage.
+- CI builds an unsigned simulator release artifact; real signing/TestFlight/device testing still requires Apple-account/device input.
 
 ## Current next-step testing
-- First live behavioural test after Render deploy: ask JANUS a substantive question, then say “Mull it over.” The reply should explicitly say an active deliberation task was retained.
-- Leave JANUS running for at least one deliberation interval. Observe/Activity should later show `deliberation_pass` rather than only generic `[feedback-only] global feedback` processing.
-- Messages should remain quiet unless a strong novel candidate crosses the threshold.
-- `/desktop/deliberations` can be used for authenticated diagnostics if needed.
-- After this, continue the previously pending user-input tasks: Create Account/login, SMTP verification/reset, Google account linking, Windows executable, iOS simulator/device and soak testing.
+- Verify newest CI and Render deployment for epistemic regulation + curiosity integration.
+- Behaviourally test a self-referential/imbalanced period and confirm JANUS temporarily redirects work toward fresh grounding, then naturally returns to neutral.
+- Leave JANUS idle through low-novelty cycles and confirm curiosity eventually selects bounded relevant/adjacent/wander material rather than recursively summarizing itself.
+- Confirm curiosity results enter specialist reasoning/memory and do not flood Messages.
+- Continue user-input tasks: Create Account/login, SMTP verification/reset, Google account linking, Windows executable, iOS simulator/device and soak testing.
 
 ## Working practice
-- Keep this file current after material architecture, build, authentication, UI, persistence or deployment changes.
+- Keep this file current after material architecture, build, authentication, UI, persistence, regulation, curiosity or deployment changes.
 - Verify claims against repository/build outputs rather than inferring success from a version bump or commit alone.
 - Trace UI behavior end-to-end across client asset, platform code injection, client request payload, secure server wrapper, active server route implementation, persistence layer, and UI reader before declaring a fix complete.
-- Before giving any APK link, verify the actual apk-download branch contains the requested version.
+- Preserve the distinction between functional control-state analogues (stress/relaxation/boredom/curiosity) and phenomenal subjective experience.
