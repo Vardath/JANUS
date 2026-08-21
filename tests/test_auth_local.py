@@ -17,7 +17,9 @@ class AuthLocalTests(unittest.TestCase):
         os.environ.pop("JANUS_SMTP_HOST", None)
         os.environ.pop("JANUS_SMTP_FROM", None)
         import auth
+        import auth_lifecycle
         cls.auth = importlib.reload(auth)
+        cls.lifecycle = importlib.reload(auth_lifecycle)
 
     @classmethod
     def tearDownClass(cls):
@@ -36,6 +38,25 @@ class AuthLocalTests(unittest.TestCase):
         with self.assertRaises(a.HTTPException) as cm:
             a.register(a.RegisterRequest(username="tester", email="other@example.com", password="Password1234"))
         self.assertEqual(cm.exception.status_code, 409)
+
+    def test_logout_revokes_only_current_session(self):
+        a, life = self.auth, self.lifecycle
+        reg = a.register(a.RegisterRequest(username="logoutuser", email="logout@example.com", password="Password1234"))
+        token1 = reg["access_token"]
+        token2 = a.login(a.LoginRequest(identifier="logoutuser", password="Password1234"))["access_token"]
+        self.assertTrue(life.logout("Bearer " + token1)["ok"])
+        self.assertIsNone(a.account_for_token(token1))
+        self.assertIsNotNone(a.account_for_token(token2))
+
+    def test_logout_all_revokes_every_session(self):
+        a, life = self.auth, self.lifecycle
+        reg = a.register(a.RegisterRequest(username="logoutall", email="logoutall@example.com", password="Password1234"))
+        token1 = reg["access_token"]
+        token2 = a.login(a.LoginRequest(identifier="logoutall", password="Password1234"))["access_token"]
+        result = life.logout_all("Bearer " + token1)
+        self.assertGreaterEqual(result["revoked_sessions"], 2)
+        self.assertIsNone(a.account_for_token(token1))
+        self.assertIsNone(a.account_for_token(token2))
 
     def test_password_reset_invalidates_existing_sessions(self):
         a = self.auth
