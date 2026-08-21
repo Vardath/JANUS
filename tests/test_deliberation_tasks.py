@@ -15,6 +15,10 @@ class DeliberationTaskTests(unittest.TestCase):
         os.environ["JANUS_DB_PATH"] = cls.db_path
         import deliberation_tasks
         cls.d = importlib.reload(deliberation_tasks)
+        # Initialize the production-owned deliberation schema before individual
+        # tests clear table contents. This keeps the fixture aligned with the
+        # real module instead of duplicating that schema here.
+        cls.d._db().close()
         with sqlite3.connect(cls.db_path) as c:
             c.executescript(
                 """
