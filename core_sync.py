@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 import auth
 from src.janus_sleep_cycle import janus_sleep_cycle
 from core_observer import ingest_remote_events, record_remote_snapshot
+from core_activity_bridge import ingest_profile_core_activity
 
 router = APIRouter(prefix="/core-sync", tags=["core-sync"])
 
@@ -40,14 +41,25 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
     device_key = f"acct-{account['id']}:{summary.device_id}"
     data=summary.model_dump()
     janus_sleep_cycle.accept_remote_summary(device_key, data)
+
+    # Three coordinated persistence layers:
+    # 1) detailed Observe journal,
+    # 2) idempotent per-core runtime snapshots,
+    # 3) normal profile Activity/Memory so JANUS itself and the UI see the same evidence.
     observed=ingest_remote_events(device_key, data.get("observe_events") or [], profile_id=profile_id)
     snapshots=record_remote_snapshot(device_key, data, profile_id=profile_id)
+    profile_records=ingest_profile_core_activity(profile_id, device_key, data)
+
     return {
         "ok": True,
         "server": janus_sleep_cycle.compact_summary(),
         "account_id": int(account["id"]),
+        "profile_id": profile_id,
         "observed_events_received": observed,
         "runtime_snapshots_recorded": snapshots,
+        "profile_activity_recorded": int(profile_records.get("activity", 0)),
+        "profile_memory_recorded": int(profile_records.get("memory", 0)),
+        "profile_snapshots_recorded": int(profile_records.get("snapshots", 0)),
     }
 
 
