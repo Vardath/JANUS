@@ -20,6 +20,7 @@ from interface_chat import install as install_interface_chat
 from deliberation_tasks import install as install_deliberation_tasks
 from curiosity_search import install as install_curiosity_search
 from epistemic_search_bridge import install as install_epistemic_search_bridge
+from saturation_regulation import install as install_saturation_regulation
 from core_observer import install as install_core_observer
 from autonomous_hive import install as install_autonomous_hive
 from self_assessment import install as install_self_assessment
@@ -27,8 +28,6 @@ from server_low_duty import install as install_server_low_duty
 from routing_policy import install as install_routing_policy
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
-# The autonomous hive owns background cognition now. Keep the older dashboard
-# reflection loop off unless explicitly re-enabled, avoiding duplicate paid calls.
 os.environ.setdefault("JANUS_SELF_EVALUATION", "0")
 janus_sleep_cycle.wake_seconds = max(10, int(os.environ.get("JANUS_WAKE_SECONDS", "300")))
 janus_sleep_cycle.sleep_seconds = max(10, int(os.environ.get("JANUS_SLEEP_SECONDS", "600")))
@@ -38,6 +37,7 @@ install_routing_policy(janus_sleep_cycle)
 install_core_observer(app, janus_sleep_cycle)
 install_autonomous_hive(app)
 install_self_assessment(app)
+install_saturation_regulation(app)
 
 def _connect():
     c=sqlite3.connect(DB_PATH,timeout=10); c.row_factory=sqlite3.Row
@@ -90,7 +90,7 @@ async def _stop_local_core_cycle(): janus_sleep_cycle.stop()
 @app.get('/desktop/runtime-cores',tags=['desktop'])
 def desktop_runtime_cores(username:str|None=Query(default=None)):
     runtime=janus_sleep_cycle.status()
-    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':runtime,'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','curiosity_web_enabled':os.environ.get('JANUS_CURIOSITY_WEB','1')=='1','curiosity_daily_search_cap':int(os.environ.get('JANUS_CURIOSITY_DAILY_SEARCH_CAP','4')),'hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'rest_background_seconds':runtime.get('rest_background_seconds',30),'core_cycle_api_calls':0,'note':'The interface remains continuously available. Local/server core cycles are deterministic and zero-API; occasional bounded web curiosity is separate, inspectable, cached in memory, and budget-capped. Self-assessment may temporarily rebalance work toward fresh grounding and request a bounded relevant search when epistemic productivity falls.'}
+    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':runtime,'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','curiosity_web_enabled':os.environ.get('JANUS_CURIOSITY_WEB','1')=='1','curiosity_daily_search_cap':int(os.environ.get('JANUS_CURIOSITY_DAILY_SEARCH_CAP','4')),'hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'rest_background_seconds':runtime.get('rest_background_seconds',30),'core_cycle_api_calls':0,'note':'The interface remains continuously available. Local/server core cycles are deterministic and zero-API; occasional bounded web curiosity is separate, inspectable, cached in memory, and budget-capped. Self-assessment can now execute saturation escape: retain a checkpoint, suppress recursive churn, redirect grounding, and request bounded relevant search when needed.'}
 
 @app.get('/desktop/messages',tags=['desktop'])
 def desktop_messages(username:str=Query(...),limit:int=Query(default=50,ge=1,le=100),include_dismissed:bool=Query(default=False)):
