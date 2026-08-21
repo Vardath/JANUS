@@ -1,9 +1,11 @@
+import asyncio
 import importlib
 import os
 import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 
 def _fresh(tmp: Path):
@@ -51,10 +53,28 @@ class ImageGenerationPolicyTests(unittest.TestCase):
             account = _account(auth)
             ok, reason = mod._budget_check(int(account["id"]), "auto", int(time.time()))
             self.assertTrue(ok, reason)
-            mod._store_image(int(account["id"]), "first explanatory visual", "low", "1024x1024", "auto", b"fake-png-one")
+            mod._store_image(int(account["id"]), "first explanatory visual", "medium", "1024x1024", "auto", b"fake-png-one")
             ok, reason = mod._budget_check(int(account["id"]), "auto", int(time.time()))
             self.assertFalse(ok)
             self.assertIn("automatic-image", reason)
+
+    def test_janus_nominated_explanatory_image_uses_medium_quality(self):
+        with tempfile.TemporaryDirectory() as td:
+            auth, mod = _fresh(Path(td))
+            _account(auth)
+            fake_result = {"generated": True, "image": {"quality": "medium"}}
+            with patch.object(mod, "generate_for_account", new=AsyncMock(return_value=fake_result)) as generate:
+                clean, result = asyncio.run(
+                    mod.maybe_generate_for_chat(
+                        "imageuser",
+                        "Explain the topology in words",
+                        "Here is the explanation. [[JANUS_VISUAL: a clear topology diagram]]",
+                    )
+                )
+            self.assertEqual(clean, "Here is the explanation.")
+            self.assertEqual(result, fake_result)
+            self.assertEqual(generate.await_args.kwargs["origin"], "auto")
+            self.assertEqual(generate.await_args.kwargs["quality"], "medium")
 
     def test_same_prompt_is_cacheable_without_another_render(self):
         with tempfile.TemporaryDirectory() as td:
