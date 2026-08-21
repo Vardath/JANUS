@@ -7,6 +7,10 @@ on:
     paths:
       - 'ios/**'
       - '.github/workflows/build-ios.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/build-ios.yml'
 
 permissions:
   contents: read
@@ -51,7 +55,7 @@ jobs:
       - name: Upload simulator app
         uses: actions/upload-artifact@v4
         with:
-          name: JANUS-iOS-simulator
+          name: JANUS-iOS-simulator-v0.2
           path: artifacts/JANUS-iOS-simulator.zip
           if-no-files-found: error
 
