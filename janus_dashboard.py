@@ -17,6 +17,7 @@ from core_sync import router as core_sync_router
 from src.janus_sleep_cycle import janus_sleep_cycle
 from interface_runtime_policy import install as install_interface_runtime_policy
 from interface_chat import install as install_interface_chat
+from deliberation_tasks import install as install_deliberation_tasks
 from core_observer import install as install_core_observer
 from autonomous_hive import install as install_autonomous_hive
 from self_assessment import install as install_self_assessment
@@ -129,4 +130,5 @@ def google_auth_android_compat(req: GoogleRequest):
 
 app.include_router(auth_router); app.include_router(account_deletion_router); app.include_router(privacy_policy_router); app.include_router(terms_router); app.include_router(ai_reports_router); app.include_router(core_sync_router)
 install_interface_chat(app)
+install_deliberation_tasks(app)
 install_runtime_messaging(app); install_secure_desktop(app); install_retention(app)
