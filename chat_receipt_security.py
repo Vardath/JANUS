@@ -12,6 +12,8 @@ import json
 import time
 from typing import Any
 
+from fastapi import HTTPException
+
 
 def install(interface_chat_module) -> None:
     if getattr(interface_chat_module, "_profile_receipt_guard_installed", False):
@@ -31,7 +33,7 @@ def install(interface_chat_module) -> None:
                 stored_profile = str(row["profile_id"] or "")
                 if stored_profile != profile:
                     # Never reveal or overwrite another account's cached result.
-                    return "profile_collision"
+                    raise HTTPException(409, "client_message_id already belongs to another account")
                 if row["status"] == "done" and row["response_json"]:
                     try:
                         return json.loads(row["response_json"])
@@ -60,7 +62,6 @@ def install(interface_chat_module) -> None:
                 (client_message_id,),
             ).fetchone()
             if row and str(row["profile_id"] or "") != profile:
-                # A colliding ID owned by another account must remain untouched.
                 return
             if row:
                 c.execute(
