@@ -22,9 +22,22 @@ struct MeResponse: Decodable {
     var account: Account
 }
 
+struct GeneratedImage: Decodable {
+    var id: String?
+    var file_id: String
+    var mime_type: String?
+    var size_bytes: Int?
+    var quality: String?
+    var size: String?
+    var origin: String?
+    var model: String?
+    var download_path: String
+}
+
 struct ChatResponse: Decodable {
     var reply: String?
     var response: String?
+    var generated_image: GeneratedImage?
 }
 
 struct MessageListResponse: Decodable {
