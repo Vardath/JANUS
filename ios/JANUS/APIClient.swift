@@ -4,19 +4,55 @@ import Foundation
 final class APIClient: ObservableObject {
     let baseURL = URL(string: "https://janus-global-core.onrender.com")!
     @Published var status: String = "Dormant"
+    @Published var accessToken: String = UserDefaults.standard.string(forKey: "janusAccessToken") ?? ""
 
-    private let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        return d
-    }()
+    private let decoder = JSONDecoder()
 
     func health() async {
         do {
-            _ = try await request(path: "/health", method: "GET", body: Optional<[String: String]>.none) as Data
+            _ = try await request(path: "/health", method: "GET", body: Optional<[String: String]>.none, authenticated: false) as Data
             status = "Active"
         } catch {
             status = "Dormant"
         }
+    }
+
+    func login(identifier: String, password: String) async throws -> AuthResponse {
+        let response: AuthResponse = try await request(
+            path: "/auth/login",
+            method: "POST",
+            body: ["identifier": identifier, "password": password],
+            authenticated: false
+        )
+        if let token = response.access_token {
+            setToken(token)
+        }
+        return response
+    }
+
+    func register(username: String, email: String, password: String) async throws -> AuthResponse {
+        let response: AuthResponse = try await request(
+            path: "/auth/register",
+            method: "POST",
+            body: ["username": username, "email": email, "password": password],
+            authenticated: false
+        )
+        if let token = response.access_token {
+            setToken(token)
+        }
+        return response
+    }
+
+    func me() async throws -> Account {
+        let response: MeResponse = try await request(path: "/auth/me", method: "GET", body: Optional<[String: String]>.none)
+        return response.account
+    }
+
+    func logout() async {
+        if !accessToken.isEmpty {
+            _ = try? await request(path: "/auth/logout", method: "POST", body: [String: String]()) as Data
+        }
+        setToken("")
     }
 
     func chat(profile: String, message: String) async throws -> String {
@@ -53,11 +89,28 @@ final class APIClient: ObservableObject {
         return response.items ?? []
     }
 
-    private func request<T: Decodable, B: Encodable>(path: String, method: String, body: B?) async throws -> T {
+    private func setToken(_ token: String) {
+        accessToken = token
+        if token.isEmpty {
+            UserDefaults.standard.removeObject(forKey: "janusAccessToken")
+        } else {
+            UserDefaults.standard.set(token, forKey: "janusAccessToken")
+        }
+    }
+
+    private func request<T: Decodable, B: Encodable>(
+        path: String,
+        method: String,
+        body: B?,
+        authenticated: Bool = true
+    ) async throws -> T {
         status = "Syncing"
         var request = URLRequest(url: baseURL.appendingPath(path))
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if authenticated, !accessToken.isEmpty {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(body)
