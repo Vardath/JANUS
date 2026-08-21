@@ -1,9 +1,81 @@
+import base64
+import ctypes
+import os
 import tkinter as tk
+from ctypes import wintypes
 from tkinter import ttk, messagebox
 
 import janus_client_v021 as v021
 
 APP_NAME = "JANUS - Global 7-2-1-1 v0.22"
+
+
+class DATA_BLOB(ctypes.Structure):
+    _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_byte))]
+
+
+def _blob(data: bytes):
+    buf = ctypes.create_string_buffer(data)
+    return DATA_BLOB(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_byte))), buf
+
+
+def protect_session_token(token: str) -> str:
+    """Protect a JANUS bearer token to the current Windows user using DPAPI."""
+    if not token:
+        return ""
+    if os.name != "nt":
+        return ""  # never persist a raw token on unsupported platforms
+    try:
+        in_blob, keep = _blob(token.encode("utf-8"))
+        out_blob = DATA_BLOB()
+        crypt32 = ctypes.windll.crypt32
+        kernel32 = ctypes.windll.kernel32
+        ok = crypt32.CryptProtectData(
+            ctypes.byref(in_blob),
+            "JANUS session",
+            None,
+            None,
+            None,
+            0,
+            ctypes.byref(out_blob),
+        )
+        if not ok:
+            return ""
+        try:
+            raw = ctypes.string_at(out_blob.pbData, out_blob.cbData)
+            return base64.b64encode(raw).decode("ascii")
+        finally:
+            kernel32.LocalFree(out_blob.pbData)
+    except Exception:
+        return ""
+
+
+def unprotect_session_token(value: str) -> str:
+    if not value or os.name != "nt":
+        return ""
+    try:
+        raw = base64.b64decode(value.encode("ascii"), validate=True)
+        in_blob, keep = _blob(raw)
+        out_blob = DATA_BLOB()
+        crypt32 = ctypes.windll.crypt32
+        kernel32 = ctypes.windll.kernel32
+        ok = crypt32.CryptUnprotectData(
+            ctypes.byref(in_blob),
+            None,
+            None,
+            None,
+            None,
+            0,
+            ctypes.byref(out_blob),
+        )
+        if not ok:
+            return ""
+        try:
+            return ctypes.string_at(out_blob.pbData, out_blob.cbData).decode("utf-8")
+        finally:
+            kernel32.LocalFree(out_blob.pbData)
+    except Exception:
+        return ""
 
 
 class AuthAPI(v021.API):
@@ -12,8 +84,6 @@ class AuthAPI(v021.API):
         self.token = token or ""
 
     def call(self, method, path, payload=None, timeout=120):
-        # v0.20's API.call has no auth header support, so reproduce its tiny
-        # transport here while preserving the same return/error behavior.
         import json
         from urllib import request, error
         data = None if payload is None else json.dumps(payload).encode("utf-8")
@@ -46,7 +116,6 @@ class AuthAPI(v021.API):
         return self.call("POST", "/auth/logout", {}, timeout=30)
 
 
-# v0.21 ultimately instantiates base.API inside the inherited constructor.
 v021.base.API = AuthAPI
 
 
@@ -54,7 +123,17 @@ class App(v021.App):
     def __init__(self):
         super().__init__()
         self.title(APP_NAME)
-        self.api.token = str(self.cfg.get("access_token") or "")
+        # Migrate any short-lived plaintext v0.22 development token once, then
+        # remove it. Production persistence uses DPAPI ciphertext only.
+        legacy = str(self.cfg.pop("access_token", "") or "")
+        protected = str(self.cfg.get("session_protected") or "")
+        restored = unprotect_session_token(protected)
+        self.api.token = restored or legacy
+        if legacy:
+            encrypted = protect_session_token(legacy)
+            if encrypted:
+                self.cfg["session_protected"] = encrypted
+            v021.base.save_cfg(self.cfg)
         if self.api.token:
             self.after(120, self.resume_saved_session)
 
@@ -102,6 +181,15 @@ class App(v021.App):
         ttk.Label(box, textvariable=self.login_status, wraplength=440).pack(anchor="w", pady=(12, 0))
         ident.focus_set()
 
+    def _save_session(self, token: str):
+        self.cfg.pop("access_token", None)
+        protected = protect_session_token(token)
+        if protected:
+            self.cfg["session_protected"] = protected
+        else:
+            self.cfg.pop("session_protected", None)
+        v021.base.save_cfg(self.cfg)
+
     def resume_saved_session(self):
         if not self.api.token or self.user:
             return
@@ -128,24 +216,24 @@ class App(v021.App):
         self.bg(lambda: self.api.register(username, email, password), self._auth_success)
 
     def _auth_success(self, result):
-        # /auth/me returns only account; login/register also return access_token.
         token = str(result.get("access_token") or self.api.token or "")
         account = result.get("account") or {}
         username = str(account.get("username") or "").strip()
         if not token or not username:
             self.api.token = ""
-            self.cfg.pop("access_token", None)
+            self.cfg.pop("session_protected", None)
             v021.base.save_cfg(self.cfg)
             self.login_status.set("Saved session is no longer valid. Please sign in again.")
             return
         self.api.token = token
         self.user = username
         self.cfg.update(
-            access_token=token,
             profile_id=username,
             login_identifier=str(account.get("email") or username),
         )
-        v021.base.save_cfg(self.cfg)
+        self._save_session(token)
+        self.password_var.set("")
+        self.register_password_var.set("")
         if hasattr(self, "login") and self.login.winfo_exists():
             self.login.destroy()
         self._build_main()
@@ -156,7 +244,6 @@ class App(v021.App):
         if result.get("verification_required"):
             messagebox.showinfo("JANUS", "Account created/signed in. Email verification is still required when mail delivery is configured.")
 
-    # Legacy profile selection must not bypass authenticated account identity.
     def enter_profile(self):
         self.sign_in()
 
@@ -164,14 +251,14 @@ class App(v021.App):
         self.logout_account()
 
     def logout_account(self):
-        token_present = bool(self.api.token)
-        if token_present:
+        if self.api.token:
             try:
                 self.api.logout()
             except Exception:
                 pass
         self.api.token = ""
         self.user = ""
+        self.cfg.pop("session_protected", None)
         self.cfg.pop("access_token", None)
         v021.base.save_cfg(self.cfg)
         for child in self.winfo_children():
@@ -188,8 +275,6 @@ class App(v021.App):
 
     def _build_main(self):
         super()._build_main()
-        # Replace the legacy 'Switch profile' meaning with an authenticated logout.
-        # A compact account action is also exposed in Settings for clarity.
         settings = self.pages.get("settings")
         if settings is not None:
             ttk.Separator(settings).pack(fill="x", pady=12)
