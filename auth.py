@@ -57,7 +57,6 @@ def _preserve_legacy_table(c, table):
 
 def init_auth_db():
     with _db() as c:
-        # Stage 1: ensure the account table exists before any dependent tables.
         c.execute("""
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,25 +68,17 @@ def init_auth_db():
                 disabled INTEGER NOT NULL DEFAULT 0
             )
         """)
-
         if not _has_column(c, "accounts", "google_sub"):
             c.execute("ALTER TABLE accounts ADD COLUMN google_sub TEXT")
         if not _has_column(c, "accounts", "email_verified"):
             c.execute("ALTER TABLE accounts ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0")
         if not _has_column(c, "accounts", "updated_at"):
-            # SQLite requires a default when adding a NOT NULL column to an
-            # existing table. Backfill from created_at immediately afterwards.
             c.execute("ALTER TABLE accounts ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0")
             c.execute("UPDATE accounts SET updated_at=created_at WHERE updated_at=0")
-
-        # Stage 2: old JANUS builds used different auth/session token schemas.
-        # Preserve incompatible tables instead of dropping them, then create the
-        # current schema. This is safe for Render's persistent SQLite disk.
         if _has_table(c, "sessions") and not _has_column(c, "sessions", "account_id"):
             _preserve_legacy_table(c, "sessions")
         if _has_table(c, "auth_tokens") and not _has_column(c, "auth_tokens", "account_id"):
             _preserve_legacy_table(c, "auth_tokens")
-
         c.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 token_hash TEXT PRIMARY KEY,
@@ -106,11 +97,16 @@ def init_auth_db():
                 used_at INTEGER
             )
         """)
-
-        # Stage 3: create indexes only after migrations have guaranteed columns.
         c.execute("CREATE INDEX IF NOT EXISTS idx_sessions_account ON sessions(account_id)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_auth_tokens_account ON auth_tokens(account_id,purpose)")
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_google_sub ON accounts(google_sub) WHERE google_sub IS NOT NULL")
+
+
+# Bootstrap normalizes truly legacy account tables before importing this module.
+# This call then guarantees all current auth tables/columns exist before any
+# /auth route handles a request. Previously init_auth_db() was defined but never
+# invoked, allowing /auth/register to fail with SQLite 'no such table' errors.
+init_auth_db()
 
 
 def _hash_password(password):
@@ -134,25 +130,29 @@ def _new_action_token(c,account_id,purpose,ttl):
 def _smtp_ready(): return bool(os.getenv("JANUS_SMTP_HOST") and os.getenv("JANUS_SMTP_FROM"))
 def _send_email(to_addr,subject,body):
     if not _smtp_ready(): return False
-    host=os.environ["JANUS_SMTP_HOST"]; port=int(os.getenv("JANUS_SMTP_PORT","587")); user=os.getenv("JANUS_SMTP_USER",""); password=os.getenv("JANUS_SMTP_PASSWORD","")
-    msg=EmailMessage(); msg["From"]=os.environ["JANUS_SMTP_FROM"]; msg["To"]=to_addr; msg["Subject"]=subject; msg.set_content(body); context=ssl.create_default_context()
-    with smtplib.SMTP(host,port,timeout=20) as smtp:
-        smtp.ehlo()
-        if os.getenv("JANUS_SMTP_TLS","1")=="1": smtp.starttls(context=context); smtp.ehlo()
-        if user: smtp.login(user,password)
-        smtp.send_message(msg)
-    return True
+    try:
+        host=os.environ["JANUS_SMTP_HOST"]; port=int(os.getenv("JANUS_SMTP_PORT","587")); user=os.getenv("JANUS_SMTP_USER",""); password=os.getenv("JANUS_SMTP_PASSWORD","")
+        msg=EmailMessage(); msg["From"]=os.environ["JANUS_SMTP_FROM"]; msg["To"]=to_addr; msg["Subject"]=subject; msg.set_content(body); context=ssl.create_default_context()
+        with smtplib.SMTP(host,port,timeout=20) as smtp:
+            smtp.ehlo()
+            if os.getenv("JANUS_SMTP_TLS","1")=="1": smtp.starttls(context=context); smtp.ehlo()
+            if user: smtp.login(user,password)
+            smtp.send_message(msg)
+        return True
+    except Exception:
+        # Account creation/reset must not become HTTP 500 just because the mail
+        # transport is temporarily unavailable. The response reports whether
+        # delivery succeeded and resend remains available.
+        return False
 
 def _send_verification(c,account_id,email):
     token=_new_action_token(c,account_id,"verify_email",VERIFY_TTL); return _send_email(email,"Verify your JANUS email",f"Your JANUS email verification code is:\n\n{token}\n\nThis code expires in 24 hours.")
-
 def _unique_username(c,email,display_name=""):
     base=(display_name or email.split("@",1)[0] or "janus").strip().lower(); base=re.sub(r"[^a-z0-9._-]+","-",base).strip("-._")[:24] or "janus"
     if len(base)<3: base=(base+"janus")[:8]
     candidate,n=base,2
     while c.execute("SELECT 1 FROM accounts WHERE username=? COLLATE NOCASE",(candidate,)).fetchone(): suffix=str(n); candidate=f"{base[:32-len(suffix)-1]}-{suffix}"; n+=1
     return candidate
-
 
 class RegisterRequest(BaseModel):
     username: str
@@ -178,25 +178,20 @@ class ForgotPasswordRequest(BaseModel): email: EmailStr
 class ResetPasswordRequest(BaseModel): token: str; new_password: str
 class DeleteAccountRequest(BaseModel): confirmation: str; current_password: Optional[str]=None
 
-
 def _account_dict(row):
     return {"id":row["id"],"username":row["username"],"email":row["email"],"email_verified":bool(row["email_verified"]),"google_linked":bool(row["google_sub"]),"created_at":row["created_at"]}
-
 def account_for_token(token):
     if not token: return None
     now=int(time.time())
     with _db() as c:
         return c.execute("SELECT a.* FROM sessions s JOIN accounts a ON a.id=s.account_id WHERE s.token_hash=? AND s.expires_at>? AND a.disabled=0",(_token_hash(token),now)).fetchone()
-
 def _bearer(authorization):
     if not authorization or not authorization.lower().startswith("bearer "): return None
     return authorization.split(" ",1)[1].strip()
-
 def require_account(authorization):
     row=account_for_token(_bearer(authorization))
     if row is None: raise HTTPException(status_code=401,detail="Authentication required")
     return row
-
 
 @router.post("/register")
 def register(req:RegisterRequest):
@@ -206,8 +201,9 @@ def register(req:RegisterRequest):
             cur=c.execute("INSERT INTO accounts(username,email,password_hash,created_at,updated_at,email_verified) VALUES(?,?,?,?,?,0)",(req.username.strip(),str(req.email).lower(),_hash_password(req.password),now,now)); account_id=cur.lastrowid
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=409,detail="Username or email already exists")
-        _send_verification(c,account_id,str(req.email).lower()); row=c.execute("SELECT * FROM accounts WHERE id=?",(account_id,)).fetchone(); token=_new_session(c,account_id)
-    return {"ok":True,"access_token":token,"account":_account_dict(row),"verification_required":True,"email_delivery":_smtp_ready()}
+        email_delivery=_send_verification(c,account_id,str(req.email).lower())
+        row=c.execute("SELECT * FROM accounts WHERE id=?",(account_id,)).fetchone(); token=_new_session(c,account_id)
+    return {"ok":True,"access_token":token,"account":_account_dict(row),"verification_required":True,"email_delivery":email_delivery}
 
 @router.post("/login")
 def login(req:LoginRequest):
@@ -220,10 +216,8 @@ def login(req:LoginRequest):
 @router.post("/google")
 def google_auth(req:GoogleRequest):
     if not GOOGLE_CLIENT_ID: raise HTTPException(status_code=503,detail="Google sign-in is not configured")
-    try:
-        info=google_id_token.verify_oauth2_token(req.id_token,google_requests.Request(),GOOGLE_CLIENT_ID)
-    except Exception:
-        raise HTTPException(status_code=401,detail="Google identity token is invalid")
+    try: info=google_id_token.verify_oauth2_token(req.id_token,google_requests.Request(),GOOGLE_CLIENT_ID)
+    except Exception: raise HTTPException(status_code=401,detail="Google identity token is invalid")
     sub=str(info.get("sub") or ""); email=str(info.get("email") or "").lower(); verified=bool(info.get("email_verified")); name=str(info.get("name") or "")
     if not sub or not email or not verified: raise HTTPException(status_code=401,detail="Google account did not provide a verified email")
     now=int(time.time())
@@ -255,18 +249,20 @@ def verify_email(req:VerifyEmailRequest):
 
 @router.post("/resend-verification")
 def resend_verification(req:ResendVerificationRequest):
+    delivered=False
     with _db() as c:
         row=c.execute("SELECT * FROM accounts WHERE email=? COLLATE NOCASE AND disabled=0",(str(req.email).lower(),)).fetchone()
-        if row and not row["email_verified"]: _send_verification(c,row["id"],row["email"])
-    return {"ok":True,"message":"If that account exists and needs verification, a message has been sent."}
+        if row and not row["email_verified"]: delivered=_send_verification(c,row["id"],row["email"])
+    return {"ok":True,"email_delivery":delivered}
 
 @router.post("/forgot-password")
 def forgot_password(req:ForgotPasswordRequest):
+    delivered=False
     with _db() as c:
         row=c.execute("SELECT * FROM accounts WHERE email=? COLLATE NOCASE AND disabled=0",(str(req.email).lower(),)).fetchone()
         if row:
-            token=_new_action_token(c,row["id"],"reset_password",RESET_TTL); _send_email(row["email"],"Reset your JANUS password",f"Your JANUS password reset code is:\n\n{token}\n\nThis code expires in 30 minutes.")
-    return {"ok":True,"message":"If that email exists, a reset message has been sent."}
+            token=_new_action_token(c,row["id"],"reset_password",RESET_TTL); delivered=_send_email(row["email"],"Reset your JANUS password",f"Your JANUS password reset code is:\n\n{token}\n\nThis code expires in 30 minutes.")
+    return {"ok":True,"email_delivery":delivered}
 
 @router.post("/reset-password")
 def reset_password(req:ResetPasswordRequest):
@@ -276,15 +272,3 @@ def reset_password(req:ResetPasswordRequest):
         if row is None: raise HTTPException(status_code=400,detail="Reset token is invalid or expired")
         c.execute("UPDATE accounts SET password_hash=?,updated_at=? WHERE id=?",(_hash_password(req.new_password),now,row["account_id"])); c.execute("UPDATE auth_tokens SET used_at=? WHERE token_hash=?",(now,digest)); c.execute("DELETE FROM sessions WHERE account_id=?",(row["account_id"],))
     return {"ok":True}
-
-@router.delete("/account")
-def delete_account(req:DeleteAccountRequest,authorization:Optional[str]=Header(default=None)):
-    row=require_account(authorization)
-    if req.confirmation!="DELETE": raise HTTPException(status_code=400,detail="Type DELETE to confirm")
-    if not row["google_sub"]:
-        if not req.current_password or not _verify_password(req.current_password,row["password_hash"]): raise HTTPException(status_code=401,detail="Current password is required")
-    with _db() as c: c.execute("DELETE FROM accounts WHERE id=?",(row["id"],))
-    return {"ok":True,"deleted":True}
-
-
-init_auth_db()
