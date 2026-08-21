@@ -47,12 +47,10 @@ try:
     from auth_lifecycle import router as auth_lifecycle_router
     from auth_rate_limit import install as install_auth_rate_limit
     from chat_receipt_security import install as install_chat_receipt_security
-    from deliberation_tasks import install as install_deliberation_tasks
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
     install_chat_receipt_security(interface_chat_module)
-    install_deliberation_tasks(app)
     install_auth_rate_limit(app)
 
     @app.middleware("http")
