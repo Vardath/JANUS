@@ -17,7 +17,7 @@ The second path is deliberately rare. It is not available to routine background 
 
 - Model: `gpt-image-1-mini`, configurable through `JANUS_IMAGE_MODEL`.
 - Explicit user request: medium quality by default.
-- JANUS-nominated explanatory visual: low quality by default.
+- JANUS-nominated explanatory visual: medium quality by default.
 - Explicit per-account daily cap: 6.
 - Automatic explanatory per-account daily cap: 1.
 - Automatic per-account cooldown: 18 hours.
