@@ -13,11 +13,15 @@ Canonical cognitive topology: **11 cores arranged 7 → 2 → 1 → 1**.
 
 Ordinary routing is forward-only: specialists → assigned hemisphere → Consensus → Interface. Consensus/Interface output is not automatically recycled as a new topic. Remote/client summaries are compressed, tagged as feedback-only, and re-enter through specialist review rather than directly through Consensus.
 
+Fano/JANUS state is operational rather than decorative: persistent d0–d7 orientations can influence attention, processing pressure and integration bias, while evidence remains grounded independently of Fano state.
+
 ## Current client status
 
-- **Android v0.45** is the current published APK checkpoint. It includes forward-only routing, readable Observe output and tightened Messages filtering.
+- **Android v0.51** is the current published APK checkpoint. It includes forward-only routing, readable Observe output, persistent local/global Messages, operational Fano semantics, persistent user-directed deliberation, and saturation-escape regulation that can redirect recursive processing toward fresh grounding.
 - **Windows v0.22** source/build workflow includes JANUS account login/register/session restore and DPAPI-protected session storage. Real Windows launch/use testing is still pending.
 - **iOS** has authenticated account/session scaffolding, Keychain token storage and an unsigned simulator CI workflow. Apple signing/TestFlight/device testing is still pending.
+
+The Android Messages path has been real-device tested end-to-end with a JANUS-originated test message. Autonomous useful unsolicited messaging is intentionally thresholded and remains an ongoing soak-test target rather than routine telemetry spam.
 
 This repository is still a development/beta project. Account creation/login, OAuth, email recovery, platform builds and long-running background behaviour should be tested before public release.
 
@@ -31,7 +35,13 @@ See `/privacy` and `/terms` on the deployed service for the current legal-develo
 
 ## API/background cost policy
 
-Deterministic local/server core cycles do not require external language-model calls. Paid background language reflection is **disabled by default** in production. User-triggered Chat may use the configured OpenAI model. If paid background reflection is deliberately enabled later, per-profile daily call/token caps are already available.
+Deterministic local/server core cycles do not require external language-model calls. Paid background language reflection is **disabled by default** in production. User-triggered Chat may use the configured OpenAI model.
+
+Bounded web curiosity is a separate capability: JANUS may occasionally perform relevant, adjacent or unrelated learning searches under daily/mode caps and cooldowns. Self-regulation may request a relevant search when processing becomes starved of fresh grounding, but it cannot bypass those caps.
+
+## Deferred capabilities
+
+Planned for later: authenticated file sharing, document understanding and image/screenshot recognition using a local-first/selective-escalation design. Upload plumbing and local parsing should remain non-API where possible; paid model/vision analysis should occur only when useful and should be cached/reused. See `DEFERRED_FEATURES.md` for the implementation plan.
 
 ## Render deployment
 
@@ -55,6 +65,7 @@ GitHub Actions contains regression/build workflows for:
 - Android APK builds and routing verification;
 - authentication lifecycle/security tests;
 - forward-only routing and remote-feedback tests;
+- operational Fano semantics and saturation-regulation checks;
 - architecture/deployment contract checks;
 - Windows client packaging;
 - iOS simulator compilation.
