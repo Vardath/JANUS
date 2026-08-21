@@ -46,6 +46,23 @@ def _account_value(account, key: str, default=None):
     return default if value is None else value
 
 
+def _safe_count(callable_, label: str, errors: list[str]) -> int:
+    try:
+        return int(callable_() or 0)
+    except Exception as exc:
+        errors.append(f"{label}: {type(exc).__name__}: {str(exc)[:240]}")
+        return 0
+
+
+def _safe_profile_records(callable_, errors: list[str]) -> dict:
+    try:
+        result = callable_() or {}
+        return result if isinstance(result, dict) else {}
+    except Exception as exc:
+        errors.append(f"profile-persistence: {type(exc).__name__}: {str(exc)[:240]}")
+        return {}
+
+
 @router.post("/exchange")
 def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default=None)):
     account = _require(authorization)
@@ -57,27 +74,51 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
     profile_id = username or email or f"acct-{account_id}"
     device_key = f"acct-{account_id}:{summary.device_id}"
     data = summary.model_dump()
-    janus_sleep_cycle.accept_remote_summary(device_key, data)
 
-    # Three coordinated persistence layers:
-    # 1) detailed Observe journal,
-    # 2) idempotent per-core runtime snapshots,
-    # 3) normal profile Activity/Memory/Messages so JANUS itself and the UI see the same evidence.
-    observed = ingest_remote_events(device_key, data.get("observe_events") or [], profile_id=profile_id)
-    snapshots = record_remote_snapshot(device_key, data, profile_id=profile_id)
-    profile_records = ingest_profile_core_activity(profile_id, device_key, data)
+    errors: list[str] = []
+    try:
+        janus_sleep_cycle.accept_remote_summary(device_key, data)
+    except Exception as exc:
+        # Core/global intake is important, but a persistence/checkpoint issue must
+        # not make the phone believe the entire sync protocol is unavailable.
+        errors.append(f"runtime-intake: {type(exc).__name__}: {str(exc)[:240]}")
+
+    # Three coordinated persistence layers are isolated so one broken storage
+    # concern cannot turn an otherwise-valid client exchange into HTTP 500.
+    observed = _safe_count(
+        lambda: ingest_remote_events(device_key, data.get("observe_events") or [], profile_id=profile_id),
+        "observe-persistence",
+        errors,
+    )
+    snapshots = _safe_count(
+        lambda: record_remote_snapshot(device_key, data, profile_id=profile_id),
+        "snapshot-persistence",
+        errors,
+    )
+    profile_records = _safe_profile_records(
+        lambda: ingest_profile_core_activity(profile_id, device_key, data),
+        errors,
+    )
+
+    try:
+        server_summary = janus_sleep_cycle.compact_summary()
+    except Exception as exc:
+        errors.append(f"server-summary: {type(exc).__name__}: {str(exc)[:240]}")
+        server_summary = {"architecture": "11 Fano/JANUS cores", "topology": "7 -> 2 -> 1 -> 1", "interface_available": True}
 
     return {
         "ok": True,
-        "server": janus_sleep_cycle.compact_summary(),
+        "server": server_summary,
         "account_id": account_id,
         "profile_id": profile_id,
         "observed_events_received": observed,
         "runtime_snapshots_recorded": snapshots,
-        "profile_activity_recorded": int(profile_records.get("activity", 0)),
-        "profile_memory_recorded": int(profile_records.get("memory", 0)),
-        "profile_messages_recorded": int(profile_records.get("messages", 0)),
-        "profile_snapshots_recorded": int(profile_records.get("snapshots", 0)),
+        "profile_activity_recorded": int(profile_records.get("activity", 0) or 0),
+        "profile_memory_recorded": int(profile_records.get("memory", 0) or 0),
+        "profile_messages_recorded": int(profile_records.get("messages", 0) or 0),
+        "profile_snapshots_recorded": int(profile_records.get("snapshots", 0) or 0),
+        "sync_degraded": bool(errors),
+        "sync_errors": errors,
     }
 
 
