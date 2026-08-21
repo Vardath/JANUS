@@ -123,7 +123,7 @@ def _assessment(row: sqlite3.Row, now: int, store_bytes: int, duplicate_count: i
     reasons: list[str] = []
 
     if duplicate_count > 1:
-        score -= 35; reasons.append("duplicate content exists")
+        score -= 35; reasons.append("duplicate content exists within this account")
     if TEMP_NAME_RE.search(name):
         score -= 20; reasons.append("temporary/test-like filename")
     if ext == ".log":
@@ -184,7 +184,7 @@ def audit_storage(*, force: bool = False, max_files: int = 200) -> dict:
             (now - STALE_SECONDS, max(1, int(max_files))),
         ).fetchall()
         duplicate_counts = {
-            row["sha256"]: int(c.execute("SELECT COUNT(*) FROM janus_files WHERE sha256=?", (row["sha256"],)).fetchone()[0])
+            row["sha256"]: int(c.execute("SELECT COUNT(*) FROM janus_files WHERE sha256=? AND account_id=?", (row["sha256"], int(row["account_id"]))).fetchone()[0])
             for row in rows
         }
 
