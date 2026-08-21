@@ -19,6 +19,7 @@ from interface_runtime_policy import install as install_interface_runtime_policy
 from interface_chat import install as install_interface_chat
 from core_observer import install as install_core_observer
 from autonomous_hive import install as install_autonomous_hive
+from self_assessment import install as install_self_assessment
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
 # The autonomous hive owns background cognition now. Keep the older dashboard
@@ -29,6 +30,7 @@ janus_sleep_cycle.sleep_seconds = max(10, int(os.environ.get("JANUS_SLEEP_SECOND
 install_interface_runtime_policy(janus_sleep_cycle)
 install_core_observer(app, janus_sleep_cycle)
 install_autonomous_hive(app)
+install_self_assessment(app)
 
 def _connect():
     c=sqlite3.connect(DB_PATH,timeout=10); c.row_factory=sqlite3.Row
@@ -79,7 +81,7 @@ async def _stop_local_core_cycle(): janus_sleep_cycle.stop()
 
 @app.get('/desktop/runtime-cores',tags=['desktop'])
 def desktop_runtime_cores(username:str|None=Query(default=None)):
-    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':janus_sleep_cycle.status(),'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'note':'The interface core remains continuously available. The society receives one-minute zero-API-cost autonomous pulses; occasional language reflection is separately rate-limited.'}
+    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':janus_sleep_cycle.status(),'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'note':'The interface core remains continuously available. The society receives one-minute zero-API-cost autonomous pulses, five-minute self-assessment, and separately rate-limited language reflection.'}
 
 @app.get('/desktop/messages',tags=['desktop'])
 def desktop_messages(username:str=Query(...),limit:int=Query(default=50,ge=1,le=100),include_dismissed:bool=Query(default=False)):
