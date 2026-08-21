@@ -24,6 +24,7 @@ jobs:
           python tools/patch_android_observe_guard.py
           python tools/patch_android_local_outbox.py
           python tools/patch_android_forward_routing.py
+          python tools/patch_android_fano_semantics.py
           python tools/patch_android_deliberation.py
           python tools/patch_android_deliberation_sync.py
           python tools/patch_android_deliberation_primary.py
