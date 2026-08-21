@@ -1,18 +1,38 @@
 """Resilient JANUS bootstrap for Render.
 
-Always exposes /health if the full JANUS application fails during import.
-Also exposes non-secret auth/runtime diagnostics when the main app loads.
+Public health/diagnostic routes expose only operational booleans. Detailed schema
+and traceback diagnostics require the server admin token so deployment failures
+remain diagnosable without publishing internals.
 """
 from __future__ import annotations
 
 import os
+import secrets
 import sqlite3
 import traceback
-from fastapi import FastAPI
+from typing import Optional
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 _startup_error = None
 _startup_trace = None
+
+
+def _admin_token(authorization: Optional[str], x_janus_admin_token: Optional[str]) -> str:
+    if x_janus_admin_token:
+        return x_janus_admin_token.strip()
+    auth = (authorization or "").strip()
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return ""
+
+
+def _require_admin(authorization: Optional[str], x_janus_admin_token: Optional[str]) -> None:
+    expected = os.getenv("JANUS_ACCESS_TOKEN", "").strip()
+    supplied = _admin_token(authorization, x_janus_admin_token)
+    if not expected or not supplied or not secrets.compare_digest(expected, supplied):
+        raise HTTPException(status_code=401, detail="JANUS admin diagnostics token required")
+
 
 try:
     from auth_db_normalizer import normalize_legacy_accounts
@@ -43,7 +63,6 @@ try:
     def _runtime_health_snapshot():
         db_path = os.getenv("JANUS_DB_PATH", "/data/janus.sqlite3")
         db_ok = False
-        db_error = None
         quick_check = None
         try:
             with sqlite3.connect(db_path, timeout=5) as c:
@@ -51,13 +70,13 @@ try:
                 c.execute("BEGIN IMMEDIATE")
                 c.execute("ROLLBACK")
                 db_ok = str(quick_check).lower() == "ok"
-        except Exception as exc:
-            db_error = f"{type(exc).__name__}: {str(exc)[:240]}"
+        except Exception:
+            db_ok = False
 
         try:
             runtime = janus_sleep_cycle.status()
-        except Exception as exc:
-            runtime = {"error": f"{type(exc).__name__}: {str(exc)[:240]}"}
+        except Exception:
+            runtime = {}
 
         auth_schema = auth_schema_snapshot()
         required = {
@@ -82,12 +101,8 @@ try:
             "service": "janus-global-core",
             "main_app_loaded": True,
             "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
-            "database": {
-                "path": db_path,
-                "quick_check": quick_check,
-                "writable": db_ok,
-                "error": db_error,
-            },
+            "database_ok": db_ok,
+            "database_quick_check_ok": str(quick_check).lower() == "ok" if quick_check is not None else False,
             "auth_schema_ok": schema_ok,
             "core_persistence_ok": core_persistent,
             "core_phase": runtime.get("phase") if isinstance(runtime, dict) else None,
@@ -109,14 +124,24 @@ try:
             "main_app_loaded": True,
             "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
             "google_client_configured": bool(os.getenv("JANUS_GOOGLE_CLIENT_ID", "").strip()),
-            "auth_module_google_client_configured": bool(getattr(auth_module, "GOOGLE_CLIENT_ID", "").strip()),
             "google_route_present": "/auth/google" in routes,
             "register_route_present": "/auth/register" in routes,
             "login_route_present": "/auth/login" in routes,
             "logout_route_present": "/auth/logout" in routes,
             "logout_all_route_present": "/auth/logout-all" in routes,
-            "health_route_present": "/health" in routes,
             "runtime_health_route_present": "/diagnostics/runtime-health" in routes,
+        }
+
+    @app.get("/diagnostics/auth-detail")
+    def auth_detail(
+        authorization: Optional[str] = Header(default=None),
+        x_janus_admin_token: Optional[str] = Header(default=None),
+    ):
+        _require_admin(authorization, x_janus_admin_token)
+        return {
+            "status": "ok",
+            "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
+            "auth_module_google_client_configured": bool(getattr(auth_module, "GOOGLE_CLIENT_ID", "").strip()),
             "chat_receipt_profile_guard": bool(getattr(interface_chat_module, "_profile_receipt_guard_installed", False)),
             "auth_schema_normalization": _auth_normalization,
             "auth_schema_guard": _auth_schema_guard,
@@ -135,7 +160,6 @@ except Exception as exc:
                 "status": "degraded",
                 "service": "janus-global-core",
                 "main_app_loaded": False,
-                "startup_error": _startup_error,
             },
         )
 
@@ -146,11 +170,14 @@ except Exception as exc:
             "service": "janus-global-core",
             "main_app_loaded": False,
             "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
-            "startup_error": _startup_error,
         }
 
     @app.get("/diagnostics/startup-error")
-    def startup_error():
+    def startup_error(
+        authorization: Optional[str] = Header(default=None),
+        x_janus_admin_token: Optional[str] = Header(default=None),
+    ):
+        _require_admin(authorization, x_janus_admin_token)
         return {
             "status": "degraded",
             "error": _startup_error,
@@ -166,14 +193,24 @@ except Exception as exc:
             "main_app_loaded": False,
             "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
             "google_client_configured": bool(os.getenv("JANUS_GOOGLE_CLIENT_ID", "").strip()),
-            "auth_module_google_client_configured": False,
             "google_route_present": False,
             "register_route_present": False,
             "login_route_present": False,
             "logout_route_present": False,
             "logout_all_route_present": False,
-            "health_route_present": True,
             "runtime_health_route_present": True,
+        }
+
+    @app.get("/diagnostics/auth-detail")
+    def auth_detail_degraded(
+        authorization: Optional[str] = Header(default=None),
+        x_janus_admin_token: Optional[str] = Header(default=None),
+    ):
+        _require_admin(authorization, x_janus_admin_token)
+        return {
+            "status": "degraded",
+            "main_app_loaded": False,
+            "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
             "startup_error": _startup_error,
         }
 
@@ -181,8 +218,5 @@ except Exception as exc:
     def unavailable(path: str):
         return JSONResponse(
             status_code=503,
-            content={
-                "detail": "JANUS server startup is degraded. Please try again shortly.",
-                "startup_error": _startup_error,
-            },
+            content={"detail": "JANUS server startup is degraded. Please try again shortly."},
         )
