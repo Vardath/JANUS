@@ -40,17 +40,16 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - This keeps the 1 GB Render disk from filling with retry receipts and cycle-counter telemetry during multi-device/soak testing.
 
 ## Render/Docker/runtime reliability checkpoint
-- Important correction: dashboard_api.py still extends the historical base FastAPI app from server.py. server.py is reconstructed from checked-in src/server.py.gz.b64.* fragments and is still required at build time.
-- Earlier removal of server reconstruction was too aggressive and was corrected before it became the intended deployment state.
-- tools/rebuild_server.py now provides one explicit, sanity-checked reconstruction path shared by Render and Docker.
+- dashboard_api.py still extends the historical base FastAPI app from server.py. server.py is reconstructed from checked-in src/server.py.gz.b64.* fragments and is still required at build time.
+- tools/rebuild_server.py provides one explicit, sanity-checked reconstruction path shared by Render and Docker.
 - Render build command runs `python tools/rebuild_server.py && pip install -r requirements.txt`, then launches `uvicorn bootstrap:app`.
 - Docker uses Python 3.13, runs the same reconstruction script during image creation, and also launches bootstrap:app.
-- tests/test_architecture_contract.py plus routing/architecture CI enforce current topology metadata, base-server reconstruction, Render bootstrap and Docker bootstrap so this dependency cannot silently disappear again.
+- tests/test_architecture_contract.py plus routing/architecture CI enforce current topology metadata, base-server reconstruction, Render bootstrap and Docker bootstrap.
 - Duplicate inline Google client configuration was removed from the start command; Render env vars are the source of truth.
-- Public /diagnostics/runtime-health exposes only sanitized operational state: app loaded, database/schema/core-persistence health, phase/core count, remote-client count and background API-use signal.
-- Public /diagnostics/auth-config exposes only route/config booleans. Detailed auth schema lives at /diagnostics/auth-detail and requires JANUS_ACCESS_TOKEN as bearer or X-JANUS-Admin-Token.
-- Detailed degraded startup traceback at /diagnostics/startup-error is also admin-token protected; ordinary degraded responses no longer publish the raw startup exception.
-- Live deployment of the newest diagnostics still requires external verification after Render deploy propagation; do not infer deployment success solely from commit state.
+- Public /diagnostics/runtime-health exposes only sanitized operational state. Public /diagnostics/auth-config exposes only route/config booleans.
+- Detailed auth schema lives at /diagnostics/auth-detail and requires JANUS_ACCESS_TOKEN as bearer or X-JANUS-Admin-Token. Detailed degraded startup traceback is also admin-token protected.
+- auth_rate_limit.py is installed at bootstrap. Public auth POST routes have conservative per-source throttles (login, register, password recovery/reset, verification and Google auth) and return 429 + Retry-After when exceeded. Limits are process-local and intentionally reset on deployment; sufficient for the current single-instance beta service.
+- Live deployment of newest diagnostics/rate limiting still requires external verification after Render deploy propagation; do not infer deployment success solely from commit state.
 
 ## API/cost-control checkpoint
 - autonomous_hive.py has per-profile paid-background daily call/token budgets and escalation thresholds.
@@ -75,15 +74,22 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - iOS uses real JANUS accounts rather than arbitrary profile names.
 - APIClient supports login/register/me/logout and authenticated private requests; tokens are stored in Keychain, not UserDefaults.
 - ContentView gates the app on a valid account and exposes Sign in/Create account/Sign out.
-- Build JANUS iOS Simulator workflow exists for unsigned simulator compilation; real Apple signing/TestFlight/device testing still requires Apple-account/device input.
+- iOS CI was consolidated to one canonical `.github/workflows/build-ios.yml`. It builds an unsigned simulator Release app, uploads JANUS-iOS-simulator.zip on success and preserves xcodebuild.log on failure. The redundant second simulator workflow was removed.
+- Real Apple signing/TestFlight/device testing still requires Apple-account/device input.
 
-## Near-term product backlog
+## Release/documentation checkpoint
+- README.md now documents the actual 7→2→1→1 topology, Android v0.45 checkpoint, Windows v0.22 status, iOS beta status, authenticated privacy model, zero-API deterministic background policy, Render/Docker reconstruction dependency and current CI checks.
+- .env.example matches production-safe variable names/defaults, including disabled paid background reflection and retention/device caps.
+- Privacy policy documents OS-protected session storage where implemented, random sync device IDs, temporary receipt/snapshot retention and current background-AI policy.
+
+## Near-term product backlog — now mostly user/input dependent
 - Live-verify non-Google registration/login on deployed Render and fix any remaining persistent-schema/runtime issue.
-- Configure/test email verification and password-reset SMTP flow.
-- Re-test Google login end-to-end and account linking/merging.
+- Configure/test email verification and password-reset SMTP flow with real delivery.
+- Re-test Google login end-to-end and account linking/merging on device.
 - Verify Windows v0.22 CI artifact and test executable on a real Windows PC.
-- Verify iOS simulator CI result; later add Sign in with Apple, signing, TestFlight/device testing and Apple background-behaviour adaptation.
-- Continue privacy/security audit, multi-day soak testing and decide eventual user-triggered/paid-background quota policy before scaling.
+- Verify canonical iOS simulator CI result; later add Sign in with Apple, signing, TestFlight/device testing and Apple background-behaviour adaptation.
+- Multi-day Android soak/battery/background-kill testing and real multi-device behavior testing.
+- Decide eventual user-triggered/paid-background quota/pricing policy before scaling.
 
 ## Working practice
 - Keep this file current after material architecture, build, authentication, UI, persistence or deployment changes.
