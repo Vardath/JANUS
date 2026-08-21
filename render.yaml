@@ -6,7 +6,7 @@ services:
     region: singapore
     branch: main
     autoDeployTrigger: commit
-    buildCommand: pip install -r requirements.txt
+    buildCommand: python tools/rebuild_server.py && pip install -r requirements.txt
     startCommand: uvicorn bootstrap:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     disk:
