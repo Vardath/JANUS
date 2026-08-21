@@ -37,6 +37,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -64,6 +65,7 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 137);
         }
         credentialManager = CredentialManager.create(this);
+        JanusLocalCoreRuntime.get(this).start();
         web = new WebView(this);
         setContentView(web);
         WebSettings s = web.getSettings();
@@ -96,12 +98,19 @@ public class MainActivity extends Activity {
                         "catch(e){alert('Unable to submit report. '+e.message);}};" +
                         "if(window.addMsg&&!window.__janusReportWrapped){window.__janusReportWrapped=true;var originalAddMsg=window.addMsg;window.addMsg=function(who,text){originalAddMsg(who,text);if(who==='JANUS'){var box=chatlog.lastElementChild;if(box&&!box.querySelector('.janus-report')){var b=document.createElement('button');b.className='janus-report';b.textContent='Report';b.style.cssText='margin-top:8px;border:0;background:transparent;color:#666;text-decoration:underline;padding:2px 0;font-size:12px';b.onclick=function(){window.janusReportResponse(box,String(text||''));};box.appendChild(document.createElement('br'));box.appendChild(b);}}};}" +
                         "(function(){var box=document.querySelector('#options .options');if(box&&!document.getElementById('deleteAccountBtn')){var b=document.createElement('button');b.id='deleteAccountBtn';b.style.borderColor='#b00020';b.style.color='#b00020';b.innerHTML='<b>Delete account</b><br><span class=\"small\">Permanently delete this JANUS account and associated data</span>';b.onclick=window.janusDeleteAccount;box.appendChild(b);}})();" +
-                        "(function(){var top=document.querySelector('.top');if(top&&top.childNodes.length)top.childNodes[0].nodeValue='JANUS · 11 cores · 7→2→1→1 ';var buttons=document.querySelectorAll('#options .options button');buttons.forEach(function(b){if((b.getAttribute('onclick')||'').indexOf(\"showSub('cores')\")>=0)b.innerHTML='<b>Cores · 11 active</b><br><span class=\"small\">7 specialists → 2 hemispheres → consensus → interface</span>';});var cl=document.getElementById('coreList');if(cl&&!document.getElementById('coreTopology')){var d=document.createElement('div');d.id='coreTopology';cl.parentNode.insertBefore(d,cl);}})();" +
-                        "window.renderCoreSide=function(title,r,isLocal){var cores=(r&&r.cores)||{};var names=['evidence','logic','counterpoint','context','memory','safety','novelty','left_hemisphere','right_hemisphere','consensus','interface'];var h='<div class=\"card\"><b>'+esc(title)+'</b><br><span class=\"small\">'+esc(r.topology||'7 → 2 → 1 → 1')+' · phase '+esc(r.phase||'unknown')+' · storage '+esc(r.storage_backend||(r.persistent_storage?'persistent':'unknown'))+(isLocal?' · sync '+esc(r.sync_state||'unknown'):' · clients '+esc(r.remote_clients||0))+'</span></div>';h+='<div class=\"grid\">';names.forEach(function(n){var c=cores[n]||{};var role=n.replaceAll('_',' ');h+='<div class=\"card\"><b>'+esc(role)+'</b><div class=\"small\">cycles '+esc(c.cycle_count||0)+' · pending '+esc(c.pending_messages||0)+'</div><div class=\"small\">'+esc((c.last_output||'').slice(0,180))+'</div></div>';});return h+'</div>';};" +
-                        "window.refreshCoreTopology=async function(){var host=document.getElementById('coreTopology');if(!host)return;try{var local=JSON.parse(Android.localCoreStatus());var global=await api('GET','/desktop/runtime-cores?username='+encodeURIComponent(profile));var gr=global.runtime||global;host.innerHTML='<div class=\"card\"><b>JANUS 11-core topology</b><p>7 specialist perspectives feed two hemispheres. The hemispheres feed the consensus reader/giver. Consensus feeds the interface core that represents JANUS to you.</p><div class=\"small\">Local and global runtimes synchronize compact state without using paid API calls for their background cycles.</div></div>'+window.renderCoreSide('This device · local JANUS',local,true)+window.renderCoreSide('Online · global JANUS',gr,false);}catch(e){host.innerHTML='<div class=\"card\"><b>11-core runtime</b><div class=\"small\">Unable to refresh live core status: '+esc(e.message)+'</div></div>';}};" +
+                        "(function(){var top=document.querySelector('.top');if(top&&top.childNodes.length)top.childNodes[0].nodeValue='JANUS · 11 cores · 7→2→1→1 ';var buttons=document.querySelectorAll('#options .options button');buttons.forEach(function(b){if((b.getAttribute('onclick')||'').indexOf(\"showSub('cores')\")>=0)b.innerHTML='<b>Cores · interface always active</b><br><span class=\"small\">7 specialists → 2 hemispheres → consensus → interface</span>';});var cl=document.getElementById('coreList');if(cl&&!document.getElementById('coreTopology')){var d=document.createElement('div');d.id='coreTopology';cl.parentNode.insertBefore(d,cl);}})();" +
+                        "window.janusHeaderStatus=function(){try{var r=JSON.parse(Android.localCoreStatus());if(window.status)status.textContent=(r.phase==='wake'?'Active · society awake':'Active · background resting');}catch(e){if(window.status)status.textContent='Active';}};" +
+                        "if(window.setStatus&&!window.__janusStatusWrapped){window.__janusStatusWrapped=true;var oldSetStatus=window.setStatus;window.setStatus=function(s){if(s==='Dormant'||s==='Active'){window.janusHeaderStatus();return;}oldSetStatus(s);};}window.janusHeaderStatus();" +
+                        "window.janusDrainOfflineReplies=function(){try{var a=JSON.parse(Android.drainQueuedReplies()||'[]');a.forEach(function(x){if(x&&x.reply)addMsg('JANUS',x.reply+'\\n\\n[Delivered from the offline queue]');});}catch(e){}};setTimeout(window.janusDrainOfflineReplies,250);" +
+                        "window.renderCoreSide=function(title,r,isLocal){var cores=(r&&r.cores)||{};var names=['evidence','logic','counterpoint','context','memory','safety','novelty','left_hemisphere','right_hemisphere','consensus','interface'];var h='<div class=\"card\"><b>'+esc(title)+'</b><br><span class=\"small\">'+esc(r.topology||'7 → 2 → 1 → 1')+' · phase '+esc(r.phase||'unknown')+' · storage '+esc(r.storage_backend||(r.persistent_storage?'persistent':'unknown'))+(isLocal?' · sync '+esc(r.sync_state||'unknown'):' · clients '+esc(r.remote_clients||0))+'</span></div>';h+='<div class=\"grid\">';names.forEach(function(n){var c=cores[n]||{};var role=n.replaceAll('_',' ');h+='<div class=\"card\"><b>'+esc(role)+'</b><div class=\"small\">'+(c.awake?'awake · ':'resting · ')+'cycles '+esc(c.cycle_count||0)+' · pending '+esc(c.pending_messages||0)+'</div><div class=\"small\">'+esc((c.last_output||'').slice(0,180))+'</div></div>';});return h+'</div>';};" +
+                        "window.refreshCoreTopology=async function(){var host=document.getElementById('coreTopology');if(!host)return;try{var local=JSON.parse(Android.localCoreStatus());var global=await api('GET','/desktop/runtime-cores?username='+encodeURIComponent(profile));var gr=global.runtime||global;host.innerHTML='<div class=\"card\"><b>JANUS 11-core topology</b><p>7 specialist perspectives feed two hemispheres. The hemispheres feed the consensus reader/giver. Consensus feeds the interface core that represents JANUS to you.</p><div class=\"small\">The interface core stays available continuously. The other ten cores may rest and update it asynchronously.</div></div>'+window.renderCoreSide('This device · local JANUS',local,true)+window.renderCoreSide('Online · global JANUS',gr,false);}catch(e){host.innerHTML='<div class=\"card\"><b>11-core runtime</b><div class=\"small\">Unable to refresh live core status: '+esc(e.message)+'</div></div>';}};" +
                         "if(window.refresh&&!window.__janusCoreRefreshWrapped){window.__janusCoreRefreshWrapped=true;var oldRefresh=window.refresh;window.refresh=function(p){var x=oldRefresh(p);if(p==='cores')setTimeout(window.refreshCoreTopology,80);return x;};}" +
                         "if(window.show&&!window.__janusCoreShowWrapped){window.__janusCoreShowWrapped=true;var oldShow=window.show;window.show=function(p){var x=oldShow(p);if(p==='cores')setTimeout(window.refreshCoreTopology,80);return x;};}";
                 view.evaluateJavascript(js, null);
+                pool.submit(() -> {
+                    JanusOfflineQueue.flush(MainActivity.this);
+                    deliverQueuedRepliesToWeb();
+                });
             }
         });
         web.loadUrl("file:///android_asset/index.html");
@@ -141,6 +150,16 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {}
         String saved = getSharedPreferences("janus", MODE_PRIVATE).getString("access_token", "");
         return saved == null ? "" : saved.trim();
+    }
+
+    private void deliverQueuedRepliesToWeb() {
+        if (web == null) return;
+        String raw = JanusOfflineQueue.drainReplies(this);
+        try {
+            if (new JSONArray(raw).length() == 0) return;
+        } catch (Exception e) { return; }
+        final String js = "(function(){try{var a=JSON.parse(" + quote(raw) + ");a.forEach(function(x){if(x&&x.reply)addMsg('JANUS',x.reply+'\\n\\n[Delivered from the offline queue]');});}catch(e){}})();";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
     }
 
     private void googleResult(boolean ok, String message) {
@@ -191,11 +210,8 @@ public class MainActivity extends Activity {
                                 clearGoogleCredentialStateAndRetry();
                                 return;
                             }
-                            if (reauth) {
-                                startLegacyGoogleFallback();
-                            } else {
-                                googleResult(false, message == null || message.isBlank() ? "Google sign-in was cancelled or unavailable." : message);
-                            }
+                            if (reauth) startLegacyGoogleFallback();
+                            else googleResult(false, message == null || message.isBlank() ? "Google sign-in was cancelled or unavailable." : message);
                         }
                     });
         } catch (Exception e) {
@@ -212,9 +228,7 @@ public class MainActivity extends Activity {
         }
         try {
             GoogleSignInOptions options = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                    .requestIdToken(clientId)
-                    .requestEmail()
-                    .build();
+                    .requestIdToken(clientId).requestEmail().build();
             legacyGoogleClient = GoogleSignIn.getClient(this, options);
             googleResult(false, "Credential Manager could not reauthenticate this device; trying Google compatibility sign-in…");
             startActivityForResult(legacyGoogleClient.getSignInIntent(), RC_GOOGLE_COMPAT);
@@ -230,9 +244,7 @@ public class MainActivity extends Activity {
                         @Override public void onResult(Void result) { requestGoogleCredential(true); }
                         @Override public void onError(@NonNull ClearCredentialException e) { requestGoogleCredential(true); }
                     });
-        } catch (Exception ignored) {
-            requestGoogleCredential(true);
-        }
+        } catch (Exception ignored) { requestGoogleCredential(true); }
     }
 
     private void startGoogleSignIn() { requestGoogleCredential(false); }
@@ -257,29 +269,21 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static boolean isTransientGateway(int code) {
-        return code == 502 || code == 503 || code == 504;
-    }
+    private static boolean isTransientGateway(int code) { return code == 502 || code == 503 || code == 504; }
 
     private static String readBody(HttpURLConnection c, int code) throws Exception {
         if (code >= 400 && c.getErrorStream() == null) return "";
         BufferedReader r = new BufferedReader(new InputStreamReader(code >= 400 ? c.getErrorStream() : c.getInputStream(), StandardCharsets.UTF_8));
-        StringBuilder b = new StringBuilder();
-        String line;
-        while ((line = r.readLine()) != null) {
-            if (b.length() < 8192) b.append(line);
-        }
-        r.close();
-        return b.toString();
+        StringBuilder b = new StringBuilder(); String line;
+        while ((line = r.readLine()) != null) if (b.length() < 8192) b.append(line);
+        r.close(); return b.toString();
     }
 
     private static String safeServerBody(int code, String body) {
         String raw = body == null ? "" : body.trim();
         String lower = raw.toLowerCase();
         boolean html = lower.startsWith("<!doctype html") || lower.startsWith("<html") || lower.contains("<body") || lower.contains("bad gateway") || lower.contains("service unavailable");
-        if (isTransientGateway(code) || html) {
-            return "{\"detail\":\"JANUS server is temporarily unavailable. Please try again shortly.\"}";
-        }
+        if (isTransientGateway(code) || html) return "{\"detail\":\"JANUS server is temporarily unavailable. Please try again shortly.\"}";
         if (raw.length() > 8192) raw = raw.substring(0, 8192);
         return raw;
     }
@@ -289,13 +293,11 @@ public class MainActivity extends Activity {
             String saved = getSharedPreferences("janus", MODE_PRIVATE).getString("profile_id", "");
             return saved == null ? "" : saved;
         }
-        @JavascriptInterface public void setProfile(String profile) {
-            persistProfile(profile);
-            scheduleMessageChecks();
-        }
+        @JavascriptInterface public void setProfile(String profile) { persistProfile(profile); scheduleMessageChecks(); }
+        @JavascriptInterface public String drainQueuedReplies() { return JanusOfflineQueue.drainReplies(MainActivity.this); }
+        @JavascriptInterface public int queuedMessageCount() { return JanusOfflineQueue.pendingCount(MainActivity.this); }
         @JavascriptInterface public void clearSession() {
-            getSharedPreferences("janus", MODE_PRIVATE).edit()
-                    .remove("access_token").remove("profile_id").remove("last_notified_message").apply();
+            getSharedPreferences("janus", MODE_PRIVATE).edit().remove("access_token").remove("profile_id").remove("last_notified_message").apply();
             runOnUiThread(() -> {
                 try { credentialManager.clearCredentialStateAsync(new ClearCredentialStateRequest(), new CancellationSignal(), getMainExecutor(), new CredentialManagerCallback<Void, ClearCredentialException>() {
                     @Override public void onResult(Void result) {}
@@ -311,45 +313,53 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void googleSignIn() { runOnUiThread(MainActivity.this::startGoogleSignIn); }
         @JavascriptInterface public String serverUrl() { return SERVER; }
         @JavascriptInterface public void request(String id, String method, String path, String json) {
-            learnProfile(path, json);
-            final String accessToken = learnAccessToken(json);
+            final boolean isChat = "POST".equals(method) && "/desktop/chat".equals(path);
+            final String requestJson = isChat ? JanusOfflineQueue.prepareChatBody(json) : (json == null ? "{}" : json);
+            learnProfile(path, requestJson);
+            final String accessToken = learnAccessToken(requestJson);
             pool.submit(() -> {
                 String result = null;
                 Exception lastException = null;
-                for (int attempt = 1; attempt <= 3; attempt++) {
+                int maxAttempts = isChat ? 5 : 3;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                     HttpURLConnection c = null;
                     try {
                         c = (HttpURLConnection) new URL(SERVER + path).openConnection();
                         c.setRequestMethod(method);
-                        c.setConnectTimeout(20000);
+                        c.setConnectTimeout(isChat ? 30000 : 20000);
                         c.setReadTimeout(120000);
                         c.setRequestProperty("Accept", "application/json");
                         if (!accessToken.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + accessToken);
                         if (!"GET".equals(method)) {
-                            c.setDoOutput(true);
-                            c.setRequestProperty("Content-Type", "application/json");
-                            byte[] body = (json == null ? "{}" : json).getBytes(StandardCharsets.UTF_8);
-                            try (OutputStream os = c.getOutputStream()) { os.write(body); }
+                            c.setDoOutput(true); c.setRequestProperty("Content-Type", "application/json");
+                            try (OutputStream os = c.getOutputStream()) { os.write(requestJson.getBytes(StandardCharsets.UTF_8)); }
                         }
                         int code = c.getResponseCode();
                         String body = safeServerBody(code, readBody(c, code));
-                        if (isTransientGateway(code) && attempt < 3) {
-                            try { Thread.sleep(1500L * attempt); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                        if ((isTransientGateway(code) || (isChat && code == 409)) && attempt < maxAttempts) {
+                            try { Thread.sleep(Math.min(8000L, 1500L * attempt)); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
                             continue;
                         }
                         result = "{\"ok\":" + (code < 400) + ",\"status\":" + code + ",\"body\":" + quote(body) + "}";
+                        if (code < 400 && isChat) {
+                            JanusOfflineQueue.flush(MainActivity.this);
+                            deliverQueuedRepliesToWeb();
+                        }
                         break;
                     } catch (Exception e) {
                         lastException = e;
-                        if (attempt < 3) {
-                            try { Thread.sleep(1500L * attempt); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                        if (attempt < maxAttempts) {
+                            try { Thread.sleep(Math.min(8000L, 1500L * attempt)); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
                             continue;
                         }
-                    } finally {
-                        if (c != null) c.disconnect();
-                    }
+                    } finally { if (c != null) c.disconnect(); }
                 }
-                if (result == null) {
+                if (result == null && isChat) {
+                    int pending = JanusOfflineQueue.enqueue(MainActivity.this, requestJson);
+                    String ack = "I’m still here. I saved that message on this device because the server connection did not complete. I’ll send it automatically when the connection returns; the other JANUS cores can continue their own cycles in the meantime. Queued: " + pending + ".";
+                    String body = "{\"reply\":" + quote(ack) + ",\"profile\":" + quote(Bridge.this.profileId()) + ",\"mode\":\"local_offline_queue\",\"stored_locally\":true,\"queued\":" + pending + "}";
+                    result = "{\"ok\":true,\"status\":202,\"body\":" + quote(body) + "}";
+                } else if (result == null) {
                     String message = lastException == null ? "JANUS server is temporarily unavailable. Please try again shortly." : "JANUS server connection failed. Please try again shortly.";
                     result = "{\"ok\":false,\"status\":0,\"body\":" + quote("{\"detail\":\"" + message + "\"}") + "}";
                 }
