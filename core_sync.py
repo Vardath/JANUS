@@ -34,26 +34,43 @@ def _require(authorization: Optional[str]):
     return account
 
 
+def _account_value(account, key: str, default=None):
+    """Read either sqlite3.Row or dict-like account records safely."""
+    try:
+        value = account[key]
+    except Exception:
+        try:
+            value = account.get(key, default)
+        except Exception:
+            value = default
+    return default if value is None else value
+
+
 @router.post("/exchange")
 def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default=None)):
     account = _require(authorization)
-    profile_id=str(account.get("username") or account.get("email") or f"acct-{account['id']}")
-    device_key = f"acct-{account['id']}:{summary.device_id}"
-    data=summary.model_dump()
+    account_id = int(_account_value(account, "id", 0) or 0)
+    if account_id <= 0:
+        raise HTTPException(401, "Authenticated account has no valid id")
+    username = str(_account_value(account, "username", "") or "").strip()
+    email = str(_account_value(account, "email", "") or "").strip()
+    profile_id = username or email or f"acct-{account_id}"
+    device_key = f"acct-{account_id}:{summary.device_id}"
+    data = summary.model_dump()
     janus_sleep_cycle.accept_remote_summary(device_key, data)
 
     # Three coordinated persistence layers:
     # 1) detailed Observe journal,
     # 2) idempotent per-core runtime snapshots,
     # 3) normal profile Activity/Memory/Messages so JANUS itself and the UI see the same evidence.
-    observed=ingest_remote_events(device_key, data.get("observe_events") or [], profile_id=profile_id)
-    snapshots=record_remote_snapshot(device_key, data, profile_id=profile_id)
-    profile_records=ingest_profile_core_activity(profile_id, device_key, data)
+    observed = ingest_remote_events(device_key, data.get("observe_events") or [], profile_id=profile_id)
+    snapshots = record_remote_snapshot(device_key, data, profile_id=profile_id)
+    profile_records = ingest_profile_core_activity(profile_id, device_key, data)
 
     return {
         "ok": True,
         "server": janus_sleep_cycle.compact_summary(),
-        "account_id": int(account["id"]),
+        "account_id": account_id,
         "profile_id": profile_id,
         "observed_events_received": observed,
         "runtime_snapshots_recorded": snapshots,
