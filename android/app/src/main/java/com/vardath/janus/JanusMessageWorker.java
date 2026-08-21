@@ -28,8 +28,17 @@ public class JanusMessageWorker extends Worker {
         Context ctx = getApplicationContext();
         String token = ctx.getSharedPreferences("janus", Context.MODE_PRIVATE).getString("access_token", "");
         if (token == null || token.isEmpty()) return Result.success();
+
+        // First priority: deliver any user messages that were persisted while
+        // the phone/server connection was unavailable. Replies are retained in
+        // app-private storage and shown the next time the JANUS UI is active.
+        JanusOfflineQueue.flush(ctx);
+
         try {
-            HttpURLConnection c = (HttpURLConnection) new URL(MainActivity.SERVER + "/desktop/messages?limit=20").openConnection();
+            String profile = ctx.getSharedPreferences("janus", Context.MODE_PRIVATE).getString("profile_id", "");
+            String suffix = (profile == null || profile.isEmpty()) ? "" : "?username=" + java.net.URLEncoder.encode(profile, StandardCharsets.UTF_8) + "&limit=20";
+            if (suffix.isEmpty()) suffix = "?limit=20";
+            HttpURLConnection c = (HttpURLConnection) new URL(MainActivity.SERVER + "/desktop/messages" + suffix).openConnection();
             c.setRequestMethod("GET");
             c.setConnectTimeout(20000);
             c.setReadTimeout(30000);
