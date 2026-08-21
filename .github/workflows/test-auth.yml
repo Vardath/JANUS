@@ -1,0 +1,43 @@
+name: Test JANUS Auth
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'auth.py'
+      - 'auth_lifecycle.py'
+      - 'auth_schema_guard.py'
+      - 'auth_db_normalizer.py'
+      - 'account_deletion.py'
+      - 'bootstrap.py'
+      - 'tests/**'
+      - 'requirements.txt'
+      - '.github/workflows/test-auth.yml'
+  pull_request:
+    paths:
+      - 'auth.py'
+      - 'auth_lifecycle.py'
+      - 'auth_schema_guard.py'
+      - 'auth_db_normalizer.py'
+      - 'account_deletion.py'
+      - 'bootstrap.py'
+      - 'tests/**'
+      - 'requirements.txt'
+      - '.github/workflows/test-auth.yml'
+  workflow_dispatch:
+
+jobs:
+  auth-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run auth regression suite
+        env:
+          JANUS_AUTH_DB: ${{ runner.temp }}/janus-auth-test.sqlite3
+        run: python -m unittest -v tests.test_auth_local
