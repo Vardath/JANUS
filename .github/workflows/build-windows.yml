@@ -16,23 +16,27 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - name: Install PyInstaller
         run: python -m pip install --upgrade pip pyinstaller
+      - name: Syntax-check Windows client chain
+        shell: pwsh
+        run: |
+          python -m py_compile client/janus_client_v020.py client/janus_client_v021.py client/janus_client_v022.py
       - name: Build JANUS.exe
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v021.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v022.py
           Copy-Item client/JANUS.bat dist/JANUS.bat
-          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.21`r`n`r`nCores now shows the live seven-core runtime: wake/sleep phase, per-core state, cycle count, inbox backlog and last activity.`r`nThe local wake/sleep core cycle makes no external model/API calls.`r`nNormal user-triggered chat can still use the configured cloud model.`r`n`r`nNavigation: Chat, Messages, Observe Thoughts, Options, Cores, Memory, Activity, Settings.`r`nEnter sends; Shift+Enter adds a new line.`r`n`r`nServer: https://janus-global-core.onrender.com"
+          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.22`r`n`r`nAuthenticated desktop client using JANUS username/email + password accounts.`r`nSessions persist across restarts and private Chat, Messages, Observe, Cores, Memory, Activity and Settings requests use the bearer session token.`r`nCreate Account and Sign Out are available from the desktop client.`r`n`r`nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface.`r`nLocal/server deterministic core cycles make no external model/API calls; user-triggered chat may use the configured cloud model.`r`n`r`nServer: https://janus-global-core.onrender.com"
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Windows-v0.21
+          name: JANUS-Windows-v0.22
           path: |
             dist/JANUS.exe
             dist/JANUS.bat
