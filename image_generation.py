@@ -16,7 +16,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
@@ -34,6 +34,14 @@ AUTO_COOLDOWN_SECONDS = max(3600, int(os.getenv("JANUS_IMAGE_AUTO_COOLDOWN_SECON
 MAX_PROMPT_CHARS = max(256, int(os.getenv("JANUS_IMAGE_MAX_PROMPT_CHARS", "3000")))
 VISUAL_MARKER_RE = re.compile(r"\[\[JANUS_VISUAL:\s*(.*?)\]\]", re.I | re.S)
 EXPLICIT_RE = re.compile(r"\b(generate|create|make|draw|render|show me|give me)\b.{0,40}\b(image|picture|illustration|diagram|artwork|visual)\b|\b(image|picture|illustration|diagram|artwork|visual)\b.{0,40}\b(generate|create|make|draw|render)\b", re.I | re.S)
+VISUAL_POLICY = """
+
+OPTIONAL VISUAL POLICY:
+If the user explicitly asks for an image, picture, illustration, diagram, artwork or visual, you may nominate one render by adding exactly one final marker of the form [[JANUS_VISUAL: concise standalone image prompt]].
+You may also nominate a visual without an explicit request only when a picture would materially improve a difficult explanation (for example spatial geometry, architecture, topology, layout, flow, or a visual comparison). Do this rarely, not decoratively.
+Do not mention the marker to the user. Do not nominate multiple images. Do not use visual generation for routine chat, emotional emphasis, telemetry, or background self-reflection.
+The renderer has separate hard cost/cooldown limits and may decline the nomination.
+"""
 
 
 class GenerateImageRequest(BaseModel):
@@ -47,6 +55,7 @@ def _db() -> sqlite3.Connection:
     c = sqlite3.connect(DB_PATH, timeout=10)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA journal_mode=WAL")
+    c.execute("PRAGMA foreign_keys=ON")
     return c
 
 
@@ -208,6 +217,39 @@ async def maybe_generate_for_chat(profile: str, message: str, reply: str) -> tup
     return clean_reply, None
 
 
+def install_chat_image_bridge(app, interface_chat_module) -> None:
+    """Wrap the already secured desktop chat route with bounded image rendering."""
+    if getattr(app.state, "janus_image_chat_bridge", False):
+        return
+    route = next((r for r in app.router.routes if getattr(r, "path", None) == "/desktop/chat" and "POST" in getattr(r, "methods", set())), None)
+    if route is None:
+        raise RuntimeError("secure /desktop/chat route missing before image bridge install")
+    chat_impl = route.endpoint
+    app.router.routes[:] = [r for r in app.router.routes if not (getattr(r, "path", None) == "/desktop/chat" and "POST" in getattr(r, "methods", set()))]
+    if VISUAL_POLICY not in str(getattr(interface_chat_module, "JANUS_SELF_KNOWLEDGE", "")):
+        interface_chat_module.JANUS_SELF_KNOWLEDGE = str(getattr(interface_chat_module, "JANUS_SELF_KNOWLEDGE", "")) + VISUAL_POLICY
+
+    @app.post("/desktop/chat", tags=["desktop"])
+    async def chat_with_optional_image(request: Request, payload: dict):
+        result = await chat_impl(request=request, payload=payload)
+        if not isinstance(result, dict) or not str(result.get("reply") or "").strip():
+            return result
+        profile = str(result.get("profile") or "").strip()
+        if not profile:
+            return result
+        message = str(payload.get("message") or payload.get("text") or "")
+        reply = str(result.get("reply") or "")
+        clean_reply, image_result = await maybe_generate_for_chat(profile, message, reply)
+        result["reply"] = clean_reply
+        if image_result is not None:
+            result["image_generation"] = image_result
+            if image_result.get("generated"):
+                result["image"] = image_result.get("image")
+        return result
+
+    app.state.janus_image_chat_bridge = True
+
+
 @router.post("/generate")
 async def generate_image(req: GenerateImageRequest, authorization: Optional[str] = Header(default=None)):
     account = auth.require_account(authorization)
@@ -225,7 +267,7 @@ def image_usage(authorization: Optional[str] = Header(default=None)):
     with _db() as c:
         total = int(c.execute("SELECT COUNT(*) FROM janus_generated_images WHERE account_id=? AND created_at>=?", (int(account["id"]), start)).fetchone()[0])
         auto = int(c.execute("SELECT COUNT(*) FROM janus_generated_images WHERE account_id=? AND origin='auto' AND created_at>=?", (int(account["id"]), start)).fetchone()[0])
-    return {"ok": True, "today": total, "automatic_today": auto, "explicit_daily_cap": EXPLICIT_DAILY_CAP, "automatic_daily_cap": AUTO_DAILY_CAP, "automatic_cooldown_seconds": AUTO_COOLDOWN_SECONDS, "model": MODEL}
+    return {"ok": True, "today": total, "automatic_today": auto, "explicit_daily_cap": EXPLICIT_DAILY_CAP, "automatic_daily_cap": AUTO_DAILY_CAP, "automatic_cooldown_seconds": AUTO_COOLDOWN_SECONDS, "global_daily_cap": GLOBAL_DAILY_CAP, "automatic_global_daily_cap": AUTO_GLOBAL_DAILY_CAP, "model": MODEL, "multi_core_background_rendering": False}
 
 
 _init_db()
