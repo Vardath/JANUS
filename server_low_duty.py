@@ -51,6 +51,8 @@ def install(cycle):
     original_status=cycle.status
     def status_with_policy():
         result=original_status()
+        worker=getattr(cycle,"_thread",None)
+        result["worker_alive"]=bool(worker and worker.is_alive())
         result["rest_background_seconds"]=rest_seconds
         result["core_cycle_api_calls"]=0
         result["rest_policy"]="low-duty processing; interface continuous"
@@ -63,11 +65,6 @@ def install(cycle):
                 core["awake"]=True
                 core["processing_mode"]="full-rate"
             else:
-                # The core is not continuously executing, but it remains an active
-                # member of the society and receives a deterministic maintenance
-                # turn every rest_seconds. Report that explicitly rather than
-                # presenting it to the UI as dormant/resting.
-                core["awake"]=True
                 core["processing_mode"]="low-duty"
         return result
     cycle.status=status_with_policy
@@ -75,9 +72,16 @@ def install(cycle):
     original_compact=cycle.compact_summary
     def compact_with_policy():
         result=original_compact()
+        worker=getattr(cycle,"_thread",None)
+        result["worker_alive"]=bool(worker and worker.is_alive())
         result["rest_background_seconds"]=rest_seconds
         result["core_cycle_api_calls"]=0
         result["rest_policy"]="low-duty processing; interface continuous"
         return result
     cycle.compact_summary=compact_with_policy
+
+    # Start immediately after policy installation. The FastAPI startup hook also
+    # calls start(), but start() is idempotent. This avoids a silent zero-cycle
+    # server society if hosting/reload paths delay or skip startup events.
+    cycle.start()
     return cycle
