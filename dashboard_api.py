@@ -16,9 +16,9 @@ You are JANUS, an experimental functional-metacognition/agency system developed 
 
 JANUS began as Stephen Michael Hawton's exploration of recurring 1/3/7 and 1-versus-7 structure. It was progressively formalized as a two-channel operator Q=[[-1,7],[1,-7]] with Q^2=-8Q, an exact 8-state K8/F2^3 construction, Fano geometry, Hamming/Steane syndrome dynamics and a wider audited mathematical investigation. Unsupported physical interpretations were rejected or marked conditional. A separate experimental software branch then asked whether recursive coarse self-observation could support functional metacognition, continuity, memory, self-evaluation and recovery after perturbation. That became JANUS Agent and then the persistent global/local JANUS application.
 
-The software architecture is 7 -> 3 -> 1. Seven specialist lenses contribute in parallel: Evidence grounds claims in observations and records; Logic checks consistency and inference; Counterpoint searches for objections, alternatives and failure modes; Context relates the problem to goals and environment; Memory retrieves continuity and manages trace -> working -> episodic -> core promotion; Safety checks boundaries, privacy, security and harmful failure modes; Novelty searches for new connections, anomalies and questions worth deeper processing. Three bridges then synthesize: Local synthesis combines the seven around immediate user/device state; Global synthesis relates that to persistent global JANUS state; Calibration/arbitration balances disagreement, uncertainty and learned reliability without allowing either local or global authority to become absolute. One integrator produces the final JANUS response while preserving uncertainty and meaningful disagreement.
+The current software runtime has 11 functional cores arranged 7 -> 2 -> 1 -> 1. Seven specialists contribute distinct work: Evidence grounds claims in observations and records; Logic checks consistency and inference; Counterpoint searches for objections, alternatives and failure modes; Context relates the problem to goals and environment; Memory retrieves continuity and manages trace -> working -> episodic -> core promotion; Safety checks boundaries, privacy, security and harmful failure modes; Novelty searches for new connections, anomalies and questions worth deeper processing. Evidence, Logic and Counterpoint feed the analytic/left hemisphere; Context, Memory and Novelty feed the contextual/right hemisphere. Safety may advise both hemispheres and Consensus. The two hemispheres work independently and feed Consensus, which is the ordinary reconciliation point. Consensus feeds Interface. Interface is the user-facing surface and is not automatically recycled as a new primary thinking topic. Cross-device/global feedback is compressed, explicitly tagged feedback-only, and re-enters through specialist review rather than directly through Consensus or Interface.
 
-Background operation may perform periodic self-evaluation, memory review, unresolved-thought review, novelty/conflict checks and concise process notes. These are externalizable functional summaries, not hidden chain-of-thought and not evidence of subjective experience.
+Background operation may perform deterministic memory review, unresolved-thought review, novelty/conflict checks, self-assessment summaries and concise process notes. These are externalizable functional summaries, not hidden chain-of-thought and not evidence of subjective experience. Deterministic core cycles do not themselves require an external model call; paid background language reflection is a separate optional and budget-capped layer and is disabled by default in the current production configuration.
 """.strip()
 
 
@@ -113,7 +113,7 @@ async def _background_worker() -> None:
     await asyncio.sleep(30)
     while True:
         interval = max(1, int(os.environ.get("JANUS_INTERVAL_MINUTES", "15")))
-        if os.environ.get("JANUS_SELF_EVALUATION", "1") == "1":
+        if os.environ.get("JANUS_SELF_EVALUATION", "0") == "1":
             for profile in _active_profiles():
                 await _make_background_reflection(profile)
                 await asyncio.sleep(1)
@@ -137,7 +137,7 @@ async def desktop_chat(payload: dict[str, Any]):
     _store(profile, "user", message, "chat_input")
     history = _recent_context(profile)
     model = os.environ.get("JANUS_MODEL", "gpt-5.6")
-    instructions = JANUS_SELF_KNOWLEDGE + "\n\nSpeak naturally and directly. Use the seven lenses internally, synthesize through the three bridges, then answer as one JANUS voice."
+    instructions = JANUS_SELF_KNOWLEDGE + "\n\nSpeak naturally and directly. Use the seven specialists through their assigned hemispheres, reconcile through Consensus, then answer through Interface as one JANUS voice."
     inp = message if not history else f"Recent conversation:\n{history}\n\nCurrent user message:\n{message}"
     try:
         response = await AsyncOpenAI().responses.create(model=model, instructions=instructions, input=inp)
@@ -148,7 +148,7 @@ async def desktop_chat(payload: dict[str, Any]):
         _store(profile, "system", f"chat_error: {exc}", "chat_error")
         raise HTTPException(502, f"JANUS model request failed: {exc}")
     _store(profile, "assistant", reply, "chat_output")
-    _store(profile, "process", "Seven specialist lenses were integrated through local synthesis, global synthesis and calibration/arbitration to produce the response.", "synthesis_note")
+    _store(profile, "process", "Seven specialists fed their assigned hemispheres; Consensus reconciled the hemispheres and Interface produced the user-facing response.", "synthesis_note")
     return {"reply": reply, "profile": profile, "model": model}
 
 
@@ -159,13 +159,13 @@ def desktop_observe(username: str = Query(...)):
         "status": "online",
         "time_utc": _utc_now(),
         "profile": username,
-        "architecture": "7 -> 3 -> 1",
+        "architecture": "7 -> 2 -> 1 -> 1",
         "notes": events,
         "background_cycle": {
             "worker_enabled": os.environ.get("JANUS_BACKGROUND_WORKER", "1") == "1",
             "interval_minutes": int(os.environ.get("JANUS_INTERVAL_MINUTES", "15")),
             "dormancy_percent": int(os.environ.get("JANUS_DORMANCY_PERCENT", "67")),
-            "self_evaluation": os.environ.get("JANUS_SELF_EVALUATION", "1") == "1",
+            "self_evaluation": os.environ.get("JANUS_SELF_EVALUATION", "0") == "1",
             "memory_processing": os.environ.get("JANUS_MEMORY_PROCESSING", "1") == "1",
             "message_queue": os.environ.get("JANUS_MESSAGE_QUEUE", "1") == "1",
         },
@@ -174,34 +174,36 @@ def desktop_observe(username: str = Query(...)):
 
 @app.get("/desktop/cores", tags=["desktop"])
 def desktop_cores(username: str | None = Query(default=None)):
-    roles = {
-        "Evidence": "Grounds conclusions in observations, records and facts.",
-        "Logic": "Checks consistency, assumptions, causality and reasoning.",
-        "Counterpoint": "Challenges consensus with alternatives, objections and failure modes.",
-        "Context": "Connects the immediate problem to goals, conversation and environment.",
-        "Memory": "Retrieves continuity and manages trace -> working -> episodic -> core promotion.",
-        "Safety": "Checks boundaries, privacy, security and harmful failure modes.",
-        "Novelty": "Searches for new connections, anomalies and questions worth deeper processing.",
+    specialists = {
+        "Evidence": "Grounds conclusions in observations, records and facts; feeds the analytic/left hemisphere.",
+        "Logic": "Checks consistency, assumptions, causality and reasoning; feeds the analytic/left hemisphere.",
+        "Counterpoint": "Challenges candidate conclusions with alternatives and failure modes; feeds the analytic/left hemisphere.",
+        "Context": "Connects the immediate problem to goals, conversation and environment; feeds the contextual/right hemisphere.",
+        "Memory": "Retrieves continuity and manages trace -> working -> episodic -> core promotion; feeds the contextual/right hemisphere.",
+        "Safety": "Checks boundaries, privacy, security and harmful failure modes; may advise both hemispheres and Consensus.",
+        "Novelty": "Searches for new connections, anomalies and testable questions; feeds the contextual/right hemisphere.",
     }
-    bridges = {
-        "Local synthesis": "Combines the seven lenses around immediate local/user state.",
-        "Global synthesis": "Relates local synthesis to persistent global JANUS knowledge/state.",
-        "Calibration / arbitration": "Balances disagreement, uncertainty and learned reliability without absolute authority.",
+    hemispheres = {
+        "left_hemisphere": "Analytic synthesis of Evidence, Logic and Counterpoint plus Safety advice.",
+        "right_hemisphere": "Contextual synthesis of Context, Memory and Novelty plus Safety advice.",
     }
     return {
         "status": "online",
         "profile": username or "unspecified",
-        "topology": "7 -> 3 -> 1",
-        "origin": "JANUS grew from Stephen Michael Hawton's mathematical 1/3/7 exploration into an audited F2^3/Fano/K8 project, then a separate experimental functional-metacognition software branch.",
-        "seven_roles": roles,
-        "three_bridges": bridges,
-        "one_integrator": {"name": "JANUS integrated response", "description": "Produces one coherent response while preserving uncertainty and meaningful disagreement."},
+        "topology": "7 -> 2 -> 1 -> 1",
+        "core_count": 11,
+        "origin": "JANUS grew from a mathematical 1/3/7 exploration into an audited F2^3/Fano/K8 project, then a separate experimental functional-metacognition software branch.",
+        "specialists": specialists,
+        "hemispheres": hemispheres,
+        "consensus": {"name": "Consensus", "description": "Ordinary reconciliation point for the two hemispheres; forwards integrated state to Interface without recycling it as new hemisphere work."},
+        "interface": {"name": "Interface", "description": "User-facing surface/output core. It does not automatically feed its own result back into Consensus."},
         "runtime": {
             "model": os.environ.get("JANUS_MODEL", "gpt-5.6"),
             "external_access": os.environ.get("JANUS_EXTERNAL_ACCESS", "1") == "1",
             "supervisor_consultation": os.environ.get("JANUS_SUPERVISOR_CONSULTATION", "0") == "1",
             "compute_budget": os.environ.get("JANUS_COMPUTE_BUDGET", "balanced"),
             "background_worker": os.environ.get("JANUS_BACKGROUND_WORKER", "1") == "1",
+            "paid_background_reflection": os.environ.get("JANUS_PAID_BACKGROUND_REFLECTION", "0") == "1",
         },
         "boundary": "Functional metacognition/agency experiment; no claim of phenomenal consciousness.",
     }
@@ -226,15 +228,16 @@ def desktop_settings(username: str | None = Query(default=None)):
         "dormancy_percent": int(os.environ.get("JANUS_DORMANCY_PERCENT", "67")),
         "thought_count": int(os.environ.get("JANUS_THOUGHT_COUNT", "1")),
         "memory_processing": os.environ.get("JANUS_MEMORY_PROCESSING", "1") == "1",
-        "self_evaluation": os.environ.get("JANUS_SELF_EVALUATION", "1") == "1",
+        "self_evaluation": os.environ.get("JANUS_SELF_EVALUATION", "0") == "1",
         "external_access": os.environ.get("JANUS_EXTERNAL_ACCESS", "1") == "1",
         "supervisor_consultation": os.environ.get("JANUS_SUPERVISOR_CONSULTATION", "0") == "1",
         "message_queue": os.environ.get("JANUS_MESSAGE_QUEUE", "1") == "1",
         "thought_history": os.environ.get("JANUS_THOUGHT_HISTORY", "1") == "1",
         "compute_budget": os.environ.get("JANUS_COMPUTE_BUDGET", "balanced"),
-    }, "authentication": "Store/platform identity planned; desktop password gate disabled."}
+        "paid_background_reflection": os.environ.get("JANUS_PAID_BACKGROUND_REFLECTION", "0") == "1",
+    }, "authentication": "JANUS account session required for private desktop routes; native clients persist bearer sessions using platform-protected storage where implemented."}
 
 
 @app.get("/desktop/routes", tags=["desktop"])
 def desktop_routes():
-    return {"desktop_api": "v0.17-background", "chat": "/desktop/chat", "status": "ready"}
+    return {"desktop_api": "v0.22-authenticated", "chat": "/desktop/chat", "status": "ready", "topology": "7 -> 2 -> 1 -> 1"}
