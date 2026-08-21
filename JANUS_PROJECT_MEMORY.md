@@ -31,6 +31,13 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - Android v0.43 complements the server bridge with a local surface path, so local Interface conclusions can reach Messages without waiting for the server. The server path remains necessary for durable global/cross-device continuity and notifications.
 - Secure desktop routing preserves local_runtime_evidence: secure_chat copies the payload, binds the authenticated profile, removes only the auth token, then forwards the evidence to runtime_messaging's active chat handler.
 
+## Core-sync 500 checkpoint
+- Android v0.43 reported repeated HTTP 500 failures from POST /core-sync/exchange while local processing itself remained healthy.
+- Proven root cause: auth.account_for_token() returns sqlite3.Row, but core_sync.py attempted account.get("username") / account.get("email"). sqlite3.Row has mapping-style [] access but no .get(), causing authenticated sync to raise AttributeError before persistence.
+- Fixed core_sync.py to read account records safely through _account_value(), supporting sqlite3.Row and ordinary dict-like records. Account id, username and email are now resolved without .get() assumptions.
+- Hardened /core-sync/exchange so runtime intake, Observe persistence, runtime snapshots, and profile Activity/Memory/Messages persistence are isolated. One failed persistence concern no longer turns a valid exchange into HTTP 500; the endpoint returns ok=true with sync_degraded=true and sync_errors diagnostics instead.
+- Android v0.43 does not require rebuilding for this specific server crash: it already posts the correct summary and retries synchronization periodically. After the server deployment it should reconnect automatically. A later client version may optionally expose sync_degraded diagnostics more explicitly in UI.
+
 ## APK delivery
 - GitHub Actions builds the debug APK and force-publishes an orphan branch named apk-download containing downloads/JANUS-Android-v<version>.apk and oauth-build-info.txt.
 - The normal GitHub folder/blob mobile UI is not a reliable one-tap APK download path. Prefer a direct raw file URL to the APK on the apk-download branch (raw.githubusercontent.com/Vardath/JANUS/apk-download/downloads/JANUS-Android-v<version>.apk), or another verified direct-download endpoint.
