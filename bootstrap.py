@@ -49,14 +49,18 @@ try:
     from attachment_api import router as attachment_router
     from attachment_retention import install_storage_auditor
     from image_generation import router as image_generation_router, install_chat_image_bridge
+    from image_inline import router as image_inline_router
+    from image_response_compat import install as install_image_response_compat
     from chat_receipt_security import install as install_chat_receipt_security
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
     app.include_router(attachment_router)
     app.include_router(image_generation_router)
+    app.include_router(image_inline_router)
     install_storage_auditor(app, janus_sleep_cycle)
     install_chat_image_bridge(app, interface_chat_module)
+    install_image_response_compat(app)
     install_chat_receipt_security(interface_chat_module)
     install_auth_rate_limit(app)
 
@@ -124,6 +128,7 @@ try:
             "file_sharing_enabled": True,
             "file_storage_auditor_enabled": True,
             "lightweight_image_generation_enabled": True,
+            "image_inline_transport_enabled": True,
             "background_multi_core_image_generation_enabled": False,
         }
 
@@ -151,6 +156,7 @@ try:
             "file_audit_route_present": "/files/audit/recent" in routes,
             "image_generate_route_present": "/images/generate" in routes,
             "image_usage_route_present": "/images/usage" in routes,
+            "image_inline_route_present": any(path.startswith("/images/{file_id}/inline") for path in routes),
             "background_multi_core_image_generation_enabled": False,
             "auth_rate_limit_enabled": True,
         }
@@ -228,6 +234,7 @@ except Exception as exc:
             "file_audit_route_present": False,
             "image_generate_route_present": False,
             "image_usage_route_present": False,
+            "image_inline_route_present": False,
             "background_multi_core_image_generation_enabled": False,
             "auth_rate_limit_enabled": False,
         }
