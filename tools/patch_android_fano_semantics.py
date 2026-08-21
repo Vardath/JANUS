@@ -34,7 +34,11 @@ if 'private static String fanoOrientationName(int d)' not in s:
         for(String t:inputs){int d=fanoDirectionFromText(t);if(d==0)continue;if(a==0)a=d;else if(d!=a){b=d;break;}}
         return a!=0&&b!=0?((a^b)&7):0;
     }
-    private static boolean hasAny(String low,String... words){for(String w:words)if(low.contains(w))return true;return false;}
+    private static String fanoReadableState(String raw){
+        Matcher m=Pattern.compile("Fano d([0-7])=([^;]+);.*?pressure=([a-z]+)",Pattern.CASE_INSENSITIVE).matcher(raw==null?"":raw);
+        if(!m.find())return "";
+        return "Fano orientation: "+m.group(2)+" (d"+m.group(1)+"); "+m.group(3)+" processing pressure is dominant.";
+    }
     private static String fanoFocus(List<String> inputs,int d){
         if(inputs==null||inputs.isEmpty())return "maintenance / retained state";
         String[] markers;
@@ -92,10 +96,16 @@ if 'private static String fanoOrientationName(int d)' not in s:
         raise SystemExit('Could not structurally replace Android think() for Fano semantics')
     s = s2
 
-# Build-time assertions: the numbers must have causal semantics, not just telemetry.
+old = '            return topic.isEmpty()?base:base+" Current focus: "+topic+".";\n'
+new = '            String visible=topic.isEmpty()?base:base+" Current focus: "+topic+"."; String fs=fanoReadableState(raw); return fs.isEmpty()?visible:visible+" "+fs;\n'
+if old in s:
+    s = s.replace(old, new, 1)
+elif 'fanoReadableState(raw)' not in s:
+    raise SystemExit('Could not patch readable Observe Fano state')
+
 required = [
     'fanoOrientationName', 'fanoDirective', 'fanoFocus', 'fanoCompletion',
-    'control=', 'pressure=', 'line-completion=d'
+    'fanoReadableState(raw)', 'control=', 'pressure=', 'line-completion=d'
 ]
 for token in required:
     if token not in s:
