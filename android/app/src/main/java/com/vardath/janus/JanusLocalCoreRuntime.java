@@ -10,6 +10,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.regex.*;
 
 /**
  * Persistent zero-API-cost 11-core runtime.
@@ -26,6 +27,9 @@ public final class JanusLocalCoreRuntime {
     private static final long REST_BACKGROUND_MS=30_000L;
     private static final long AUTONOMOUS_PULSE_MS=60_000L;
     private static final long SELF_ASSESS_MS=120_000L;
+    private static final Pattern WORD_RE=Pattern.compile("[A-Za-z][A-Za-z0-9_-]{2,}");
+    private static final Pattern NUM_RE=Pattern.compile("(?<![A-Za-z])[-+]?\\d+(?:\\.\\d+)?(?:/\\d+(?:\\.\\d+)?)?");
+    private static final Set<String> STOP=new HashSet<>(Arrays.asList("the","and","that","this","with","from","have","has","had","was","were","are","for","you","your","but","not","can","could","would","should","into","about","then","than","they","them","their","there","what","when","where","which","while","will","also","just","more","some","such","only","our","out","how","why","who","its","itself"));
     private static JanusLocalCoreRuntime instance;
     static synchronized JanusLocalCoreRuntime get(Context c){ if(instance==null)instance=new JanusLocalCoreRuntime(c.getApplicationContext()); return instance; }
 
@@ -100,6 +104,7 @@ public final class JanusLocalCoreRuntime {
         if("phase".equals(type))return clean;
         if("user_topic".equals(type))return clean;
         if("autonomous_pulse".equals(type))return "Memory resurfaced retained material for an autonomous cross-core review. "+clean;
+        if("functional_state".equals(type))return "The local hive computed operational curiosity/tension/confidence signals for the current comparison. "+clean;
         if("self_assessment".equals(type))return "Consensus compared internal positions and measured unresolved disagreement. "+clean;
         return clean;
     }
@@ -133,6 +138,23 @@ public final class JanusLocalCoreRuntime {
         if(clean.length()>1200)clean=clean.substring(0,1200);
         localMemories.addLast(role+": "+clean); while(localMemories.size()>MAX_LOCAL_MEMORIES)localMemories.pollFirst();
     }
+
+    private static Set<String> terms(String text){
+        Set<String> out=new LinkedHashSet<>(); Matcher m=WORD_RE.matcher(text==null?"":text.toLowerCase(Locale.ROOT));
+        while(m.find()&&out.size()<64){String w=m.group();if(!STOP.contains(w))out.add(w);}return out;
+    }
+    private static List<Double> numbers(String text){
+        List<Double> out=new ArrayList<>();Matcher m=NUM_RE.matcher(text==null?"":text);
+        while(m.find()&&out.size()<16){String s=m.group();try{double v;if(s.contains("/")){String[] p=s.split("/",2);v=Double.parseDouble(p[0])/Double.parseDouble(p[1]);}else v=Double.parseDouble(s);if(Double.isFinite(v))out.add(v);}catch(Exception ignored){}}return out;
+    }
+    private static String numericRelations(String a,String b){
+        List<Double> x=numbers(a),y=numbers(b);List<String> found=new ArrayList<>();
+        for(double u:x)for(double v:y){if(found.size()>=5)break;if(Math.abs(u-v)<1e-9)found.add(trimNum(u)+"="+trimNum(v));if(Math.abs(v)>1e-9){double r=u/v,longR=Math.rint(r);if(Math.abs(r-longR)<1e-9&&Math.abs(longR)>=2&&Math.abs(longR)<=64)found.add(trimNum(u)+"="+(long)longR+"×"+trimNum(v));}double s=u+v;if(Math.abs(s-Math.rint(s))<1e-9&&Math.abs(s)<=10000)found.add(trimNum(u)+"+"+trimNum(v)+"="+(long)Math.rint(s));}
+        LinkedHashSet<String> unique=new LinkedHashSet<>(found);return unique.isEmpty()?"no simple exact relation":String.join("; ",unique);
+    }
+    private static String trimNum(double v){return Math.abs(v-Math.rint(v))<1e-9?Long.toString((long)Math.rint(v)):String.format(Locale.US,"%.4g",v);}
+    private static int countAny(String text,String... needles){String t=(text==null?"":text.toLowerCase(Locale.ROOT));int n=0;for(String s:needles)if(t.contains(s))n++;return n;}
+    private static double clamp(double v){return Math.max(0.0,Math.min(1.0,v));}
 
     private JSONArray unsyncedObserveArray(){
         JSONArray a=new JSONArray();int kept=0;long maxAt=lastSyncAt;
@@ -180,13 +202,25 @@ public final class JanusLocalCoreRuntime {
 
     private void autonomousPulse(long now){
         if(localMemories.isEmpty()){record("memory",null,"autonomous_pulse","Local autonomous pulse found no retained topic yet.");return;}
-        List<String> mem=new ArrayList<>(localMemories);
-        int a=Math.floorMod((int)(now/60000L),mem.size());
-        int b=mem.size()==1?a:Math.floorMod(a+Math.max(1,mem.size()/2),mem.size());
-        String first=mem.get(a),second=mem.get(b);
-        String task="Autonomous revisit: "+clip(first,420)+(a==b?"":" | Compare/connect with: "+clip(second,420));
-        for(String n:SPECIALISTS)cores.get(n).inbox.addLast(task);
-        record("memory","novelty","autonomous_pulse",task);
+        List<String> mem=new ArrayList<>(localMemories);int a=Math.floorMod((int)(now/60000L),mem.size());int b=mem.size()==1?a:Math.floorMod(a+Math.max(1,mem.size()/2),mem.size());
+        String first=mem.get(a),second=mem.get(b);Set<String> ta=terms(first),tb=terms(second),shared=new LinkedHashSet<>(ta);shared.retainAll(tb);Set<String> union=new LinkedHashSet<>(ta);union.addAll(tb);
+        double overlap=union.isEmpty()?0.0:(double)shared.size()/union.size();String numeric=numericRelations(first,second);
+        int uncertain=countAny(first+" "+second,"maybe","perhaps","might","could","uncertain","possible","hypothesis","tentative","unknown","?");
+        int conflict=countAny(first+" "+second," not ","no ","never","false","wrong","cannot","unsupported","fails","failed");
+        double novelty=clamp(1.0-overlap+("no simple exact relation".equals(numeric)?0.0:0.12));double uncertainty=clamp(uncertain*0.14);double tension=clamp(conflict*0.20+uncertainty*0.35);double salience=clamp(0.30+Math.min(0.40,shared.size()*0.08)+("no simple exact relation".equals(numeric)?0.0:0.15));double confidence=clamp(0.62+0.20*overlap-0.30*uncertainty-0.25*tension);double curiosity=clamp(0.45*novelty+0.30*uncertainty+0.25*salience);
+        String sharedText=shared.isEmpty()?"none strong":String.join(", ",new ArrayList<>(shared).subList(0,Math.min(8,shared.size())));
+        String base="A: "+clip(first,300)+" | B: "+clip(second,300);
+        Map<String,String> tasks=new LinkedHashMap<>();
+        tasks.put("evidence","Autonomous evidence task: separate recorded support from inference; shared terms="+sharedText+"; identify what observation/source/test would discriminate alternatives. "+base);
+        tasks.put("logic","Autonomous logic/calculation task: test structural and numeric consistency without assuming significance; numeric scan="+numeric+". "+base);
+        tasks.put("counterpoint","Autonomous counterpoint task: try to falsify the connection; look for coincidence, selection effects, base-rate alternatives and overfitting. tension="+String.format(Locale.US,"%.2f",tension)+" confidence="+String.format(Locale.US,"%.2f",confidence)+". "+base);
+        tasks.put("context","Autonomous context task: determine whether the pair shares historical/semantic context or merely vocabulary; shared terms="+sharedText+". "+base);
+        tasks.put("memory","Autonomous memory task: compare these retained records with unfinished work; identify repetition, change or unresolved questions. "+base);
+        tasks.put("safety","Autonomous boundary task: preserve privacy/security and separate mathematical, historical, speculative and phenomenal-consciousness claims. "+base);
+        tasks.put("novelty","Autonomous novelty task: seek a useful but testable new connection; curiosity="+String.format(Locale.US,"%.2f",curiosity)+" salience="+String.format(Locale.US,"%.2f",salience)+"; numeric scan="+numeric+". "+base);
+        for(Map.Entry<String,String> e:tasks.entrySet())cores.get(e.getKey()).inbox.addLast(e.getValue());
+        String state="shared="+sharedText+"; numeric="+numeric+"; curiosity="+String.format(Locale.US,"%.2f",curiosity)+"; tension="+String.format(Locale.US,"%.2f",tension)+"; confidence="+String.format(Locale.US,"%.2f",confidence)+"; salience="+String.format(Locale.US,"%.2f",salience);
+        record("memory","novelty","autonomous_pulse","Compared two retained memories. "+state+". "+base);record("consensus",null,"functional_state",state);
         serviceBurst(true);
     }
 
