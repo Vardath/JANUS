@@ -63,10 +63,53 @@ public final class JanusLocalCoreRuntime {
         lastDisagreementScore=prefs.getInt("core_last_disagreement_score",0);
     }
 
+    private static String displayName(String core){return core==null?"Core":core.replace('_',' ');}
+    private static String actionFor(String core){
+        if("evidence".equals(core))return "checked what is supported versus inferred";
+        if("logic".equals(core))return "checked consistency and causal gaps";
+        if("counterpoint".equals(core))return "challenged the current interpretation and looked for alternatives";
+        if("context".equals(core))return "related the topic to retained context and goals";
+        if("memory".equals(core))return "compared the topic with retained local memory";
+        if("safety".equals(core))return "checked privacy, security and harmful failure modes";
+        if("novelty".equals(core))return "looked for an unusual but testable connection";
+        if("left_hemisphere".equals(core))return "combined the evidence, logic and counterpoint views";
+        if("right_hemisphere".equals(core))return "combined the context, memory and novelty views";
+        if("consensus".equals(core))return "integrated both hemispheres while preserving unresolved disagreement";
+        if("interface".equals(core))return "updated the user-facing shared state";
+        return "processed its assigned work";
+    }
+    private static String topicFrom(String raw){
+        if(raw==null)return "";
+        int p=raw.indexOf("; topic="); if(p<0)return ""; p+=8;
+        int q=raw.indexOf("; Fano",p); if(q<0)q=Math.min(raw.length(),p+260);
+        return clip(raw.substring(p,q),260);
+    }
+    private static String externalize(String core,String peer,String type,String raw){
+        String clean=clip(raw,900);
+        if("process_note".equals(type)){
+            String topic=topicFrom(raw);
+            String base=Character.toUpperCase(displayName(core).charAt(0))+displayName(core).substring(1)+" "+actionFor(core)+".";
+            return topic.isEmpty()?base:base+" Current focus: "+topic+".";
+        }
+        if("interaction".equals(type)){
+            String topic=topicFrom(raw);
+            String base=Character.toUpperCase(displayName(core).charAt(0))+displayName(core).substring(1)+" sent its current result to "+displayName(peer)+".";
+            return topic.isEmpty()?base:base+" Shared focus: "+topic+".";
+        }
+        if("maintenance".equals(type))return "The local society completed a low-duty maintenance pass; pending work was checked with zero model/API calls.";
+        if("phase".equals(type))return clean;
+        if("user_topic".equals(type))return clean;
+        if("autonomous_pulse".equals(type))return "Memory resurfaced retained material for an autonomous cross-core review. "+clean;
+        if("self_assessment".equals(type))return "Consensus compared internal positions and measured unresolved disagreement. "+clean;
+        return clean;
+    }
+
     private synchronized void record(String core,String peer,String type,String detail){
         try{
             long ts=System.currentTimeMillis();
-            JSONObject e=new JSONObject().put("event_id",UUID.randomUUID().toString()).put("source","local").put("core_name",core).put("event_type",type).put("detail",detail).put("created_at",ts);
+            String raw=detail==null?"":detail;
+            JSONObject e=new JSONObject().put("event_id",UUID.randomUUID().toString()).put("source","local").put("core_name",core).put("event_type",type)
+                    .put("detail",externalize(core,peer,type,raw)).put("raw_detail",raw).put("created_at",ts);
             if(peer!=null&&!peer.isEmpty())e.put("peer_core",peer);
             observeEvents.addLast(e); while(observeEvents.size()>MAX_OBSERVE_EVENTS)observeEvents.pollFirst();
         }catch(Exception ignored){}
@@ -124,13 +167,10 @@ public final class JanusLocalCoreRuntime {
         long now=System.currentTimeMillis(),elapsed=now-phaseStarted;
         if("wake".equals(phase)&&elapsed>=5*60_000L){phase="sleep";phaseStarted=now;record("interface",null,"phase","Local society entered low-duty mode; all cores remain available for work.");}
         else if("sleep".equals(phase)&&elapsed>=10*60_000L){phase="wake";phaseStarted=now;record("interface",null,"phase","Local society entered full-rate processing.");}
-
         boolean fullRate="wake".equals(phase);
         if(cores.get("interface").inbox.size()>0)cycle("interface");
-
         if(fullRate || now-lastBackgroundCycleAt>=REST_BACKGROUND_MS){
-            serviceBurst(false);
-            lastBackgroundCycleAt=now;
+            serviceBurst(false); lastBackgroundCycleAt=now;
             if(!fullRate)record("interface",null,"maintenance","Low-duty local maintenance pass checked all pending core work; zero API calls.");
         }
         if(now-lastAutonomousAt>=AUTONOMOUS_PULSE_MS){autonomousPulse(now);lastAutonomousAt=now;}
@@ -164,7 +204,6 @@ public final class JanusLocalCoreRuntime {
         }
     }
 
-    /** Process a meaningful staged 7→2→1→1 pass from whatever work is pending. */
     private void serviceBurst(boolean includeInterface){
         for(String n:SPECIALISTS)if(!cores.get(n).inbox.isEmpty())cycle(n);
         if(!cores.get("left_hemisphere").inbox.isEmpty())cycle("left_hemisphere");
@@ -217,7 +256,6 @@ public final class JanusLocalCoreRuntime {
     }
 
     private static String clip(String s,int max){String x=s==null?"":s.replace('\n',' ').replace('\r',' ').trim();return x.length()<=max?x:x.substring(0,max)+"…";}
-
     private void loadFano(Core c){String raw=prefs.getString("core_fano_"+c.name,"");if(raw==null||raw.isEmpty())return;try{JSONArray a=new JSONArray(raw);for(int i=0;i<8&&i<a.length();i++)c.fano[i]=Math.max(1,a.optLong(i,1));c.fanoSteps=prefs.getLong("core_fano_steps_"+c.name,0);c.activeDirection=prefs.getInt("core_fano_active_"+c.name,0);}catch(Exception ignored){}}
 
     private synchronized void persist(){
