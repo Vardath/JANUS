@@ -17,9 +17,13 @@ Fano/JANUS state is operational rather than decorative: persistent d0–d7 orien
 
 ## Current client status
 
-- **Android v0.51** is the current published APK checkpoint. It includes forward-only routing, readable Observe output, persistent local/global Messages, operational Fano semantics, persistent user-directed deliberation, and saturation-escape regulation that can redirect recursive processing toward fresh grounding.
-- **Windows v0.22** source/build workflow includes JANUS account login/register/session restore and DPAPI-protected session storage. Real Windows launch/use testing is still pending.
-- **iOS** has authenticated account/session scaffolding, Keychain token storage and an unsigned simulator CI workflow. Apple signing/TestFlight/device testing is still pending.
+On the lightweight-image feature branch:
+
+- **Android v0.52** renders account-bound JANUS-generated images inline in Chat. The WebView receives image bytes through an authenticated JSON/base64 transport; no public or token-bearing image URL is exposed.
+- **Windows v0.23** renders generated PNGs inline in the Tk Chat transcript after a bearer-authenticated binary fetch. Session tokens remain DPAPI-protected at rest.
+- **iOS v0.2** renders generated images inline in native SwiftUI Chat after a Keychain-backed bearer-authenticated binary fetch. The unsigned simulator build workflow compiles successfully; Apple signing/TestFlight/device testing remain future release steps.
+
+The prior published Android checkpoint remains v0.51 until the image branch is merged/published. Windows and iOS feature-branch packages are CI artifacts rather than signed production releases.
 
 The Android Messages path has been real-device tested end-to-end with a JANUS-originated test message. Autonomous useful unsolicited messaging is intentionally thresholded and remains an ongoing soak-test target rather than routine telemetry spam.
 
@@ -31,17 +35,23 @@ Private Chat, Messages, Observe, Cores, Memory, Activity and Settings routes are
 
 Public authentication endpoints are rate-limited. Detailed deployment/schema diagnostics require the server administrative token. Temporary chat-delivery receipts and repetitive runtime snapshots have bounded retention; meaningful conversation/memory continuity data remains until account deletion.
 
+Generated images and uploaded files use the same account-bound persistent file store. File bytes are not made public merely to display them in clients: Windows/iOS use authenticated binary download and Android uses an authenticated inline/base64 transport. The global storage auditor may review stale unpinned files under its configured retention policy.
+
 See `/privacy` and `/terms` on the deployed service for the current legal-development pages.
 
 ## API/background cost policy
 
 Deterministic local/server core cycles do not require external language-model calls. Paid background language reflection is **disabled by default** in production. User-triggered Chat may use the configured OpenAI model.
 
+Stage-1 image generation is bounded separately. Explicit user image requests and rare explanation-helpful visuals can render under account/global caps and cache reuse. Background multi-core image generation, candidate render/review loops and autonomous visual deliberation remain disabled until deliberately enabled under a future revenue/cost policy.
+
 Bounded web curiosity is a separate capability: JANUS may occasionally perform relevant, adjacent or unrelated learning searches under daily/mode caps and cooldowns. Self-regulation may request a relevant search when processing becomes starved of fresh grounding, but it cannot bypass those caps.
 
-## Deferred capabilities
+## File and image capabilities
 
-Planned for later: authenticated file sharing, document understanding and image/screenshot recognition using a local-first/selective-escalation design. Upload plumbing and local parsing should remain non-API where possible; paid model/vision analysis should occur only when useful and should be cached/reused. See `DEFERRED_FEATURES.md` for the implementation plan.
+The current feature stack adds authenticated file storage, autonomous retention auditing and bounded Stage-1 image generation. Generated images are reusable file artifacts and therefore share the same ownership, deletion and retention controls as other attachments.
+
+Future work still includes richer document parsing/grounding, image/screenshot recognition, and eventually the revenue-gated multi-core visual deliberation system described in `DEFERRED_FEATURES.md` and `IMAGE_GENERATION_POLICY.md`.
 
 ## Render deployment
 
@@ -64,6 +74,7 @@ GitHub Actions contains regression/build workflows for:
 
 - Android APK builds and routing verification;
 - authentication lifecycle/security tests;
+- file ownership/retention and image-generation policy tests;
 - forward-only routing and remote-feedback tests;
 - operational Fano semantics and saturation-regulation checks;
 - architecture/deployment contract checks;
