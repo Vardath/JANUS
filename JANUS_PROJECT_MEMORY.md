@@ -36,6 +36,8 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - Left and right hemispheres do not feed each other directly during ordinary routing. Consensus is the reconciliation point.
 - Interface is a surface/output state, not an automatic new thinking topic. Consensus does not feed its result back into either hemisphere.
 - Cross-device/global feedback is compressed and tagged [feedback-only], then routed through Context + Counterpoint specialist review rather than injected directly into Consensus/Interface.
+- routing_policy.py overrides BOTH ordinary _route_output and accept_remote_summary, so synchronized client Consensus/Interface states cannot re-enter global Consensus directly.
+- Added tests/test_routing_policy.py plus GitHub Actions routing CI. The suite fails if ordinary left/right cross-feed, Consensus->hemisphere feedback, Interface->Consensus feedback, or direct remote-summary injection into Consensus/Interface returns.
 - Android forward-routing patch is verified at build time; routing verifier must only flag actual prohibited edges and must not mistake legitimate Safety fan-out for recursion.
 
 ## Core-sync 500 checkpoint
@@ -51,21 +53,24 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - Added GitHub Actions auth regression workflow so auth/security changes are automatically tested.
 - secure_desktop.py binds private desktop routes to the authenticated account username and ignores client attempts to select another profile. Added regression coverage for cross-user profile spoofing and invalid-session rejection.
 - Google-only account lifecycle edge fixed for new accounts: password_hash is explicitly marked google_only rather than using an unreachable random PBKDF2 password. Password login rejects the marker; account deletion can therefore distinguish Google-only accounts correctly. Existing password accounts linked to Google keep their real password hash.
+- retention.py already performs daily auth hygiene: expired sessions, expired/old-used action tokens and stale pending deletion requests are cleaned automatically.
 - Non-Google account creation/login still requires end-to-end verification against the live Render persistent database from a real client.
 
 ## Windows / PC checkpoint
 - The previously packaged Windows v0.21 client used free-form profile selection and sent no bearer token, so it was structurally incompatible with secure_desktop's authenticated private routes.
 - Added client/janus_client_v022.py as an authenticated compatibility layer over the feature-complete v0.21/v0.20 UI chain.
-- Windows v0.22 adds username/email + password sign-in, Create Account, persisted session token restore, bearer-authenticated private Chat/Messages/Observe/Cores/Memory/Activity/Settings requests, and Sign Out.
+- Windows v0.22 adds username/email + password sign-in, Create Account, persisted session restore, bearer-authenticated private Chat/Messages/Observe/Cores/Memory/Activity/Settings requests, and Sign Out.
 - The authenticated account username, not a typed profile, becomes the active JANUS profile.
-- build-windows.yml now syntax-checks the v0.20/v0.21/v0.22 chain before PyInstaller and builds JANUS.exe from v0.22. Artifact name is JANUS-Windows-v0.22.
+- Windows session tokens are now persisted with Windows DPAPI bound to the current Windows user. Plaintext development access_token config is migrated once and removed; passwords are never persisted. If DPAPI is unavailable, JANUS does not persist the token.
+- build-windows.yml syntax-checks the v0.20/v0.21/v0.22 chain before PyInstaller and builds JANUS.exe from v0.22. Artifact name is JANUS-Windows-v0.22.
 - Windows v0.22 still needs real Windows launch/use testing by the user after CI produces the executable.
 
 ## Apple / iOS checkpoint
 - Existing iOS scaffold was also using arbitrary profile names and unauthenticated private requests.
-- APIClient.swift now persists a JANUS bearer token, supports username/email + password login, account registration, /auth/me session restore and /auth/logout, and attaches Authorization headers to private JANUS requests.
+- APIClient.swift supports username/email + password login, account registration, /auth/me session restore and /auth/logout, and attaches Authorization headers to private JANUS requests.
+- iOS session tokens are stored in Keychain using a device-bound generic-password entry rather than UserDefaults. APIClient explicitly imports Combine for ObservableObject/@Published compilation.
 - Models.swift contains Account/AuthResponse/MeResponse models for the auth lifecycle.
-- ContentView.swift now gates the app on a real JANUS account, provides Sign in/Create account UI, restores saved sessions, uses the authenticated account username as the profile, and exposes Sign out.
+- ContentView.swift gates the app on a real JANUS account, provides Sign in/Create account UI, restores saved sessions, uses the authenticated account username as the profile, and exposes Sign out.
 - iOS signing/certificates/Apple Developer account are not required for this source work. Simulator CI should be used to catch Swift compile errors before device signing work.
 - Sign in with Apple and native Apple-device background behaviour remain later tasks requiring platform/account input.
 
