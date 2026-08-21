@@ -1,10 +1,11 @@
 import Foundation
+import Combine
 
 @MainActor
 final class APIClient: ObservableObject {
     let baseURL = URL(string: "https://janus-global-core.onrender.com")!
     @Published var status: String = "Dormant"
-    @Published var accessToken: String = UserDefaults.standard.string(forKey: "janusAccessToken") ?? ""
+    @Published var accessToken: String = KeychainStore.readToken()
 
     private let decoder = JSONDecoder()
 
@@ -24,9 +25,7 @@ final class APIClient: ObservableObject {
             body: ["identifier": identifier, "password": password],
             authenticated: false
         )
-        if let token = response.access_token {
-            setToken(token)
-        }
+        if let token = response.access_token { setToken(token) }
         return response
     }
 
@@ -37,9 +36,7 @@ final class APIClient: ObservableObject {
             body: ["username": username, "email": email, "password": password],
             authenticated: false
         )
-        if let token = response.access_token {
-            setToken(token)
-        }
+        if let token = response.access_token { setToken(token) }
         return response
     }
 
@@ -91,11 +88,7 @@ final class APIClient: ObservableObject {
 
     private func setToken(_ token: String) {
         accessToken = token
-        if token.isEmpty {
-            UserDefaults.standard.removeObject(forKey: "janusAccessToken")
-        } else {
-            UserDefaults.standard.set(token, forKey: "janusAccessToken")
-        }
+        KeychainStore.writeToken(token)
     }
 
     private func request<T: Decodable, B: Encodable>(
