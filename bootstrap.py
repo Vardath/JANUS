@@ -48,7 +48,7 @@ try:
     from auth_rate_limit import install as install_auth_rate_limit
     from attachment_api import router as attachment_router
     from attachment_retention import install_storage_auditor
-    from image_generation import router as image_generation_router
+    from image_generation import router as image_generation_router, install_chat_image_bridge
     from chat_receipt_security import install as install_chat_receipt_security
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
@@ -56,6 +56,7 @@ try:
     app.include_router(attachment_router)
     app.include_router(image_generation_router)
     install_storage_auditor(app, janus_sleep_cycle)
+    install_chat_image_bridge(app, interface_chat_module)
     install_chat_receipt_security(interface_chat_module)
     install_auth_rate_limit(app)
 
