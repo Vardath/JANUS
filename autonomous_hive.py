@@ -94,8 +94,9 @@ def pulse(profile:str)->dict:
 
     message=None
     pair=f"{min(a['id'],b['id'])}:{max(a['id'],b['id'])}"
-    # Default: no more than one spontaneous candidate per six free pulses.
-    if count%6==0 and pair!=_meta(profile,"last_message_pair",""):
+    # Internal thought is frequent; user-facing spontaneity is deliberately slower.
+    # At the default one-minute pulse this is at most roughly once per hour.
+    if count%60==0 and pair!=_meta(profile,"last_message_pair",""):
         message=("I revisited two older parts of our history and found a connection worth bringing back into the conversation. "
                  f"One was about “{_clip(a['content'],120)}”; another was “{_clip(b['content'],120)}”. "
                  "I have not treated the connection as true—Evidence, Logic and Counterpoint are being asked to test it—but it may be worth exploring together.")
@@ -109,7 +110,6 @@ async def _language_reflection(profile:str):
     if not os.environ.get("OPENAI_API_KEY"): return
     rows=_memories(profile,40)
     if not rows: return
-    # Mix recent and older records so reflection is not only about the last turn.
     chosen=list(rows[:8])
     if len(rows)>12: chosen += [rows[len(rows)//2], rows[-1]]
     context="\n".join(f"[{r['level']}/{r['role']}] {_clip(r['content'],500)}" for r in chosen)
