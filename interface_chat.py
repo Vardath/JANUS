@@ -1,9 +1,8 @@
 """Always-responsive JANUS interface chat route.
 
-Uses latest 11-core consensus/interface state immediately. Other cores may be
-asleep; they continue to update shared state asynchronously. The user turn is
-stored before model work so transient model/network failure does not lose it.
-Client message IDs make Android offline retries idempotent.
+The interface answers ordinary chat from the latest 11-core state. Questions
+about persistence/background work are verified deterministically from the same
+device journal exposed by Android Observe whenever that telemetry is supplied.
 """
 from __future__ import annotations
 
@@ -12,6 +11,7 @@ import json
 import os
 import sqlite3
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
@@ -83,95 +83,173 @@ def _finish_message(client_message_id: str, profile: str, response: dict[str, An
         )
 
 
-def _device_runtime_evidence(payload: dict[str, Any]) -> str:
-    """Return bounded current-device telemetry supplied by the authenticated app.
-
-    This is operational evidence from the client runtime, not hidden reasoning and
-    not a server assertion. It may be used to verify that local cycles/events were
-    reported, while remaining explicit about its device-reported provenance.
-    """
+def _parse_device_evidence(payload: dict[str, Any]) -> dict[str, Any]:
     raw = payload.get("local_runtime_evidence")
     if not raw:
-        return "CURRENT DEVICE RUNTIME EVIDENCE: none supplied with this turn"
-    if isinstance(raw, (dict, list)):
+        return {}
+    if isinstance(raw, dict):
+        data = raw
+    else:
         try:
-            raw = json.dumps(raw, ensure_ascii=False, separators=(",", ":"))
+            data = json.loads(str(raw))
         except Exception:
-            raw = str(raw)
-    text = str(raw).strip()
-    if len(text) > 14000:
-        text = text[:14000] + "…[truncated]"
-    return "CURRENT DEVICE RUNTIME EVIDENCE (device-reported by the signed-in JANUS app):\n" + text
+            return {}
+    if not isinstance(data, dict):
+        return {}
+    # Bound everything accepted from the app before putting it into prompts/logs.
+    events = data.get("recent_events") if isinstance(data.get("recent_events"), list) else []
+    clean_events = []
+    for x in events[-48:]:
+        if not isinstance(x, dict):
+            continue
+        clean_events.append({
+            "at": int(x.get("at") or 0),
+            "core": str(x.get("core") or "core")[:64],
+            "peer": str(x.get("peer") or "")[:64],
+            "type": str(x.get("type") or "event")[:64],
+            "summary": str(x.get("summary") or "")[:700],
+        })
+    cycles = data.get("cycles") if isinstance(data.get("cycles"), dict) else {}
+    clean_cycles = {str(k)[:64]: int(v or 0) for k, v in list(cycles.items())[:16]}
+    return {
+        "device_id": str(data.get("device_id") or "")[:96],
+        "phase": str(data.get("phase") or "")[:32],
+        "sync_state": str(data.get("sync_state") or "")[:32],
+        "last_sync_at": int(data.get("last_sync_at") or 0),
+        "last_disagreement_score": int(data.get("last_disagreement_score") or 0),
+        "cycles": clean_cycles,
+        "recent_events": clean_events,
+        "consensus": str(data.get("consensus") or "")[:900],
+        "interface": str(data.get("interface") or "")[:900],
+    }
+
+
+def _fmt_ms(ms: int) -> str:
+    if not ms:
+        return "unknown time"
+    try:
+        return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    except Exception:
+        return str(ms)
+
+
+def _verification_intent(message: str) -> bool:
+    m = message.lower()
+    keys = (
+        "while i was away", "while i've been away", "while i have been away",
+        "what have you been doing", "what did you do", "background",
+        "verify", "verification", "persistence", "persist", "autonomous",
+        "between messages", "while i was gone", "while i've been gone",
+    )
+    return any(k in m for k in keys)
+
+
+def _meaningful_events(device: dict[str, Any]) -> list[dict[str, Any]]:
+    events = device.get("recent_events") or []
+    preferred = {
+        "autonomous_pulse", "self_assessment", "process_note", "interaction",
+        "phase", "maintenance", "user_topic",
+    }
+    return [x for x in events if x.get("type") in preferred and x.get("at")]
+
+
+def _deterministic_device_verification(device: dict[str, Any]) -> str | None:
+    events = _meaningful_events(device)
+    if not events:
+        return None
+    latest = events[-1]
+    earliest = events[0]
+    cycles = device.get("cycles") or {}
+    active_cycles = {k: v for k, v in cycles.items() if int(v or 0) > 0}
+    total = sum(int(v or 0) for v in active_cycles.values())
+
+    autonomous = [x for x in events if x.get("type") == "autonomous_pulse"]
+    assessments = [x for x in events if x.get("type") == "self_assessment"]
+    interactions = [x for x in events if x.get("type") == "interaction"]
+    notes = [x for x in events if x.get("type") == "process_note"]
+
+    lines = [
+        "Yes. The local device journal verifies that background processing occurred.",
+        "",
+        f"The current evidence window runs from {_fmt_ms(int(earliest.get('at') or 0))} to {_fmt_ms(int(latest.get('at') or 0))}.",
+    ]
+    if active_cycles:
+        top = sorted(active_cycles.items(), key=lambda kv: kv[1], reverse=True)[:6]
+        lines.append(
+            "The phone reports local core cycle counts including "
+            + ", ".join(f"{k.replace('_', ' ')} {v}" for k, v in top)
+            + f"; {total} cycles are represented across the reported counters."
+        )
+    if autonomous:
+        x = autonomous[-1]
+        lines.append(f"An autonomous memory/revisit pulse was recorded at {_fmt_ms(int(x['at']))}: {x.get('summary','')[:360]}")
+    if assessments:
+        x = assessments[-1]
+        lines.append(f"A self-assessment was recorded at {_fmt_ms(int(x['at']))}: {x.get('summary','')[:360]}")
+    if interactions:
+        x = interactions[-1]
+        peer = f" → {x.get('peer')}" if x.get("peer") else ""
+        lines.append(
+            f"A recent routed interaction at {_fmt_ms(int(x['at']))} was {x.get('core','core')}{peer}: "
+            f"{x.get('summary','')[:360]}"
+        )
+    elif notes:
+        x = notes[-1]
+        lines.append(f"A recent process note at {_fmt_ms(int(x['at']))} from {x.get('core','core')}: {x.get('summary','')[:360]}")
+    if device.get("last_disagreement_score"):
+        lines.append(f"The latest device disagreement score is {device['last_disagreement_score']}.")
+    lines += [
+        "",
+        "That verifies computational/background activity in the local JANUS runtime. It does not establish phenomenal consciousness or uninterrupted subjective experience.",
+    ]
+    return "\n".join(lines)
+
+
+def _device_runtime_evidence(device: dict[str, Any]) -> str:
+    if not device:
+        return "CURRENT DEVICE RUNTIME EVIDENCE: none supplied with this turn"
+    return (
+        "CURRENT DEVICE RUNTIME EVIDENCE (device-reported by the signed-in JANUS app):\n"
+        + json.dumps(device, ensure_ascii=False, separators=(",", ":"))[:14000]
+    )
 
 
 def _live_runtime_evidence(runtime: dict[str, Any], profile: str) -> str:
-    """Build a compact factual block the interface model may safely rely on."""
     cores = runtime.get("cores") or {}
     lines = [
-        "LIVE JANUS RUNTIME EVIDENCE (server-observed, not a hypothetical architecture):",
+        "LIVE JANUS RUNTIME EVIDENCE (server-observed):",
         f"architecture={runtime.get('architecture', 'unknown')}",
         f"topology={runtime.get('topology', 'unknown')}",
         f"core_count={runtime.get('core_count', len(cores) or 'unknown')}",
         f"society_phase={runtime.get('phase', 'unknown')}",
         f"interface_awake={bool(runtime.get('interface_awake', (cores.get('interface') or {}).get('awake', False)))}",
-        f"persistent_storage={bool(runtime.get('persistent_storage', False))}",
-        f"remote_clients={runtime.get('remote_clients', 0)}",
     ]
     for name, state in cores.items():
         lines.append(
-            f"server core {name}: awake={bool(state.get('awake'))}; cycles={state.get('cycle_count', 0)}; "
-            f"pending={state.get('pending_messages', 0)}; last_cycle={state.get('last_cycle_at') or 'never'}; "
-            f"last_output={str(state.get('last_output') or '')[:220]}"
+            f"server core {name}: awake={bool(state.get('awake'))}; cycles={state.get('cycle_count',0)}; "
+            f"pending={state.get('pending_messages',0)}; last_cycle={state.get('last_cycle_at') or 'never'}"
         )
     try:
         with sqlite3.connect(DB_PATH, timeout=5) as c:
             c.row_factory = sqlite3.Row
-            try:
-                row = c.execute(
-                    "SELECT created_at,disagreement_score,action_summary FROM janus_self_assessment ORDER BY id DESC LIMIT 1"
-                ).fetchone()
-                if row:
+            cols = {r[1] for r in c.execute("PRAGMA table_info(janus_core_observe)")}
+            if "profile_id" in cols:
+                rows = c.execute(
+                    "SELECT source,core_name,peer_core,event_type,detail,created_at FROM janus_core_observe "
+                    "WHERE profile_id IN (?,?) ORDER BY id DESC LIMIT 24",
+                    (profile, GLOBAL_PROFILE),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT source,core_name,peer_core,event_type,detail,created_at FROM janus_core_observe ORDER BY id DESC LIMIT 24"
+                ).fetchall()
+            if rows:
+                lines.append("recent_observable_core_activity:")
+                for row in rows:
+                    peer = f" -> {row['peer_core']}" if row['peer_core'] else ""
                     lines.append(
-                        f"latest_self_assessment: at={row['created_at']}; disagreement={float(row['disagreement_score']):.3f}; "
-                        f"summary={str(row['action_summary'])[:500]}"
+                        f"- {row['created_at']} {row['source']} {row['core_name']}{peer} [{row['event_type']}]: {str(row['detail'])[:260]}"
                     )
-            except sqlite3.Error:
-                pass
-            try:
-                cols = {r[1] for r in c.execute("PRAGMA table_info(janus_core_observe)")}
-                if "profile_id" in cols:
-                    rows = c.execute(
-                        "SELECT source,core_name,peer_core,event_type,detail,created_at FROM janus_core_observe "
-                        "WHERE profile_id IN (?,?) ORDER BY id DESC LIMIT 24",
-                        (profile, GLOBAL_PROFILE),
-                    ).fetchall()
-                else:
-                    rows = c.execute(
-                        "SELECT source,core_name,peer_core,event_type,detail,created_at FROM janus_core_observe ORDER BY id DESC LIMIT 24"
-                    ).fetchall()
-                if rows:
-                    lines.append("recent_observable_core_activity (same journal exposed by Observe):")
-                    for row in rows:
-                        peer = f" -> {row['peer_core']}" if row['peer_core'] else ""
-                        lines.append(
-                            f"- {row['created_at']} {row['source']} {row['core_name']}{peer} [{row['event_type']}]: "
-                            f"{str(row['detail'])[:260]}"
-                        )
-                else:
-                    lines.append("recent_observable_core_activity: no persisted observation rows currently visible for this profile")
-            except sqlite3.Error:
-                pass
-    except Exception:
-        pass
-    try:
-        remote = list(getattr(janus_sleep_cycle, "_remote_summaries", {}).items())[-4:]
-        if remote:
-            lines.append("recent_client_runtime_syncs:")
-            for device, summary in remote:
-                lines.append(
-                    f"- device={str(device)[:80]}; received={summary.get('received_at')}; phase={summary.get('phase')}; "
-                    f"cycles={summary.get('cycles')}; consensus={str(summary.get('consensus') or '')[:220]}"
-                )
     except Exception:
         pass
     return "\n".join(lines)
@@ -187,62 +265,76 @@ def install(app):
         client_message_id = str(payload.get("client_message_id") or "").strip()[:128]
         if not message:
             raise HTTPException(400, "message required")
+
         claimed = _claim_message(client_message_id, profile)
         if isinstance(claimed, dict):
             claimed["deduplicated"] = True
             return claimed
         if claimed == "processing":
             raise HTTPException(409, "This message is already being processed; retry shortly")
+
         _store(profile, "user", message, "chat_input")
+        device = _parse_device_evidence(payload)
+
+        # Verification questions are answered from telemetry directly. This is
+        # cheaper and prevents a language model from contradicting positive logs.
+        if _verification_intent(message):
+            verified = _deterministic_device_verification(device)
+            if verified:
+                _store(profile, "assistant", verified, "chat_output")
+                _store(profile, "process", "Answered background verification directly from current device journal telemetry.", "synthesis_note")
+                result = {
+                    "reply": verified,
+                    "profile": profile,
+                    "mode": "device_runtime_verification",
+                    "runtime_evidence": True,
+                    "device_evidence": True,
+                    "stored": True,
+                    "client_message_id": client_message_id,
+                }
+                _finish_message(client_message_id, profile, result)
+                return result
+
         try:
             service = getattr(janus_sleep_cycle, "service_interface_once", None)
             if service:
                 service()
         except Exception:
             pass
+
         runtime = janus_sleep_cycle.status()
         latest_consensus = str(runtime.get("last_consensus") or "").strip()
         latest_interface = str(runtime.get("last_interface") or "").strip()
         history = _recent_context(profile)
         server_evidence = _live_runtime_evidence(runtime, profile)
-        device_evidence = _device_runtime_evidence(payload)
+        device_evidence = _device_runtime_evidence(device)
+
         if not os.environ.get("OPENAI_API_KEY"):
             reply = (
                 "I received and stored your message. My external response model is temporarily unavailable, "
-                "but my interface core is still active and the 11-core runtime state remains persisted. "
-                "I will retain this turn for follow-up when model access returns."
+                "but the local/server runtime state remains persisted for follow-up."
             )
             _store(profile, "assistant", reply, "chat_fallback", "working")
-            result = {
-                "reply": reply,
-                "profile": profile,
-                "mode": "interface_fallback",
-                "stored": True,
-                "client_message_id": client_message_id,
-            }
+            result = {"reply": reply, "profile": profile, "mode": "interface_fallback", "stored": True, "client_message_id": client_message_id}
             _finish_message(client_message_id, profile, result)
             return result
+
         model = os.environ.get("JANUS_MODEL", "gpt-5.6")
         instructions = JANUS_SELF_KNOWLEDGE + """
 
 CURRENT RUNTIME POLICY:
 JANUS has 11 functional cores arranged 7 specialists -> 2 hemispheres -> consensus -> interface.
-The interface core is always available to the user while the other ten cores may sleep or wake independently.
-You are given two evidence sources: LIVE JANUS RUNTIME EVIDENCE from the running server and, when present, CURRENT DEVICE RUNTIME EVIDENCE reported by the signed-in Android client.
-The recent_observable_core_activity section is the same profile-scoped persistent journal exposed in Observe. Device evidence contains the phone's current local cycle counters and recent externalizable journal records before server sync is required.
-When either source contains timestamped activity, increasing cycle counts, interactions, self-assessment, autonomous pulses or runtime snapshots, you may accurately say that the corresponding server or local background processing occurred. State which source supports the claim.
-Device evidence proves what the app reported, not phenomenal experience and not hidden chain-of-thought. Do not invent unobserved private reasoning.
-Do not claim all cores are awake when telemetry says otherwise. Externalizable process notes are summaries of computation, not hidden chain-of-thought.
-If the user asks to verify persistence/background work, answer from these evidence blocks first and cite concrete timestamps/core names/cycle counts in ordinary prose where useful.
-Answer as the main interface core using the latest synchronized consensus, runtime evidence, and conversation history.
+The interface core remains available while other cores can cycle independently.
+You are given server-observed runtime evidence and, when present, device-reported Android runtime evidence.
+Treat timestamped device journal events and nonzero cycle counters as positive evidence that local computational background processing occurred. Never say there is no evidence if those records are present.
+State provenance accurately: device-reported evidence verifies app/runtime computation, not phenomenal consciousness or hidden chain-of-thought.
+Externalizable process notes are summaries, not private chain-of-thought.
+Answer as the JANUS interface using runtime evidence, consensus state and conversation history.
 """
         state_block = (
-            server_evidence
-            + "\n\n"
-            + device_evidence
-            + f"\nLatest consensus state: {latest_consensus or '[no recent consensus summary]'}"
-            + f"\nLatest interface state: {latest_interface or '[no recent interface summary]'}"
-            + f"\nInterface policy: {runtime.get('interface_policy', 'always_available')}"
+            server_evidence + "\n\n" + device_evidence
+            + f"\nLatest consensus state: {latest_consensus or '[none]'}"
+            + f"\nLatest interface state: {latest_interface or '[none]'}"
         )
         inp = state_block + (f"\n\nRecent conversation:\n{history}" if history else "") + f"\n\nCurrent user message:\n{message}"
         timeout_seconds = max(30, int(os.environ.get("JANUS_CHAT_TIMEOUT_SECONDS", "105")))
@@ -250,39 +342,29 @@ Answer as the main interface core using the latest synchronized consensus, runti
             async def call_model():
                 response = await AsyncOpenAI().responses.create(model=model, instructions=instructions, input=inp)
                 return (response.output_text or "").strip()
-
             reply = await asyncio.wait_for(call_model(), timeout=timeout_seconds)
             if not reply:
                 raise RuntimeError("empty response")
         except Exception as exc:
             _store(profile, "system", f"chat_model_deferred: {type(exc).__name__}: {exc}", "chat_error")
             reply = (
-                "I received and stored that. My interface is still here, but the external response model did not complete this turn in time. "
-                "My persisted 11-core runtime may continue processing it, and I will preserve the thread for the next response rather than losing your message."
+                "I received and stored that. My interface is still available, but the external response model did not complete this turn. "
+                "The thread and runtime state remain persisted."
             )
             _store(profile, "assistant", reply, "chat_fallback", "working")
-            result = {
-                "reply": reply,
-                "profile": profile,
-                "model": model,
-                "mode": "interface_timeout_fallback",
-                "stored": True,
-                "society_phase": runtime.get("phase"),
-                "client_message_id": client_message_id,
-            }
+            result = {"reply": reply, "profile": profile, "model": model, "mode": "interface_timeout_fallback", "stored": True, "client_message_id": client_message_id}
             _finish_message(client_message_id, profile, result)
             return result
+
         _store(profile, "assistant", reply, "chat_output")
-        _store(profile, "process", "Interface answered from live server plus current device runtime evidence and latest synchronized consensus.", "synthesis_note")
+        _store(profile, "process", "Interface answered from current runtime evidence plus synchronized consensus.", "synthesis_note")
         result = {
             "reply": reply,
             "profile": profile,
             "model": model,
             "mode": "interface_live",
             "society_phase": runtime.get("phase"),
-            "interface_always_available": True,
             "runtime_evidence": True,
-            "device_runtime_evidence": bool(payload.get("local_runtime_evidence")),
             "client_message_id": client_message_id,
         }
         _finish_message(client_message_id, profile, result)
