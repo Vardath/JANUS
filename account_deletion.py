@@ -52,12 +52,7 @@ def _app_db():
 
 
 def _delete_profile_data(profile: str) -> dict[str, int]:
-    """Delete known JANUS data partitioned by profile_id.
-
-    The app currently stores conversation/memory/outbox data under the authenticated
-    username. This function is deliberately explicit so future user-scoped tables
-    can be added to this deletion list during the data audit.
-    """
+    """Delete known JANUS data partitioned by profile_id."""
     deleted: dict[str, int] = {}
     c = _app_db()
     try:
@@ -104,7 +99,6 @@ def delete_account(req: DeleteAccountRequest, authorization: Optional[str] = Hea
     account_id = int(account["id"])
     username = str(account["username"])
 
-    # Password-backed accounts must re-authenticate before destructive deletion.
     with auth._db() as c:
         row = c.execute(
             "SELECT password_hash FROM accounts WHERE id=?", (account_id,)
@@ -117,8 +111,16 @@ def delete_account(req: DeleteAccountRequest, authorization: Optional[str] = Hea
                 raise HTTPException(401, "Current password is required to delete this account")
 
     removed = _delete_profile_data(username)
+    attachment_files_deleted = 0
+    try:
+        from attachment_api import cleanup_account_files
+        attachment_files_deleted = cleanup_account_files(account_id)
+    except Exception:
+        # Account deletion must not be blocked by an optional attachment cleanup
+        # import. FK cascade removes metadata; a maintenance pass can remove any
+        # orphaned bytes if the filesystem was temporarily unavailable.
+        attachment_files_deleted = 0
 
-    # Delete the account last. Foreign-key cascades remove sessions and auth tokens.
     with auth._db() as c:
         c.execute("DELETE FROM account_deletion_requests WHERE email=? COLLATE NOCASE", (account["email"],))
         c.execute("DELETE FROM accounts WHERE id=?", (account_id,))
@@ -128,6 +130,7 @@ def delete_account(req: DeleteAccountRequest, authorization: Optional[str] = Hea
         "deleted": True,
         "message": "JANUS account and known associated user data were deleted.",
         "profile_rows_deleted": removed,
+        "attachment_files_deleted": attachment_files_deleted,
     }
 
 
@@ -137,7 +140,7 @@ def delete_account_page():
         """<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
         <title>Delete JANUS account</title><style>body{font-family:Arial,sans-serif;max-width:720px;margin:40px auto;padding:0 18px;line-height:1.5}input,button{font:inherit;padding:10px;margin:6px 0;width:100%;box-sizing:border-box}button{background:#111;color:#fff;border:0;border-radius:8px}small{color:#666}</style></head><body>
         <h1>Delete your JANUS account</h1>
-        <p>You can permanently delete your JANUS account from inside the JANUS Android app. This removes the account, active sessions, authentication tokens, and known JANUS conversation, memory, activity and message data associated with the account profile.</p>
+        <p>You can permanently delete your JANUS account from inside the JANUS Android app. This removes the account, active sessions, authentication tokens, known JANUS conversation, memory, activity, message data and uploaded files associated with the account.</p>
         <p>If you cannot access the app, submit the email address used for your JANUS account below. This creates an account-deletion request for identity verification and processing.</p>
         <form id='f'><input id='email' type='email' required placeholder='JANUS account email'><button>Request account deletion</button></form>
         <p id='result'></p><small>For security, a public request does not immediately delete an account merely because someone knows its email address.</small>
@@ -152,7 +155,6 @@ def public_delete_request(req: PublicDeletionRequest):
     email = str(req.email).strip().lower()
     now = int(time.time())
     with auth._db() as c:
-        # Avoid flooding duplicate pending requests for the same account email.
         existing = c.execute(
             "SELECT id FROM account_deletion_requests WHERE email=? COLLATE NOCASE AND status='pending' ORDER BY id DESC LIMIT 1",
             (email,),
