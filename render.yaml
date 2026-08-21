@@ -80,6 +80,20 @@ services:
         value: "12"
       - key: JANUS_BACKGROUND_DAILY_TOKEN_CAP
         value: "20000"
+      - key: JANUS_CURIOSITY_WEB
+        value: "1"
+      - key: JANUS_CURIOSITY_DAILY_SEARCH_CAP
+        value: "4"
+      - key: JANUS_CURIOSITY_RELEVANT_DAILY_CAP
+        value: "2"
+      - key: JANUS_CURIOSITY_ADJACENT_DAILY_CAP
+        value: "1"
+      - key: JANUS_CURIOSITY_WANDER_DAILY_CAP
+        value: "1"
+      - key: JANUS_CURIOSITY_MIN_GAP_SECONDS
+        value: "7200"
+      - key: JANUS_CURIOSITY_MODEL
+        value: gpt-5.6
       - key: JANUS_ALLOW_LEGACY_BRIDGE_AUTH
         value: "0"
       - key: JANUS_AUTH_DEV_TOKENS
