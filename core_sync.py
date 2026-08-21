@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 import auth
 from src.janus_sleep_cycle import janus_sleep_cycle
-from core_observer import ingest_remote_events
+from core_observer import ingest_remote_events, record_remote_snapshot
 
 router = APIRouter(prefix="/core-sync", tags=["core-sync"])
 
@@ -36,15 +36,18 @@ def _require(authorization: Optional[str]):
 @router.post("/exchange")
 def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default=None)):
     account = _require(authorization)
+    profile_id=str(account.get("username") or account.get("email") or f"acct-{account['id']}")
     device_key = f"acct-{account['id']}:{summary.device_id}"
     data=summary.model_dump()
     janus_sleep_cycle.accept_remote_summary(device_key, data)
-    observed=ingest_remote_events(device_key, data.get("observe_events") or [])
+    observed=ingest_remote_events(device_key, data.get("observe_events") or [], profile_id=profile_id)
+    snapshots=record_remote_snapshot(device_key, data, profile_id=profile_id)
     return {
         "ok": True,
         "server": janus_sleep_cycle.compact_summary(),
         "account_id": int(account["id"]),
         "observed_events_received": observed,
+        "runtime_snapshots_recorded": snapshots,
     }
 
 
