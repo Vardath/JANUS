@@ -40,18 +40,30 @@ if '[feedback-only] check disagreement/novelty:' not in s:
         raise SystemExit('Android sync success block not found')
     s = s[:m.start()] + new_sync + s[m.end():]
 
-# Build-time assertions: fail with a precise message if legacy recursion remains.
-legacy_fragments = [
-    'send(from,"right_hemisphere",text);send(from,"consensus",text);',
-    'send(from,"left_hemisphere",text);send(from,"consensus",text);',
-    'send(from,"interface",text);send(from,"left_hemisphere",text);send(from,"right_hemisphere",text);',
+# Build-time assertions target only the actual forbidden edges. Safety fan-out to
+# both hemispheres + Consensus is legitimate and must not be flagged.
+forbidden = [
+    'else if("left_hemisphere".equals(from)){send(from,"right_hemisphere",text);send(from,"consensus",text);}',
+    'else if("right_hemisphere".equals(from)){send(from,"left_hemisphere",text);send(from,"consensus",text);}',
+    'else if("consensus".equals(from)){lastConsensus=text;send(from,"interface",text);send(from,"left_hemisphere",text);send(from,"right_hemisphere",text);}',
     'else if("interface".equals(from)){lastInterface=text;send(from,"consensus",text);}',
     'send("interface","consensus","global consensus:',
     'send("consensus","interface","global interface:',
 ]
-left = [x for x in legacy_fragments if x in s]
+left = [x for x in forbidden if x in s]
 if left:
     raise SystemExit('Legacy recursive routing still present: ' + repr(left))
+
+required = [
+    'else if("left_hemisphere".equals(from))send(from,"consensus",text);',
+    'else if("right_hemisphere".equals(from))send(from,"consensus",text);',
+    'else if("consensus".equals(from)){lastConsensus=text;send(from,"interface",text);}',
+    'else if("interface".equals(from))lastInterface=text;',
+    '[feedback-only] check disagreement/novelty:',
+]
+missing = [x for x in required if x not in s]
+if missing:
+    raise SystemExit('Forward-routing verification missing: ' + repr(missing))
 
 p.write_text(s, encoding='utf-8')
 print('Forward-only Android routing verified')
