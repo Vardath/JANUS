@@ -123,7 +123,7 @@ def _assessment(row: sqlite3.Row, now: int, store_bytes: int, duplicate_count: i
     reasons: list[str] = []
 
     if duplicate_count > 1:
-        score -= 35; reasons.append("duplicate content exists within this account")
+        score -= 35; reasons.append("older redundant copy exists within this account")
     if TEMP_NAME_RE.search(name):
         score -= 20; reasons.append("temporary/test-like filename")
     if ext == ".log":
@@ -183,8 +183,12 @@ def audit_storage(*, force: bool = False, max_files: int = 200) -> dict:
             "SELECT * FROM janus_files WHERE pinned=0 AND MAX(created_at,last_touched_at,last_referenced_at)<=? ORDER BY MAX(created_at,last_touched_at,last_referenced_at) ASC LIMIT ?",
             (now - STALE_SECONDS, max(1, int(max_files))),
         ).fetchall()
-        duplicate_counts = {
-            row["sha256"]: int(c.execute("SELECT COUNT(*) FROM janus_files WHERE sha256=? AND account_id=?", (row["sha256"], int(row["account_id"]))).fetchone()[0])
+        redundant_duplicates = {
+            row["id"]: bool(c.execute(
+                "SELECT 1 FROM janus_files WHERE account_id=? AND sha256=? AND id<>? "
+                "AND (created_at>? OR (created_at=? AND id>?)) LIMIT 1",
+                (int(row["account_id"]), row["sha256"], row["id"], int(row["created_at"]), int(row["created_at"]), row["id"]),
+            ).fetchone())
             for row in rows
         }
 
@@ -192,7 +196,7 @@ def audit_storage(*, force: bool = False, max_files: int = 200) -> dict:
         kept = deleted = bytes_freed = 0
         decisions: list[dict] = []
         for row in rows:
-            decision, score, reason = _assessment(row, now, current_bytes, duplicate_counts.get(row["sha256"], 1))
+            decision, score, reason = _assessment(row, now, current_bytes, 2 if redundant_duplicates.get(row["id"]) else 1)
             c.execute(
                 "UPDATE janus_files SET last_audited_at=?,retention_decision=?,retention_reason=?,retention_score=? WHERE id=?",
                 (now, decision, reason, score, row["id"]),
