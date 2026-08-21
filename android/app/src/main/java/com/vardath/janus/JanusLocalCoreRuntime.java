@@ -31,7 +31,7 @@ public final class JanusLocalCoreRuntime {
     private final ArrayDeque<JSONObject> observeEvents=new ArrayDeque<>();
     private volatile boolean started; private volatile String phase="sleep"; private volatile long phaseStarted=System.currentTimeMillis();
     private volatile long lastBackgroundCycleAt=0L;
-    private volatile String lastConsensus="",lastInterface="",lastSyncState="waiting"; private volatile long lastSyncAt=0; private final String installationId;
+    private volatile String lastConsensus="",lastInterface="",lastSyncState="waiting"; private volatile long lastSyncAt=0; private volatile long pendingBatchMaxAt=0; private final String installationId;
 
     private JanusLocalCoreRuntime(Context context){
         prefs=context.getSharedPreferences("janus",Context.MODE_PRIVATE); phase=prefs.getString("core_phase","sleep");
@@ -52,9 +52,9 @@ public final class JanusLocalCoreRuntime {
     }
     private void loadObserveEvents(){String raw=prefs.getString("core_observe_events","");if(raw==null||raw.isEmpty())return;try{JSONArray a=new JSONArray(raw);for(int i=Math.max(0,a.length()-MAX_OBSERVE_EVENTS);i<a.length();i++){JSONObject x=a.optJSONObject(i);if(x!=null)observeEvents.addLast(x);}}catch(Exception ignored){}}
     private JSONArray observeArray(){JSONArray a=new JSONArray();for(JSONObject x:observeEvents)a.put(x);return a;}
-    private JSONArray unsyncedObserveArray(){JSONArray a=new JSONArray();int kept=0;for(JSONObject x:observeEvents){if(x.optLong("created_at",0L)>lastSyncAt){a.put(x);kept++;if(kept>=100)break;}}return a;}
+    private JSONArray unsyncedObserveArray(){JSONArray a=new JSONArray();int kept=0;long maxAt=lastSyncAt;for(JSONObject x:observeEvents){long at=x.optLong("created_at",0L);if(at>lastSyncAt){a.put(x);kept++;if(at>maxAt)maxAt=at;if(kept>=100)break;}}pendingBatchMaxAt=maxAt;return a;}
 
-    synchronized void start(){if(started)return;started=true;executor.scheduleAtFixedRate(this::tickSafe,0,5,TimeUnit.SECONDS);executor.scheduleAtFixedRate(this::syncSafe,20,60,TimeUnit.SECONDS);}
+    synchronized void start(){if(started)return;started=true;executor.scheduleAtFixedRate(this::tickSafe,0,5,TimeUnit.SECONDS);executor.scheduleAtFixedRate(this::syncSafe,10,15,TimeUnit.SECONDS);}
     private void tickSafe(){try{tick();}catch(Exception ignored){}}
     private void cycle(String n){Core c=cores.get(n);if(c==null)return;String t=think(c);c.last=t;c.cycles++;record(n,null,"process_note",t);route(n,t);}
     private synchronized void tick(){
@@ -111,7 +111,7 @@ public final class JanusLocalCoreRuntime {
     private void syncSafe(){try{sync();}catch(Exception e){lastSyncState="offline";}}
     private void sync() throws Exception{
         String token=prefs.getString("access_token","");if(token==null||token.trim().isEmpty()){lastSyncState="not-signed-in";return;}
-        HttpURLConnection c=(HttpURLConnection)new URL(SERVER+"/core-sync/exchange").openConnection();c.setRequestMethod("POST");c.setDoOutput(true);c.setConnectTimeout(15000);c.setReadTimeout(30000);c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Authorization","Bearer "+token.trim());long syncStarted=System.currentTimeMillis();try(OutputStream os=c.getOutputStream()){os.write(summary().toString().getBytes(StandardCharsets.UTF_8));}
-        int code=c.getResponseCode();BufferedReader r=new BufferedReader(new InputStreamReader(code>=400?c.getErrorStream():c.getInputStream(),StandardCharsets.UTF_8));StringBuilder b=new StringBuilder();String line;while((line=r.readLine())!=null)b.append(line);r.close();if(code<400){JSONObject server=new JSONObject(b.toString()).optJSONObject("server");if(server!=null){String rc=server.optString("consensus","");String ri=server.optString("interface","");if(!rc.isEmpty())send("interface","consensus","global: "+rc);if(!ri.isEmpty())send("consensus","interface","global: "+ri);}lastSyncAt=syncStarted;lastSyncState="connected";persist();}else lastSyncState="server-error-"+code;
+        HttpURLConnection c=(HttpURLConnection)new URL(SERVER+"/core-sync/exchange").openConnection();c.setRequestMethod("POST");c.setDoOutput(true);c.setConnectTimeout(15000);c.setReadTimeout(30000);c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Authorization","Bearer "+token.trim());JSONObject payload=summary();try(OutputStream os=c.getOutputStream()){os.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
+        int code=c.getResponseCode();BufferedReader r=new BufferedReader(new InputStreamReader(code>=400?c.getErrorStream():c.getInputStream(),StandardCharsets.UTF_8));StringBuilder b=new StringBuilder();String line;while((line=r.readLine())!=null)b.append(line);r.close();if(code<400){JSONObject server=new JSONObject(b.toString()).optJSONObject("server");if(server!=null){String rc=server.optString("consensus","");String ri=server.optString("interface","");if(!rc.isEmpty())send("interface","consensus","global: "+rc);if(!ri.isEmpty())send("consensus","interface","global: "+ri);}if(pendingBatchMaxAt>lastSyncAt)lastSyncAt=pendingBatchMaxAt;lastSyncState="connected";persist();}else lastSyncState="server-error-"+code;
     }
 }
