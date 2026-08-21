@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'routing_policy.py'
+      - 'src/fano_core.py'
       - 'src/janus_sleep_cycle.py'
       - 'src/server.py.gz.b64.*'
       - 'core_sync.py'
@@ -16,6 +17,7 @@ on:
       - 'render.yaml'
       - 'Dockerfile'
       - 'tools/rebuild_server.py'
+      - 'tests/test_fano_semantics.py'
       - 'tests/test_routing_policy.py'
       - 'tests/test_architecture_contract.py'
       - 'tests/test_deliberation_tasks.py'
@@ -23,6 +25,7 @@ on:
   pull_request:
     paths:
       - 'routing_policy.py'
+      - 'src/fano_core.py'
       - 'src/janus_sleep_cycle.py'
       - 'src/server.py.gz.b64.*'
       - 'core_sync.py'
@@ -34,6 +37,7 @@ on:
       - 'render.yaml'
       - 'Dockerfile'
       - 'tools/rebuild_server.py'
+      - 'tests/test_fano_semantics.py'
       - 'tests/test_routing_policy.py'
       - 'tests/test_architecture_contract.py'
       - 'tests/test_deliberation_tasks.py'
@@ -50,5 +54,5 @@ jobs:
           python-version: '3.13'
       - name: Rebuild legacy base server
         run: python tools/rebuild_server.py
-      - name: Run routing, architecture and deliberation regression suites
-        run: python -m unittest -v tests.test_routing_policy tests.test_architecture_contract tests.test_deliberation_tasks
+      - name: Run routing, Fano, architecture and deliberation regression suites
+        run: python -m unittest -v tests.test_fano_semantics tests.test_routing_policy tests.test_architecture_contract tests.test_deliberation_tasks
