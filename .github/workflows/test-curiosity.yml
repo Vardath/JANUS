@@ -1,0 +1,57 @@
+name: Test JANUS Curiosity Search
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'curiosity_search.py'
+      - 'janus_dashboard.py'
+      - 'render.yaml'
+      - '.env.example'
+      - '.github/workflows/test-curiosity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-curiosity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install minimal dependencies
+        run: pip install 'openai>=1.99,<2'
+      - name: Compile curiosity integration
+        run: python -m py_compile curiosity_search.py janus_dashboard.py
+      - name: Verify policy constants and modes
+        env:
+          JANUS_DB_PATH: /tmp/janus-curiosity-test.sqlite3
+          OPENAI_API_KEY: test-key-not-used
+          JANUS_CURIOSITY_WEB: '1'
+          JANUS_CURIOSITY_DAILY_SEARCH_CAP: '4'
+          JANUS_CURIOSITY_RELEVANT_DAILY_CAP: '2'
+          JANUS_CURIOSITY_ADJACENT_DAILY_CAP: '1'
+          JANUS_CURIOSITY_WANDER_DAILY_CAP: '1'
+          JANUS_CURIOSITY_MIN_GAP_SECONDS: '900'
+        run: |
+          python - <<'PY'
+          import os, sqlite3
+          import curiosity_search as c
+          assert c.DAILY_CAP == 4
+          assert c.RELEVANT_CAP == 2
+          assert c.ADJACENT_CAP == 1
+          assert c.WANDER_CAP == 1
+          assert set(c.status().keys()) >= {'enabled','daily_cap','relevant_cap','adjacent_cap','wander_cap'}
+          db=sqlite3.connect(os.environ['JANUS_DB_PATH'])
+          db.execute('CREATE TABLE IF NOT EXISTS desktop_memory(id INTEGER PRIMARY KEY AUTOINCREMENT,profile_id TEXT,role TEXT,content TEXT,level TEXT,created_at TEXT)')
+          db.execute('CREATE TABLE IF NOT EXISTS janus_deliberation_tasks(id INTEGER PRIMARY KEY AUTOINCREMENT,profile_id TEXT,topic TEXT,status TEXT,updated_at TEXT)')
+          db.execute("INSERT INTO desktop_memory(profile_id,role,content,level,created_at) VALUES('tester','user','distributed memory and error correction','working','2026-08-21T00:00:00+00:00')")
+          db.execute("INSERT INTO janus_deliberation_tasks(profile_id,topic,status,updated_at) VALUES('tester','compare two candidate naming schemes','active','2026-08-21T00:00:00+00:00')")
+          db.commit(); db.close()
+          choice=c._choose('tester')
+          assert choice and choice[0]=='relevant', choice
+          print('curiosity policy test passed:', choice[0])
+          PY
