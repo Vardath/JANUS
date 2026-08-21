@@ -37,7 +37,10 @@ struct GeneratedImage: Decodable {
 struct ChatResponse: Decodable {
     var reply: String?
     var response: String?
+    var image: GeneratedImage?
     var generated_image: GeneratedImage?
+
+    var attachedImage: GeneratedImage? { generated_image ?? image }
 }
 
 struct MessageListResponse: Decodable {
