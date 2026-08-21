@@ -47,10 +47,12 @@ try:
     from auth_lifecycle import router as auth_lifecycle_router
     from auth_rate_limit import install as install_auth_rate_limit
     from chat_receipt_security import install as install_chat_receipt_security
+    from deliberation_tasks import install as install_deliberation_tasks
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
     install_chat_receipt_security(interface_chat_module)
+    install_deliberation_tasks(app)
     install_auth_rate_limit(app)
 
     @app.middleware("http")
@@ -113,6 +115,7 @@ try:
             "background_external_api_budget_used": runtime.get("external_api_budget_used", 0) if isinstance(runtime, dict) else None,
             "chat_receipt_profile_guard": bool(getattr(interface_chat_module, "_profile_receipt_guard_installed", False)),
             "auth_rate_limit_enabled": True,
+            "deliberation_tasks_enabled": True,
         }
 
     @app.get("/diagnostics/runtime-health")
@@ -133,6 +136,7 @@ try:
             "logout_route_present": "/auth/logout" in routes,
             "logout_all_route_present": "/auth/logout-all" in routes,
             "runtime_health_route_present": "/diagnostics/runtime-health" in routes,
+            "deliberation_route_present": "/desktop/deliberations" in routes,
             "auth_rate_limit_enabled": True,
         }
 
@@ -203,6 +207,7 @@ except Exception as exc:
             "logout_route_present": False,
             "logout_all_route_present": False,
             "runtime_health_route_present": True,
+            "deliberation_route_present": False,
             "auth_rate_limit_enabled": False,
         }
 
