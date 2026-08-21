@@ -174,9 +174,9 @@ async def generate_for_account(account, prompt: str, *, origin: str, quality: Op
         return {"generated": False, "reason": "image prompt is empty"}
     if size not in {"1024x1024", "1024x1536", "1536x1024"}:
         size = "1024x1024"
-    quality = quality or ("low" if origin == "auto" else "medium")
+    quality = quality or "medium"
     if quality not in {"low", "medium"}:
-        quality = "medium" if origin != "auto" else "low"
+        quality = "medium"
     account_id = int(account["id"])
     prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     cached = _cached(account_id, prompt_hash, quality, size)
@@ -212,7 +212,7 @@ async def maybe_generate_for_chat(profile: str, message: str, reply: str) -> tup
         result = await generate_for_account(account, prompt, origin="explicit", quality="medium")
         return clean_reply, result
     if nominated:
-        result = await generate_for_account(account, nominated, origin="auto", quality="low")
+        result = await generate_for_account(account, nominated, origin="auto", quality="medium")
         return clean_reply, result
     return clean_reply, None
 
