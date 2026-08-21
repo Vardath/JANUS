@@ -23,6 +23,7 @@ PRIVATE_PATHS = {
     "/desktop/home",
     "/desktop/messages",
     "/desktop/runtime-cores",
+    "/desktop/deliberations",
 }
 
 
@@ -70,6 +71,7 @@ def install(app) -> None:
     home_impl = _find(app, "/desktop/home", "GET")
     messages_impl = _find(app, "/desktop/messages", "GET")
     runtime_impl = _find(app, "/desktop/runtime-cores", "GET")
+    deliberations_impl = _find(app, "/desktop/deliberations", "GET")
     message_state_impl = _find(app, "/desktop/messages/{event_id}/state", "POST")
 
     for path, method in [
@@ -82,6 +84,7 @@ def install(app) -> None:
         ("/desktop/home", "GET"),
         ("/desktop/messages", "GET"),
         ("/desktop/runtime-cores", "GET"),
+        ("/desktop/deliberations", "GET"),
         ("/desktop/messages/{event_id}/state", "POST"),
     ]:
         _remove(app, path, method)
@@ -134,6 +137,10 @@ def install(app) -> None:
     @app.get("/desktop/runtime-cores", tags=["desktop"])
     def secure_runtime_cores(request: Request):
         return runtime_impl(username=_profile(request))
+
+    @app.get("/desktop/deliberations", tags=["desktop"])
+    def secure_deliberations(request: Request, limit: int = Query(default=20, ge=1, le=100)):
+        return deliberations_impl(username=_profile(request), limit=limit)
 
     @app.post("/desktop/messages/{event_id}/state", tags=["desktop"])
     def secure_message_state(event_id: int, request: Request, payload: dict[str, Any]):
