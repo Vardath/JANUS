@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'android/**'
+      - 'tools/patch_android_forward_routing.py'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
@@ -99,6 +100,10 @@ jobs:
               s = s.replace(marker, block + '\n' + marker, 1)
               p.write_text(s, encoding='utf-8')
           PY
+
+      - name: Enforce forward-only local core routing
+        shell: bash
+        run: python tools/patch_android_forward_routing.py
 
       - uses: actions/setup-java@v5
         with:
