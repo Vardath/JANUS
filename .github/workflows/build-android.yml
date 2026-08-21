@@ -24,6 +24,7 @@ jobs:
           python tools/patch_android_observe_guard.py
           python tools/patch_android_local_outbox.py
           python tools/patch_android_forward_routing.py
+          python tools/patch_android_deliberation.py
 
       - uses: actions/setup-java@v5
         with:
