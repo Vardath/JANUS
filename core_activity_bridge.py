@@ -1,9 +1,9 @@
 """Bridge authenticated local-core sync into JANUS profile Activity and Memory.
 
-This is deliberately separate from core_observer.py: Observe is the detailed
-runtime journal, while desktop_events/desktop_memory are the user's durable
-JANUS profile records. Idempotency receipts prevent sync retries from duplicating
-records.
+Observe remains the detailed runtime journal. Messages are intentionally much
+more selective: routine self-assessment, Fano telemetry, maintenance and generic
+integration summaries stay in Observe instead of becoming user-facing outbox
+items.
 """
 from __future__ import annotations
 
@@ -42,18 +42,46 @@ def _claim(c, profile_id: str, key: str, created_at: str) -> bool:
     return bool(cur.rowcount)
 
 
-def _surface_local_interface(c, profile_id: str, text: str, created_at: str) -> bool:
-    """Promote a substantive local Interface conclusion into the real Messages outbox.
+def _low_value_message(text: str) -> bool:
+    t = str(text or "").casefold()
+    markers = (
+        "self-assessment", "self_assessment", "active fano direction", "fano d",
+        "processed 0 peer inputs", "processed 1 peer inputs",
+        "interface updated the user-facing shared state",
+        "interface formulated the shared state around",
+        "integration: combine hemispheres", "autonomous boundary task",
+        "maintenance pass",
+    )
+    return (not t.strip()) or any(m in t for m in markers)
 
-    Local cores can cycle every minute, so this is deliberately conservative:
-    exact duplicates are rejected and local-background messages have a five-minute
-    cooldown. The detailed stream remains available in Observe regardless.
-    """
-    text = str(text or "").strip()
-    if not text:
+
+def _message_worthy(text: str) -> bool:
+    if _low_value_message(text):
         return False
+    t = str(text or "").casefold()
+    useful = (
+        "?", "conclusion", "found ", "discovered", "new connection",
+        "new finding", "unresolved question", "needs your input",
+        "recommend", "warning", "important",
+    )
+    return any(m in t for m in useful)
+
+
+def _canonical(text: str) -> str:
+    import re
+    t = str(text or "").casefold()
+    t = re.sub(r"\d+(?:\.\d+)?", "#", t)
+    t = re.sub(r"[^a-z?#]+", " ", t)
+    return " ".join(t.split())
+
+
+def _surface_local_interface(c, profile_id: str, text: str, created_at: str) -> bool:
+    text = str(text or "").strip()
+    if not _message_worthy(text):
+        return False
+    sig = _canonical(text)
     recent = c.execute(
-        "SELECT detail,created_at FROM desktop_events WHERE profile_id=? AND event_type='proactive_message' ORDER BY id DESC LIMIT 30",
+        "SELECT detail,created_at FROM desktop_events WHERE profile_id=? AND event_type='proactive_message' ORDER BY id DESC LIMIT 40",
         (profile_id,),
     ).fetchall()
     newest_local_at = None
@@ -64,7 +92,7 @@ def _surface_local_interface(c, profile_id: str, text: str, created_at: str) -> 
         except Exception:
             item = {}
         old_text = str(item.get("text") or raw).strip()
-        if old_text.casefold() == text.casefold():
+        if _canonical(old_text) == sig:
             return False
         if item.get("source") == "local-background" and newest_local_at is None:
             try:
@@ -80,10 +108,11 @@ def _surface_local_interface(c, profile_id: str, text: str, created_at: str) -> 
             newest_local_at = newest_local_at.replace(tzinfo=timezone.utc)
         if current_at.tzinfo is None:
             current_at = current_at.replace(tzinfo=timezone.utc)
-        if (current_at - newest_local_at).total_seconds() < 300:
+        if (current_at - newest_local_at).total_seconds() < 600:
             return False
+    message_type = "Question" if "?" in text else "Observation"
     payload = json.dumps(
-        {"message_type": "Observation", "text": text[:1600], "source": "local-background"},
+        {"message_type": message_type, "text": text[:1600], "source": "local-background"},
         ensure_ascii=False,
     )
     c.execute(
@@ -94,7 +123,6 @@ def _surface_local_interface(c, profile_id: str, text: str, created_at: str) -> 
 
 
 def ingest_profile_core_activity(profile_id: str, device_id: str, summary: dict) -> dict:
-    """Persist detailed local events plus cycle snapshots into profile history."""
     profile_id = str(profile_id or "").strip()[:128]
     if not profile_id:
         return {"activity": 0, "memory": 0, "snapshots": 0, "messages": 0}
@@ -130,8 +158,6 @@ def ingest_profile_core_activity(profile_id: str, device_id: str, summary: dict)
             )
             added_activity += 1
 
-            # Promote only substantive autonomous work, not idle maintenance ticks,
-            # so Memory remains useful instead of becoming a cycle log.
             idle = "processed 0 peer inputs" in (detail + " " + raw_detail).lower()
             if (not idle) and etype == "process_note" and core in {"memory", "novelty", "consensus", "interface"}:
                 c.execute(
@@ -140,19 +166,15 @@ def ingest_profile_core_activity(profile_id: str, device_id: str, summary: dict)
                 )
                 added_memory += 1
 
-            # The Interface is the user-facing end of the local 7→2→1→1 society.
-            # When its conclusion came from autonomous/self-assessment work, give
-            # that conclusion a real chance to reach Messages instead of leaving
-            # it stranded in Observe. Routine/user-triggered cycles are excluded.
+            # Only genuinely user-relevant autonomous Interface outcomes become
+            # Messages. Self-assessment and telemetry remain visible in Observe.
             lower_raw = raw_detail.lower()
-            autonomous = "autonomous" in lower_raw or "self-assessment" in lower_raw or "self_assessment" in lower_raw
-            if core == "interface" and etype == "process_note" and (not idle) and autonomous:
-                message = detail
-                if _surface_local_interface(c, profile_id, message, created):
+            autonomous = "autonomous" in lower_raw
+            candidate = raw_detail if _message_worthy(raw_detail) else detail
+            if core == "interface" and etype == "process_note" and (not idle) and autonomous and _message_worthy(candidate):
+                if _surface_local_interface(c, profile_id, candidate, created):
                     added_messages += 1
 
-        # Cycle-count snapshots are an independent operational proof. They make
-        # Activity truthful even when a detailed journal batch was unavailable.
         phase = str(summary.get("phase") or "unknown")[:32]
         cycles = dict(summary.get("cycles") or {})
         for core, count in cycles.items():
@@ -171,9 +193,6 @@ def ingest_profile_core_activity(profile_id: str, device_id: str, summary: dict)
             )
             snapshots += 1
 
-        # The synchronized integration state is meaningful working memory. Store
-        # it once per new consensus/interface cycle so the Memory screen and the
-        # next JANUS process can inspect the same persisted continuity evidence.
         for core, field in (("consensus", "consensus"), ("interface", "interface")):
             text = str(summary.get(field) or "").strip()[:5000]
             if not text:
