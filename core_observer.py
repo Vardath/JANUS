@@ -53,7 +53,7 @@ def _record(core: str, event_type: str, detail: str, peer: str | None = None, so
         with _db() as c:
             c.execute(
                 "INSERT OR IGNORE INTO janus_core_observe(source,source_event_id,core_name,peer_core,event_type,detail,created_at) VALUES(?,?,?,?,?,?,?)",
-                (source[:32], source_event_id[:128] if source_event_id else None, str(core)[:64], str(peer)[:64] if peer else None, str(event_type)[:64], str(detail)[:4000], created_at or _now()),
+                (source[:64], source_event_id[:160] if source_event_id else None, str(core)[:64], str(peer)[:64] if peer else None, str(event_type)[:64], str(detail)[:4000], created_at or _now()),
             )
             _trim(c)
     except Exception:
@@ -61,7 +61,7 @@ def _record(core: str, event_type: str, detail: str, peer: str | None = None, so
 
 
 def ingest_remote_events(device_id: str, events: list[dict]) -> int:
-    source=("local:"+str(device_id))[:32]
+    source=("local:"+str(device_id))[:64]
     added=0
     for event in (events or [])[-100:]:
         if not isinstance(event,dict):
@@ -105,7 +105,6 @@ def install(app, cycle):
         cycle._think = observed_think
         cycle.send = observed_send
 
-    # Replace the older generic Observe route with the 11-core observation stream.
     app.router.routes=[r for r in app.router.routes if getattr(r,"path",None)!="/desktop/observe"]
 
     def _query(core="all", mode="all", limit=200):
@@ -115,15 +114,42 @@ def install(app, cycle):
         elif mode=="thoughts": clauses.append("event_type='process_note'")
         where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
         with _db() as c:
-            return c.execute(f"SELECT id,source,core_name,peer_core,event_type,detail,created_at FROM janus_core_observe{where} ORDER BY created_at DESC,id DESC LIMIT ?",(*args,limit)).fetchall()
+            rows=c.execute(f"SELECT id,source,core_name,peer_core,event_type,detail,created_at FROM janus_core_observe{where} ORDER BY created_at DESC,id DESC LIMIT ?",(*args,limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    def _live_fallback(core="all", mode="all"):
+        if mode=="interactions":
+            return []
+        try:
+            runtime=cycle.status(); items=[]
+            for name,state in (runtime.get("cores") or {}).items():
+                if core not in ("all",name):
+                    continue
+                detail=str(state.get("last_output") or "").strip()
+                if not detail:
+                    continue
+                items.append({
+                    "id":None,"source":"global-live","core_name":name,"peer_core":None,
+                    "event_type":"process_note","detail":detail,
+                    "created_at":state.get("last_cycle_at") or _now(),
+                })
+            items.sort(key=lambda x:str(x.get("created_at") or ""),reverse=True)
+            return items
+        except Exception:
+            return []
 
     @app.get("/desktop/core-observe", tags=["desktop"])
     def core_observe(username: str | None=Query(default=None), core: str=Query(default="all"), mode: str=Query(default="all"), limit: int=Query(default=200,ge=1,le=500)):
-        return {"profile":username or "unspecified","core":core,"mode":mode,"note":"Externalizable process summaries and routed interactions; not hidden model chain-of-thought.","items":[dict(r) for r in _query(core,mode,limit)]}
+        rows=_query(core,mode,limit)
+        if not rows:
+            rows=_live_fallback(core,mode)[:limit]
+        return {"profile":username or "unspecified","core":core,"mode":mode,"note":"Externalizable process summaries and routed interactions; not hidden model chain-of-thought.","items":rows}
 
     @app.get("/desktop/observe", tags=["desktop"])
     def observe_compat(username: str=Query(...), limit: int=Query(default=200,ge=1,le=500)):
-        rows=[dict(r) for r in _query("all","all",limit)]
+        rows=_query("all","all",limit)
+        if not rows:
+            rows=_live_fallback("all","all")[:limit]
         notes=[]
         for r in rows:
             src="local" if str(r.get("source") or "").startswith("local:") else "global"
