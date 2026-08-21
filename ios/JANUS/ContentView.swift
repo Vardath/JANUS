@@ -3,10 +3,17 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var api = APIClient()
     @AppStorage("janusProfile") private var profile = ""
-    @State private var draftProfile = ""
+    @AppStorage("janusLoginIdentifier") private var savedIdentifier = ""
+    @State private var authMode = 0
+    @State private var identifier = ""
+    @State private var password = ""
+    @State private var registerUsername = ""
+    @State private var registerEmail = ""
+    @State private var registerPassword = ""
+    @State private var authBusy = false
     @State private var selectedTab = 0
     @State private var chatText = ""
-    @State private var chat: [(String, String)] = [("JANUS", "Ready. Choose or enter a profile to connect this device to the same JANUS memory as Windows and Android.")]
+    @State private var chat: [(String, String)] = [("JANUS", "Ready.")]
     @State private var messages: [JanusMessage] = []
     @State private var unread = 0
     @State private var home: HomeResponse?
@@ -15,14 +22,14 @@ struct ContentView: View {
     @State private var memoryItems: [MemoryItem] = []
     @State private var errorText: String?
 
+    private var signedIn: Bool {
+        !profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !api.accessToken.isEmpty
+    }
+
     var body: some View {
         NavigationStack {
             Group {
-                if profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    loginView
-                } else {
-                    appView
-                }
+                if signedIn { appView } else { loginView }
             }
             .navigationTitle("JANUS")
             .toolbar {
@@ -40,24 +47,39 @@ struct ContentView: View {
     }
 
     private var loginView: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Spacer()
-            Text("Global 7→3→1")
-                .font(.largeTitle.bold())
-            Text("Use the same profile name as the Windows or Android app to continue the same persistent JANUS conversation, memory and outbox.")
-                .foregroundStyle(.secondary)
-            TextField("Username / JANUS profile", text: $draftProfile)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
-            Button("Continue") {
-                let trimmed = draftProfile.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty { profile = trimmed }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Spacer(minLength: 30)
+                Text("Global 7→2→1→1").font(.largeTitle.bold())
+                Text("Sign in to continue the same JANUS identity, memory and message outbox across devices.")
+                    .foregroundStyle(.secondary)
+
+                Picker("Account", selection: $authMode) {
+                    Text("Sign in").tag(0)
+                    Text("Create account").tag(1)
+                }
+                .pickerStyle(.segmented)
+
+                if authMode == 0 {
+                    TextField("Username or email", text: $identifier)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
+                    SecureField("Password", text: $password).textFieldStyle(.roundedBorder)
+                    Button(authBusy ? "Signing in…" : "Sign in") { Task { await signIn() } }
+                        .buttonStyle(.borderedProminent).disabled(authBusy || identifier.isEmpty || password.isEmpty)
+                } else {
+                    TextField("Username", text: $registerUsername)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
+                    TextField("Email", text: $registerEmail)
+                        .textInputAutocapitalization(.never).keyboardType(.emailAddress).autocorrectionDisabled().textFieldStyle(.roundedBorder)
+                    SecureField("Password (12+ characters, letter + number)", text: $registerPassword).textFieldStyle(.roundedBorder)
+                    Button(authBusy ? "Creating…" : "Create account") { Task { await createAccount() } }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(authBusy || registerUsername.isEmpty || registerEmail.isEmpty || registerPassword.isEmpty)
+                }
+                Spacer(minLength: 30)
             }
-            .buttonStyle(.borderedProminent)
-            Spacer()
+            .padding()
         }
-        .padding()
     }
 
     private var appView: some View {
@@ -67,9 +89,7 @@ struct ContentView: View {
             observeView.tabItem { Label("Observe", systemImage: "eye") }.tag(2)
             optionsView.tabItem { Label("Options", systemImage: "slider.horizontal.3") }.tag(3)
         }
-        .onChange(of: selectedTab) { _, tab in
-            Task { await refresh(tab: tab) }
-        }
+        .onChange(of: selectedTab) { _, tab in Task { await refresh(tab: tab) } }
         .refreshable { await refresh(tab: selectedTab) }
     }
 
@@ -89,8 +109,7 @@ struct ContentView: View {
                                 .background(item.0 == "You" ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                                 if item.0 != "You" { Spacer(minLength: 40) }
-                            }
-                            .id(index)
+                            }.id(index)
                         }
                     }.padding()
                 }
@@ -99,8 +118,7 @@ struct ContentView: View {
             Divider()
             HStack(alignment: .bottom) {
                 TextField("Message JANUS", text: $chatText, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...5)
+                    .textFieldStyle(.roundedBorder).lineLimit(1...5)
                 Button("Send") { Task { await sendChat() } }
                     .buttonStyle(.borderedProminent)
                     .disabled(chatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -111,7 +129,7 @@ struct ContentView: View {
     private var messagesView: some View {
         List {
             if messages.isEmpty {
-                ContentUnavailableView("No JANUS messages", systemImage: "tray", description: Text("Questions, observations and follow-ups created outside the immediate chat turn will appear here."))
+                ContentUnavailableView("No JANUS messages", systemImage: "tray", description: Text("Questions, observations and useful follow-ups will appear here."))
             }
             ForEach(messages) { message in
                 VStack(alignment: .leading, spacing: 8) {
@@ -146,9 +164,9 @@ struct ContentView: View {
 
     private var optionsView: some View {
         List {
-            Section("Profile") {
-                LabeledContent("Current", value: profile)
-                Button("Switch profile", role: .destructive) { profile = ""; draftProfile = "" }
+            Section("Account") {
+                LabeledContent("JANUS profile", value: profile)
+                Button("Sign out", role: .destructive) { Task { await signOut() } }
             }
             Section("Global Core") {
                 LabeledContent("Server", value: api.baseURL.absoluteString)
@@ -180,20 +198,63 @@ struct ContentView: View {
     }
 
     private func startup() async {
-        draftProfile = profile
+        identifier = savedIdentifier
+        registerEmail = savedIdentifier.contains("@") ? savedIdentifier : ""
         await api.health()
-        if !profile.isEmpty {
-            await loadMessages()
-            await loadHome()
+        guard !api.accessToken.isEmpty else { profile = ""; return }
+        do {
+            let account = try await api.me()
+            profile = account.username
+            savedIdentifier = account.email
+            await loadMessages(); await loadHome()
+        } catch {
+            await api.logout()
+            profile = ""
         }
     }
 
+    private func signIn() async {
+        authBusy = true; defer { authBusy = false }
+        do {
+            let response = try await api.login(identifier: identifier.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
+            profile = response.account.username
+            savedIdentifier = response.account.email
+            password = ""
+            await loadMessages(); await loadHome()
+        } catch { errorText = error.localizedDescription }
+    }
+
+    private func createAccount() async {
+        authBusy = true; defer { authBusy = false }
+        do {
+            let response = try await api.register(
+                username: registerUsername.trimmingCharacters(in: .whitespacesAndNewlines),
+                email: registerEmail.trimmingCharacters(in: .whitespacesAndNewlines),
+                password: registerPassword
+            )
+            profile = response.account.username
+            savedIdentifier = response.account.email
+            registerPassword = ""
+            if response.verification_required == true && response.email_delivery != true {
+                errorText = "Account created. Email verification is pending, but email delivery is not configured yet."
+            }
+            await loadMessages(); await loadHome()
+        } catch { errorText = error.localizedDescription }
+    }
+
+    private func signOut() async {
+        await api.logout()
+        profile = ""
+        messages = []; unread = 0; home = nil; observeItems = []; activityItems = []; memoryItems = []
+        identifier = savedIdentifier
+    }
+
     private func refresh(tab: Int) async {
+        guard signedIn else { return }
         switch tab {
         case 1: await loadMessages()
         case 2: await loadObserve()
-        case 3:
-            await loadHome(); await loadMemory(); await loadActivity()
+        case 3: await loadHome(); await loadMemory(); await loadActivity()
         default: await loadMessages()
         }
     }
@@ -201,38 +262,20 @@ struct ContentView: View {
     private func sendChat() async {
         let text = chatText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        chatText = ""
-        chat.append(("You", text))
+        chatText = ""; chat.append(("You", text))
         do {
             let reply = try await api.chat(profile: profile, message: text)
-            chat.append(("JANUS", reply))
-            await loadMessages()
-        } catch {
-            chat.append(("System", error.localizedDescription))
-        }
+            chat.append(("JANUS", reply)); await loadMessages()
+        } catch { chat.append(("System", error.localizedDescription)) }
     }
 
     private func loadHome() async {
         do { home = try await api.home(profile: profile); unread = home?.unread_messages ?? unread } catch { errorText = error.localizedDescription }
     }
-
     private func loadMessages() async {
-        do {
-            let response = try await api.messages(profile: profile)
-            messages = response.items ?? []
-            unread = response.unread ?? messages.filter { $0.state == "unread" }.count
-        } catch { errorText = error.localizedDescription }
+        do { let r = try await api.messages(profile: profile); messages = r.items ?? []; unread = r.unread ?? messages.filter { $0.state == "unread" }.count } catch { errorText = error.localizedDescription }
     }
-
-    private func loadObserve() async {
-        do { observeItems = try await api.observe(profile: profile) } catch { errorText = error.localizedDescription }
-    }
-
-    private func loadActivity() async {
-        do { activityItems = try await api.activity(profile: profile) } catch { errorText = error.localizedDescription }
-    }
-
-    private func loadMemory() async {
-        do { memoryItems = try await api.memory(profile: profile) } catch { errorText = error.localizedDescription }
-    }
+    private func loadObserve() async { do { observeItems = try await api.observe(profile: profile) } catch { errorText = error.localizedDescription } }
+    private func loadActivity() async { do { activityItems = try await api.activity(profile: profile) } catch { errorText = error.localizedDescription } }
+    private func loadMemory() async { do { memoryItems = try await api.memory(profile: profile) } catch { errorText = error.localizedDescription } }
 }
