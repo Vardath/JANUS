@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.49: preserve merged local/global Messages when opening the Messages view.
+// v0.50: Fano state now shapes attention, processing pressure and integration semantics.
 android {
     namespace 'com.vardath.janus'
     compileSdk 36
@@ -18,8 +18,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 49
-        versionName '0.49'
+        versionCode 50
+        versionName '0.50'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
