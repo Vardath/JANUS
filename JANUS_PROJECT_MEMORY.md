@@ -12,13 +12,13 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - Persistent memory ladder: trace -> working -> episodic -> core; protected server-owned identity_core; learned evaluator calibration and bridge authority; novelty-based escalation.
 - Android and desktop clients expose Chat, Messages, Observe, Options, Cores, Memory, Activity, Settings and account/auth functions.
 
-## Android checkpoint: v0.43
+## Android checkpoint: v0.43 / v0.44 pending publication
 - Android v0.43 was built/published on 2026-08-21 and verified on the apk-download branch.
 - Observe UI has readable externalizable process-journal cards, expandable Technical details, incremental DOM updates, scroll-position preservation and a New thoughts indicator.
 - Root cause of the earlier apparent failed Observe fixes: MainActivity.java injects a legacy janusLocalEvidence() JavaScript renderer after index.html loads. That legacy renderer used observeList.innerHTML and could overwrite the newer readable/incremental Observe renderer.
 - The Android build workflow inserts a guard into index.html before compilation so assignments to window.janusLocalEvidence cannot replace Observe; legacy local Memory/Activity augmentation is still allowed.
 - v0.43 adds a device-local Interface outbox layer. Substantive autonomous/self-assessment Interface process notes are surfaced directly into Messages from Android.localCoreStatus(), even if server sync is unavailable or delayed. Read/dismiss state is retained locally; server-surfaced duplicates are suppressed when both copies are present.
-- The underlying local core routing remains 7 specialists -> 2 hemispheres -> consensus -> interface. The v0.43 change addresses the missing local surface channel rather than replacing that routing.
+- v0.44 is the routing-correction build. Do not call it ready until apk-download actually publishes JANUS-Android-v0.44.apk.
 - Important lesson: when an Android UI or core-surface change appears absent, inspect BOTH android/app/src/main/assets/index.html and JavaScript injected by MainActivity.onPageFinished(), plus build-time workflow transformations. Do not assume the asset alone controls runtime UI.
 
 ## Background activity -> Interface/Messages checkpoint
@@ -31,12 +31,22 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - Android v0.43 complements the server bridge with a local surface path, so local Interface conclusions can reach Messages without waiting for the server. The server path remains necessary for durable global/cross-device continuity and notifications.
 - Secure desktop routing preserves local_runtime_evidence: secure_chat copies the payload, binds the authenticated profile, removes only the auth token, then forwards the evidence to runtime_messaging's active chat handler.
 
+## Forward-only routing / recursive-echo checkpoint
+- Live JANUS correctly diagnosed role leakage/routing noise: hemispheres were active, but previous Consensus/Interface text was repeatedly becoming their next topic, producing recursive description of integration rather than continued pondering of the underlying question.
+- Root cause existed in both local Android and global server routing. Android routed left hemisphere -> right hemisphere, right -> left, Consensus -> both hemispheres, Interface -> Consensus; sync also injected global Consensus/Interface directly into the local integration pair. The server runtime had the same ordinary Consensus -> hemisphere and Interface -> Consensus feedback pattern, and remote client summaries were injected directly into Consensus.
+- Correct ordinary cognition path is now strict: evidence/logic/counterpoint -> left hemisphere; context/memory/novelty -> right hemisphere; both hemispheres -> Consensus; Consensus -> Interface. Safety may advise left, right and Consensus but does not create an Interface feedback loop.
+- Left and right hemispheres no longer feed each other directly during ordinary routing. Consensus is the reconciliation point.
+- Interface is now a surface/output state, not an automatic new thinking topic. Consensus no longer feeds its own result back into either hemisphere.
+- Cross-device/global feedback remains possible but is explicitly tagged `[feedback-only]`, compressed, and routed through Context + Counterpoint specialist review instead of directly into Consensus/Interface. This preserves correction/global integration without allowing recursive echo to dominate the primary topic.
+- Server implementation: routing_policy.py is installed onto janus_sleep_cycle before observer/hive processing.
+- Android implementation: tools/patch_android_forward_routing.py is applied by the Android build workflow before compilation. v0.44 is the first client build intended to contain this routing correction.
+
 ## Core-sync 500 checkpoint
 - Android v0.43 reported repeated HTTP 500 failures from POST /core-sync/exchange while local processing itself remained healthy.
 - Proven root cause: auth.account_for_token() returns sqlite3.Row, but core_sync.py attempted account.get("username") / account.get("email"). sqlite3.Row has mapping-style [] access but no .get(), causing authenticated sync to raise AttributeError before persistence.
 - Fixed core_sync.py to read account records safely through _account_value(), supporting sqlite3.Row and ordinary dict-like records. Account id, username and email are now resolved without .get() assumptions.
 - Hardened /core-sync/exchange so runtime intake, Observe persistence, runtime snapshots, and profile Activity/Memory/Messages persistence are isolated. One failed persistence concern no longer turns a valid exchange into HTTP 500; the endpoint returns ok=true with sync_degraded=true and sync_errors diagnostics instead.
-- Android v0.43 does not require rebuilding for this specific server crash: it already posts the correct summary and retries synchronization periodically. After the server deployment it should reconnect automatically. A later client version may optionally expose sync_degraded diagnostics more explicitly in UI.
+- Android v0.43 does not require rebuilding for this specific server crash: it already posts the correct summary and retries synchronization periodically. A later client version may optionally expose sync_degraded diagnostics more explicitly in UI.
 
 ## Account creation HTTP 500 checkpoint
 - Android v0.43 still returned HTTP 500 from POST /auth/register after the core-sync fixes.
