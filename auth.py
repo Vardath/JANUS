@@ -23,6 +23,7 @@ SESSION_TTL = 60 * 60 * 24 * 30
 VERIFY_TTL = 60 * 60 * 24
 RESET_TTL = 60 * 30
 PBKDF2_ITERATIONS = 600_000
+GOOGLE_ONLY_PASSWORD = "google_only"
 
 
 def _db():
@@ -43,7 +44,6 @@ def _has_column(c, table, column):
 
 
 def _preserve_legacy_table(c, table):
-    """Move an incompatible legacy table aside without deleting user data."""
     if not _has_table(c, table):
         return
     base = f"{table}_legacy"
@@ -102,10 +102,6 @@ def init_auth_db():
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_google_sub ON accounts(google_sub) WHERE google_sub IS NOT NULL")
 
 
-# Bootstrap normalizes truly legacy account tables before importing this module.
-# This call then guarantees all current auth tables/columns exist before any
-# /auth route handles a request. Previously init_auth_db() was defined but never
-# invoked, allowing /auth/register to fail with SQLite 'no such table' errors.
 init_auth_db()
 
 
@@ -114,6 +110,8 @@ def _hash_password(password):
     return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt.hex()}${digest.hex()}"
 
 def _verify_password(password,encoded):
+    if encoded == GOOGLE_ONLY_PASSWORD:
+        return False
     try:
         alg,iterations,salt_hex,digest_hex=encoded.split("$",3)
         if alg!="pbkdf2_sha256": return False
@@ -140,9 +138,6 @@ def _send_email(to_addr,subject,body):
             smtp.send_message(msg)
         return True
     except Exception:
-        # Account creation/reset must not become HTTP 500 just because the mail
-        # transport is temporarily unavailable. The response reports whether
-        # delivery succeeded and resend remains available.
         return False
 
 def _send_verification(c,account_id,email):
@@ -226,7 +221,7 @@ def google_auth(req:GoogleRequest):
         if row is None:
             row=c.execute("SELECT * FROM accounts WHERE email=? COLLATE NOCASE",(email,)).fetchone()
             if row is None:
-                username=_unique_username(c,email,name); random_password=_hash_password(secrets.token_urlsafe(48)); cur=c.execute("INSERT INTO accounts(username,email,password_hash,created_at,updated_at,google_sub,email_verified) VALUES(?,?,?,?,?,?,1)",(username,email,random_password,now,now,sub)); row=c.execute("SELECT * FROM accounts WHERE id=?",(cur.lastrowid,)).fetchone()
+                username=_unique_username(c,email,name); cur=c.execute("INSERT INTO accounts(username,email,password_hash,created_at,updated_at,google_sub,email_verified) VALUES(?,?,?,?,?,?,1)",(username,email,GOOGLE_ONLY_PASSWORD,now,now,sub)); row=c.execute("SELECT * FROM accounts WHERE id=?",(cur.lastrowid,)).fetchone()
             else:
                 if row["google_sub"] and row["google_sub"]!=sub: raise HTTPException(status_code=409,detail="Email is already linked to another Google account")
                 c.execute("UPDATE accounts SET google_sub=?,email_verified=1,updated_at=? WHERE id=?",(sub,now,row["id"])); row=c.execute("SELECT * FROM accounts WHERE id=?",(row["id"],)).fetchone()
