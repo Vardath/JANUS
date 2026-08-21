@@ -27,7 +27,9 @@ try:
 
     from janus_dashboard import app as real_app
     import auth as auth_module
+    from auth_lifecycle import router as auth_lifecycle_router
     app = real_app
+    app.include_router(auth_lifecycle_router)
 
     @app.middleware("http")
     async def preserve_google_auth_error(request, call_next):
@@ -49,6 +51,9 @@ try:
             "auth_module_google_client_configured": bool(getattr(auth_module, "GOOGLE_CLIENT_ID", "").strip()),
             "google_route_present": "/auth/google" in routes,
             "register_route_present": "/auth/register" in routes,
+            "login_route_present": "/auth/login" in routes,
+            "logout_route_present": "/auth/logout" in routes,
+            "logout_all_route_present": "/auth/logout-all" in routes,
             "health_route_present": "/health" in routes,
             "auth_schema_normalization": _auth_normalization,
             "auth_schema_guard": _auth_schema_guard,
@@ -91,6 +96,9 @@ except Exception as exc:  # keep Render reachable for diagnosis
             "auth_module_google_client_configured": False,
             "google_route_present": False,
             "register_route_present": False,
+            "login_route_present": False,
+            "logout_route_present": False,
+            "logout_all_route_present": False,
             "health_route_present": True,
             "startup_error": _startup_error,
         }
