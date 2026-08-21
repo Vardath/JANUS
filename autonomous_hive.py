@@ -8,7 +8,7 @@ It does not call an external model; model escalation is handled separately.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import hashlib, os, sqlite3
+import hashlib, json, os, sqlite3
 
 from src.janus_sleep_cycle import janus_sleep_cycle
 
@@ -75,22 +75,20 @@ def pulse(profile:str)->dict:
     _event(profile,"hive_memory_review",review)
     _event(profile,"hive_connection_candidate",connection)
 
-    # Let different roles challenge/ground the candidate rather than accepting it.
     janus_sleep_cycle.send("consensus","evidence",connection,"hive_check")
     janus_sleep_cycle.send("consensus","logic",connection,"hive_check")
     janus_sleep_cycle.send("consensus","counterpoint",connection,"hive_check")
     janus_sleep_cycle.send("consensus","context",connection,"hive_check")
     janus_sleep_cycle.send("consensus","safety",connection,"hive_check")
 
-    # At most one deterministic proactive candidate every 6 pulses, and only
-    # when this memory-pair has not already produced the previous message.
     message=None
     pair=f"{min(a['id'],b['id'])}:{max(a['id'],b['id'])}"
     if count%6==0 and pair!=_meta(profile,"last_message_pair",""):
         message=("I revisited two older parts of our history and found a connection worth bringing back into the conversation. "
                  f"One was about “{_clip(a['content'],120)}”; another was “{_clip(b['content'],120)}”. "
                  "I have not treated the connection as true—Evidence, Logic and Counterpoint are being asked to test it—but it may be worth exploring together.")
-        _event(profile,"proactive_message",'{"message_type":"Observation","source":"autonomous_hive","text":'+repr(message).replace("'",'"')+'}')
+        payload=json.dumps({"message_type":"Observation","source":"autonomous_hive","text":message},ensure_ascii=False)
+        _event(profile,"proactive_message",payload)
         _set_meta(profile,"last_message_pair",pair)
         janus_sleep_cycle.send("consensus","interface",message,"proactive_candidate")
     return {"ok":True,"pulse":count,"memory_ids":[a['id'],b['id']],"message":message}
