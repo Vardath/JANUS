@@ -1,18 +1,22 @@
-name: Build iOS
+name: Build JANUS iOS Simulator
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'ios/**'
       - '.github/workflows/build-ios.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build-ios-simulator:
     runs-on: macos-15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -24,6 +28,7 @@ jobs:
       - name: Build unsigned simulator app
         working-directory: ios
         run: |
+          set -o pipefail
           xcodebuild \
             -project JANUS.xcodeproj \
             -scheme JANUS \
@@ -31,7 +36,7 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
-            clean build
+            clean build | tee xcodebuild.log
 
       - name: Package simulator app
         run: |
@@ -43,8 +48,17 @@ jobs:
           mkdir -p artifacts
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" artifacts/JANUS-iOS-simulator.zip
 
-      - name: Upload artifact
+      - name: Upload simulator app
         uses: actions/upload-artifact@v4
         with:
           name: JANUS-iOS-simulator
           path: artifacts/JANUS-iOS-simulator.zip
+          if-no-files-found: error
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: JANUS-iOS-simulator-build-log
+          path: ios/xcodebuild.log
+          if-no-files-found: ignore
