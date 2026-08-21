@@ -21,6 +21,7 @@ from core_observer import install as install_core_observer
 from autonomous_hive import install as install_autonomous_hive
 from self_assessment import install as install_self_assessment
 from server_low_duty import install as install_server_low_duty
+from routing_policy import install as install_routing_policy
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
 # The autonomous hive owns background cognition now. Keep the older dashboard
@@ -30,6 +31,7 @@ janus_sleep_cycle.wake_seconds = max(10, int(os.environ.get("JANUS_WAKE_SECONDS"
 janus_sleep_cycle.sleep_seconds = max(10, int(os.environ.get("JANUS_SLEEP_SECONDS", "600")))
 install_interface_runtime_policy(janus_sleep_cycle)
 install_server_low_duty(janus_sleep_cycle)
+install_routing_policy(janus_sleep_cycle)
 install_core_observer(app, janus_sleep_cycle)
 install_autonomous_hive(app)
 install_self_assessment(app)
