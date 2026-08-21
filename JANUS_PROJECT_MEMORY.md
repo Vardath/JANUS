@@ -38,6 +38,15 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - Hardened /core-sync/exchange so runtime intake, Observe persistence, runtime snapshots, and profile Activity/Memory/Messages persistence are isolated. One failed persistence concern no longer turns a valid exchange into HTTP 500; the endpoint returns ok=true with sync_degraded=true and sync_errors diagnostics instead.
 - Android v0.43 does not require rebuilding for this specific server crash: it already posts the correct summary and retries synchronization periodically. After the server deployment it should reconnect automatically. A later client version may optionally expose sync_degraded diagnostics more explicitly in UI.
 
+## Account creation HTTP 500 checkpoint
+- Android v0.43 still returned HTTP 500 from POST /auth/register after the core-sync fixes.
+- First auth bug: auth.py defined init_auth_db() but never called it. Fixed by running init_auth_db() at module import so accounts/sessions/auth_tokens exist before any auth request.
+- Email verification delivery is now non-fatal: SMTP failure returns email_delivery=false rather than converting a successfully-created account/session into HTTP 500.
+- A deeper persistent-schema compatibility hole remained: legacy sessions/auth_tokens tables were considered compatible merely because they contained account_id. Older tables can contain account_id while still lacking token_hash, created_at, expires_at, purpose or used_at, causing _new_session() or token creation to crash.
+- Added auth_schema_guard.py, run from bootstrap before auth.py imports. It validates complete required column sets, preserves partially-compatible legacy sessions/auth_tokens tables under *_legacy_guard names, safely adds missing accounts columns that can be migrated in place, and lets auth.py recreate the current tables.
+- /diagnostics/auth-config now reports the live deployed Render commit marker, route presence, normalization/guard actions, and non-secret auth table column names. Use this to distinguish deployment lag from a remaining schema/runtime fault instead of assuming GitHub main is live.
+- No Android rebuild is required for these registration fixes; they are server persistence/bootstrap/auth-route changes.
+
 ## APK delivery
 - GitHub Actions builds the debug APK and force-publishes an orphan branch named apk-download containing downloads/JANUS-Android-v<version>.apk and oauth-build-info.txt.
 - The normal GitHub folder/blob mobile UI is not a reliable one-tap APK download path. Prefer a direct raw file URL to the APK on the apk-download branch (raw.githubusercontent.com/Vardath/JANUS/apk-download/downloads/JANUS-Android-v<version>.apk), or another verified direct-download endpoint.
