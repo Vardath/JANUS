@@ -46,10 +46,12 @@ try:
     import interface_chat as interface_chat_module
     from auth_lifecycle import router as auth_lifecycle_router
     from auth_rate_limit import install as install_auth_rate_limit
+    from attachment_api import router as attachment_router
     from chat_receipt_security import install as install_chat_receipt_security
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
+    app.include_router(attachment_router)
     install_chat_receipt_security(interface_chat_module)
     install_auth_rate_limit(app)
 
@@ -114,6 +116,7 @@ try:
             "chat_receipt_profile_guard": bool(getattr(interface_chat_module, "_profile_receipt_guard_installed", False)),
             "auth_rate_limit_enabled": True,
             "deliberation_tasks_enabled": True,
+            "file_sharing_enabled": True,
         }
 
     @app.get("/diagnostics/runtime-health")
@@ -135,6 +138,7 @@ try:
             "logout_all_route_present": "/auth/logout-all" in routes,
             "runtime_health_route_present": "/diagnostics/runtime-health" in routes,
             "deliberation_route_present": "/desktop/deliberations" in routes,
+            "file_upload_route_present": "/files/upload" in routes,
             "auth_rate_limit_enabled": True,
         }
 
@@ -206,6 +210,7 @@ except Exception as exc:
             "logout_all_route_present": False,
             "runtime_health_route_present": True,
             "deliberation_route_present": False,
+            "file_upload_route_present": False,
             "auth_rate_limit_enabled": False,
         }
 
