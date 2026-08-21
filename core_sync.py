@@ -9,6 +9,7 @@ import auth
 from src.janus_sleep_cycle import janus_sleep_cycle
 from core_observer import ingest_remote_events, record_remote_snapshot
 from core_activity_bridge import ingest_profile_core_activity
+from deliberation_sync import active_for_profile
 
 router = APIRouter(prefix="/core-sync", tags=["core-sync"])
 
@@ -79,12 +80,8 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
     try:
         janus_sleep_cycle.accept_remote_summary(device_key, data)
     except Exception as exc:
-        # Core/global intake is important, but a persistence/checkpoint issue must
-        # not make the phone believe the entire sync protocol is unavailable.
         errors.append(f"runtime-intake: {type(exc).__name__}: {str(exc)[:240]}")
 
-    # Three coordinated persistence layers are isolated so one broken storage
-    # concern cannot turn an otherwise-valid client exchange into HTTP 500.
     observed = _safe_count(
         lambda: ingest_remote_events(device_key, data.get("observe_events") or [], profile_id=profile_id),
         "observe-persistence",
@@ -106,9 +103,12 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
         errors.append(f"server-summary: {type(exc).__name__}: {str(exc)[:240]}")
         server_summary = {"architecture": "11 Fano/JANUS cores", "topology": "7 -> 2 -> 1 -> 1", "interface_available": True}
 
+    active_deliberation = active_for_profile(profile_id)
+
     return {
         "ok": True,
         "server": server_summary,
+        "active_deliberation": active_deliberation,
         "account_id": account_id,
         "profile_id": profile_id,
         "observed_events_received": observed,
