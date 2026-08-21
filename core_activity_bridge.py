@@ -90,7 +90,8 @@ def ingest_profile_core_activity(profile_id: str, device_id: str, summary: dict)
         # Cycle-count snapshots are an independent operational proof. They make
         # Activity truthful even when a detailed journal batch was unavailable.
         phase = str(summary.get("phase") or "unknown")[:32]
-        for core, count in dict(summary.get("cycles") or {}).items():
+        cycles = dict(summary.get("cycles") or {})
+        for core, count in cycles.items():
             try:
                 count = int(count)
             except Exception:
@@ -105,6 +106,26 @@ def ingest_profile_core_activity(profile_id: str, device_id: str, summary: dict)
                 (profile_id, "core_runtime_snapshot", detail, created),
             )
             snapshots += 1
+
+        # The synchronized integration state is meaningful working memory. Store
+        # it once per new consensus/interface cycle so the Memory screen and the
+        # next JANUS process can inspect the same persisted continuity evidence.
+        for core, field in (("consensus", "consensus"), ("interface", "interface")):
+            text = str(summary.get(field) or "").strip()[:5000]
+            if not text:
+                continue
+            try:
+                count = int(cycles.get(core, 0))
+            except Exception:
+                count = 0
+            created = _now()
+            key = f"state-memory:{device}:{core}:{count}"
+            if _claim(c, profile_id, key, created):
+                c.execute(
+                    "INSERT INTO desktop_memory(profile_id,role,content,level,created_at) VALUES(?,?,?,?,?)",
+                    (profile_id, f"core:{core}", text, "working", created),
+                )
+                added_memory += 1
         c.commit()
 
     return {"activity": added_activity, "memory": added_memory, "snapshots": snapshots}
