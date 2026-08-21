@@ -1,4 +1,4 @@
-name: Test JANUS Routing
+name: Test JANUS Routing and Architecture
 
 on:
   push:
@@ -6,15 +6,27 @@ on:
     paths:
       - 'routing_policy.py'
       - 'src/janus_sleep_cycle.py'
+      - 'src/server.py.gz.b64.*'
       - 'core_sync.py'
+      - 'dashboard_api.py'
+      - 'render.yaml'
+      - 'Dockerfile'
+      - 'tools/rebuild_server.py'
       - 'tests/test_routing_policy.py'
+      - 'tests/test_architecture_contract.py'
       - '.github/workflows/test-routing.yml'
   pull_request:
     paths:
       - 'routing_policy.py'
       - 'src/janus_sleep_cycle.py'
+      - 'src/server.py.gz.b64.*'
       - 'core_sync.py'
+      - 'dashboard_api.py'
+      - 'render.yaml'
+      - 'Dockerfile'
+      - 'tools/rebuild_server.py'
       - 'tests/test_routing_policy.py'
+      - 'tests/test_architecture_contract.py'
       - '.github/workflows/test-routing.yml'
   workflow_dispatch:
 
@@ -26,5 +38,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Run forward-routing regression suite
-        run: python -m unittest -v tests.test_routing_policy
+      - name: Rebuild legacy base server
+        run: python tools/rebuild_server.py
+      - name: Run routing and architecture regression suites
+        run: python -m unittest -v tests.test_routing_policy tests.test_architecture_contract
