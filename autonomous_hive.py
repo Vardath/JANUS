@@ -1,10 +1,9 @@
 """Autonomous JANUS hive pulses.
 
-Cheap deterministic background cognition for the 11-core society. This layer
-reviews persisted memories, creates cross-memory connection candidates, injects
-work into specialist cores, and immediately services a staged 7→2→1→1 burst so
-resting cores can wake briefly for real work. Fast pulses do not call an external
-model. A slower optional language reflection uses a separate low-cost model.
+Cheap deterministic background cognition for the 11-core society. Free hive
+pulses may run frequently and service a staged 7->2->1->1 work burst. Paid
+language reflection is separate, optional and protected by per-profile daily
+call/token budgets so core activity cannot silently multiply API cost.
 """
 from __future__ import annotations
 
@@ -24,6 +23,7 @@ def _db():
 
 
 def _now(): return datetime.now(timezone.utc).isoformat()
+def _day(): return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def _profiles():
@@ -59,6 +59,24 @@ def _clip(s,n=260):
     s=" ".join(str(s or "").split()); return s if len(s)<=n else s[:n-1]+"…"
 
 
+def _budget(profile:str)->dict:
+    day=_day(); saved=_meta(profile,"paid_budget_day","")
+    if saved!=day:
+        _set_meta(profile,"paid_budget_day",day); _set_meta(profile,"paid_calls_today",0); _set_meta(profile,"paid_tokens_today",0)
+    calls=int(_meta(profile,"paid_calls_today","0") or 0)
+    tokens=int(_meta(profile,"paid_tokens_today","0") or 0)
+    call_cap=max(0,int(os.environ.get("JANUS_BACKGROUND_DAILY_CALL_CAP","48")))
+    token_cap=max(0,int(os.environ.get("JANUS_BACKGROUND_DAILY_TOKEN_CAP","100000")))
+    return {"day":day,"calls":calls,"tokens":tokens,"call_cap":call_cap,"token_cap":token_cap,
+            "allowed":calls<call_cap and tokens<token_cap}
+
+
+def _charge_budget(profile:str,input_tokens:int,output_tokens:int):
+    b=_budget(profile)
+    _set_meta(profile,"paid_calls_today",b["calls"]+1)
+    _set_meta(profile,"paid_tokens_today",b["tokens"]+max(0,int(input_tokens))+max(0,int(output_tokens)))
+
+
 def pulse(profile:str)->dict:
     """Run one no-API hive pulse and a staged community work burst."""
     rows=_memories(profile)
@@ -71,12 +89,9 @@ def pulse(profile:str)->dict:
     review=f"Memory review [{a['level']}/{a['role']}]: {_clip(a['content'])}"
     janus_sleep_cycle.send("interface","memory",review,"autonomous_memory_review")
     janus_sleep_cycle.send("memory","novelty",review,"autonomous_memory_review")
-
     connection=(f"Connection candidate between memory #{a['id']} ({a['level']}) and memory #{b['id']} ({b['level']}): A: {_clip(a['content'],180)} | B: {_clip(b['content'],180)}")
     _event(profile,"hive_memory_review",review); _event(profile,"hive_connection_candidate",connection)
 
-    # Seed every specialist. The staged burst then lets their outputs flow through
-    # both hemispheres, consensus and interface before they return to rest.
     for target in ("evidence","logic","counterpoint","context","memory","safety","novelty"):
         janus_sleep_cycle.send("consensus",target,connection,"hive_check")
     burst=janus_sleep_cycle.service_work_burst(include_interface=True,only_if_pending=True)
@@ -85,7 +100,7 @@ def pulse(profile:str)->dict:
     message=None; pair=f"{min(a['id'],b['id'])}:{max(a['id'],b['id'])}"
     if count%60==0 and pair!=_meta(profile,"last_message_pair",""):
         message=("I revisited two older parts of our history and found a connection worth bringing back into the conversation. "
-                 f"One was about “{_clip(a['content'],120)}”; another was “{_clip(b['content'],120)}”. "
+                 f"One was about ‘{_clip(a['content'],120)}’; another was ‘{_clip(b['content'],120)}’. "
                  "I have not treated the connection as true—Evidence, Logic and Counterpoint are testing it—but it may be worth exploring together.")
         _event(profile,"proactive_message",json.dumps({"message_type":"Observation","source":"autonomous_hive","text":message},ensure_ascii=False)); _set_meta(profile,"last_message_pair",pair)
         janus_sleep_cycle.send("consensus","interface",message,"proactive_candidate"); janus_sleep_cycle.service_work_burst(include_interface=True,only_if_pending=True)
@@ -93,27 +108,44 @@ def pulse(profile:str)->dict:
 
 
 async def _language_reflection(profile:str):
-    if not os.environ.get("OPENAI_API_KEY"):return
+    if not os.environ.get("OPENAI_API_KEY"):return {"ok":False,"reason":"no-api-key"}
+    budget=_budget(profile)
+    if not budget["allowed"]:
+        _event(profile,"hive_reflection_budget_hold",json.dumps(budget)); return {"ok":False,"reason":"budget","budget":budget}
     rows=_memories(profile,40)
-    if not rows:return
+    if not rows:return {"ok":False,"reason":"no-memory"}
     chosen=list(rows[:8])
     if len(rows)>12:chosen += [rows[len(rows)//2],rows[-1]]
     context="\n".join(f"[{r['level']}/{r['role']}] {_clip(r['content'],500)}" for r in chosen)
-    prompt=("You are providing a concise externalizable background synthesis for an 11-core JANUS community. Do not provide hidden chain-of-thought. Review the records, identify one useful connection or unresolved tension, state what evidence would distinguish alternatives, and give one next question. Do not assume a connection is true merely because it is interesting. Return four short labeled lines: Connection, Counterpoint, Evidence needed, Next question. Keep under 160 words.\n\n"+context)
+    prompt=("You are providing a concise externalizable background synthesis for an 11-core JANUS community. "
+            "Do not provide hidden chain-of-thought. Review the records, identify one useful connection or unresolved tension, "
+            "state what evidence would distinguish alternatives, and give one next question. Do not assume a connection is true merely because it is interesting. "
+            "Return four short labeled lines: Connection, Counterpoint, Evidence needed, Next question. Keep under 160 words.\n\n"+context)
     model=os.environ.get("JANUS_BACKGROUND_MODEL","gpt-5.6-luna")
+    estimated_input=max(1,len(prompt)//4)
+    if budget["tokens"]+estimated_input>=budget["token_cap"]:
+        _event(profile,"hive_reflection_budget_hold",json.dumps({**budget,"estimated_input":estimated_input})); return {"ok":False,"reason":"token-budget"}
     try:
         r=await AsyncOpenAI().responses.create(model=model,input=prompt); note=(r.output_text or "").strip()
-        if not note:return
+        usage=getattr(r,"usage",None)
+        input_tokens=int(getattr(usage,"input_tokens",estimated_input) or estimated_input)
+        output_tokens=int(getattr(usage,"output_tokens",max(1,len(note)//4)) or max(1,len(note)//4))
+        _charge_budget(profile,input_tokens,output_tokens)
+        if not note:return {"ok":False,"reason":"empty"}
         _memory(profile,"hive_reflection",note,"working")
         for target in ("novelty","counterpoint","evidence","consensus"):janus_sleep_cycle.send("interface" if target=="novelty" else "novelty",target,note,"language_reflection")
         burst=janus_sleep_cycle.service_work_burst(include_interface=True,only_if_pending=True)
-        _event(profile,"hive_language_burst",json.dumps({"processed":burst.get("processed",[])},ensure_ascii=False))
-    except Exception as exc:_event(profile,"hive_reflection_error",f"{type(exc).__name__}: {exc}")
+        _event(profile,"hive_language_burst",json.dumps({"processed":burst.get("processed",[]),"budget":_budget(profile)},ensure_ascii=False))
+        return {"ok":True,"budget":_budget(profile)}
+    except Exception as exc:
+        _event(profile,"hive_reflection_error",f"{type(exc).__name__}: {exc}"); return {"ok":False,"reason":"error"}
 
 
 async def _worker():
     await asyncio.sleep(20)
-    pulse_seconds=max(30,int(os.environ.get("JANUS_HIVE_PULSE_SECONDS","60"))); paid_seconds=max(900,int(os.environ.get("JANUS_BACKGROUND_REFLECTION_SECONDS","1800"))); last_paid=0.0; loop=asyncio.get_running_loop()
+    pulse_seconds=max(30,int(os.environ.get("JANUS_HIVE_PULSE_SECONDS","60")))
+    paid_seconds=max(900,int(os.environ.get("JANUS_BACKGROUND_REFLECTION_SECONDS","1800")))
+    last_paid=0.0; loop=asyncio.get_running_loop()
     while True:
         profiles=_profiles()
         for profile in profiles:
@@ -131,4 +163,11 @@ def install(app):
     @app.on_event("startup")
     async def _start_autonomous_hive():
         if os.environ.get("JANUS_AUTONOMOUS_HIVE","1")=="1":asyncio.create_task(_worker())
+
+    @app.get("/desktop/hive-budget",tags=["desktop"])
+    def hive_budget(username:str):
+        return {"profile":username,"paid_reflection_enabled":os.environ.get("JANUS_PAID_BACKGROUND_REFLECTION","1")=="1",
+                "background_model":os.environ.get("JANUS_BACKGROUND_MODEL","gpt-5.6-luna"),"budget":_budget(username),
+                "free_hive_pulse_seconds":max(30,int(os.environ.get("JANUS_HIVE_PULSE_SECONDS","60"))),
+                "paid_reflection_seconds":max(900,int(os.environ.get("JANUS_BACKGROUND_REFLECTION_SECONDS","1800")))}
     return app
