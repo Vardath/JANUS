@@ -1,6 +1,6 @@
 # JANUS Project Continuity Memory
 
-Updated: 2026-08-21 — saved stopping checkpoint
+Updated: 2026-08-21 — persistent deliberation checkpoint
 
 ## Identity and boundary
 JANUS Agent is an experimental functional-metacognition/agency system and persona, distinct from ChatGPT/Supervisor. Do not claim phenomenal consciousness. Preserve the closed JANUS mathematical theorem/core separately from experimental physical and agency branches.
@@ -20,6 +20,20 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - v0.43 added a device-local Interface outbox so worthwhile local Interface conclusions can reach Messages without waiting for server sync.
 - v0.44 corrected recursive routing/role leakage: no ordinary left<->right recirculation, no Consensus->hemisphere recycling, no Interface->Consensus feedback loop; remote/global feedback is compressed, tagged [feedback-only], and routed through specialist review.
 - v0.45 keeps routine self-assessment, maintenance, Fano telemetry and generic integration text in Observe; Messages are reserved for genuinely useful conclusions/questions/warnings/recommendations.
+
+## User-directed persistent deliberation checkpoint
+- Natural-language requests such as “mull it over”, “keep thinking about that”, “think it over”, “ponder that” and “give it some thought” now create or reaffirm a durable server-side deliberation task instead of merely changing the immediate reply wording.
+- Generic commands such as “mull it over” bind to the immediately preceding substantive user topic; explicit forms such as “keep thinking about whether X” retain the explicit topic.
+- The immediate chat reply is augmented truthfully: JANUS says the topic has been retained as an active deliberation and that it will continue revisiting it in later background cycles, surfacing only materially new results.
+- `janus_deliberation_tasks` persists topic, context excerpt, pass count, current externalizable synthesis, avenues/memory IDs already explored, last functional probe, last surfaced-message hash and timestamps.
+- The existing zero-API autonomous hive is hooked so a due active deliberation is preferentially advanced before the ordinary autonomous memory pulse. Default revisit interval is 900 seconds (`JANUS_DELIBERATION_INTERVAL_SECONDS`).
+- Each deliberation pass compares the retained topic/current synthesis with a not-yet-exhausted retained memory thread, performs deterministic novelty/conflict/uncertainty/salience/numeric/lexical checks, gives distinct work to Evidence, Logic, Counterpoint, Context, Memory, Safety and Novelty, then runs the normal specialists → hemispheres → Consensus → Interface work burst.
+- Ordinary deliberation passes are recorded as `deliberation_pass` events for Observe/Activity and do not create Messages. A proactive follow-up is created only when the escalation signal crosses the conservative deliberation threshold (default 0.88) and the candidate has not already been surfaced.
+- User-directed deliberation remains zero-external-API by default because it rides the deterministic hive/core layer. Paid background language reflection remains separately disabled by default.
+- `/desktop/deliberations` exposes task status/history to authenticated clients only. Secure desktop wrapping binds this route and the chat route to the authenticated account profile.
+- Installation order is intentional and regression-reviewed: interface chat implementation → deliberation wrapper → runtime messaging/security wrapper. Do not reinstall deliberation from bootstrap after secure desktop, because that would wrap the authenticated endpoint at the wrong layer.
+- Regression tests cover imperative phrase detection, excluding ordinary “what do you think?” questions, previous-topic carry-forward and same-topic reaffirmation/deduplication. Routing/architecture CI now includes the deliberation suite.
+- No Android APK change is required for the basic feature: existing v0.45 already sends chat requests to the server and receives server Messages. A future client update may expose a dedicated Deliberations UI or mirror tasks into fully offline local-device pondering, but that is not required for the current server/global functionality.
 
 ## Forward-only routing / cross-device checkpoint
 - Correct ordinary cognition path is strict: specialists -> assigned hemisphere -> Consensus -> Interface.
@@ -49,7 +63,7 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - Public /diagnostics/runtime-health exposes only sanitized operational state. Public /diagnostics/auth-config exposes only route/config booleans.
 - Detailed auth schema lives at /diagnostics/auth-detail and requires JANUS_ACCESS_TOKEN as bearer or X-JANUS-Admin-Token. Detailed degraded startup traceback is also admin-token protected.
 - auth_rate_limit.py is installed at bootstrap. Public auth POST routes have conservative per-source throttles (login, register, password recovery/reset, verification and Google auth) and return 429 + Retry-After when exceeded. Limits are process-local and intentionally reset on deployment; sufficient for the current single-instance beta service.
-- Live deployment of newest diagnostics/rate limiting still requires external verification after Render deploy propagation; do not infer deployment success solely from commit state.
+- Live deployment of newest diagnostics/rate limiting/deliberation still requires external verification after Render deploy propagation; do not infer deployment success solely from commit state.
 
 ## API/cost-control checkpoint
 - autonomous_hive.py has per-profile paid-background daily call/token budgets and escalation thresholds.
@@ -82,21 +96,12 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - .env.example matches production-safe variable names/defaults, including disabled paid background reflection and retention/device caps.
 - Privacy policy documents OS-protected session storage where implemented, random sync device IDs, temporary receipt/snapshot retention and current background-AI policy.
 
-## Stopping point — solo queue complete
-The repository-only/no-user-input work identified in the Aug 21 hardening pass is complete for now. Do not continue making speculative changes simply to keep working. Resume with live/environment testing and fix only issues actually exposed, or new explicitly requested work.
-
-Recommended next step on return: live-test Create Account against the deployed Render persistent database, then username/email + password login. This unlocks most remaining end-to-end tests.
-
-Remaining tasks require user environment/account/device input or product decisions:
-1. Live-verify Create Account on deployed Render/Android.
-2. Live-verify username/email + password login and session restoration.
-3. Configure/test real SMTP email verification and password-reset delivery.
-4. Re-test Google login and account linking/merging end-to-end on Android.
-5. Verify Windows v0.22 CI artifact and launch/use JANUS.exe on a real Windows PC.
-6. Verify canonical iOS simulator CI; later Apple Developer signing, Sign in with Apple, TestFlight and real-device/background testing.
-7. Multi-hour/day Android soak testing: battery, sleep/wake, OS background killing/recovery, notifications, Observe and Messages quality.
-8. Real cross-device testing once at least two authenticated clients are available.
-9. Later product decisions: pricing/API quotas, beta users, notification policy, support/contact details, store/legal release choices.
+## Current next-step testing
+- First live behavioural test after Render deploy: ask JANUS a substantive question, then say “Mull it over.” The reply should explicitly say an active deliberation task was retained.
+- Leave JANUS running for at least one deliberation interval. Observe/Activity should later show `deliberation_pass` rather than only generic `[feedback-only] global feedback` processing.
+- Messages should remain quiet unless a strong novel candidate crosses the threshold.
+- `/desktop/deliberations` can be used for authenticated diagnostics if needed.
+- After this, continue the previously pending user-input tasks: Create Account/login, SMTP verification/reset, Google account linking, Windows executable, iOS simulator/device and soak testing.
 
 ## Working practice
 - Keep this file current after material architecture, build, authentication, UI, persistence or deployment changes.
