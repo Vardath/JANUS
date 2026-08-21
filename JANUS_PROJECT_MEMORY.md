@@ -19,6 +19,16 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 - v0.42 build workflow inserts a guard into index.html before compilation so assignments to window.janusLocalEvidence cannot replace Observe; legacy local Memory/Activity augmentation is still allowed.
 - Important lesson: when an Android UI change appears absent, inspect BOTH android/app/src/main/assets/index.html and JavaScript injected by MainActivity.onPageFinished(), plus build-time workflow transformations. Do not assume the asset alone controls runtime UI.
 
+## Background activity -> Interface/Messages checkpoint
+- Verified from Android v0.42 Observe screenshots that the local 11-core society does continue deterministic background processing and routes specialist/hemisphere work through Consensus to Interface.
+- A contradiction was found: Chat could say there was no verified background activity even while Observe showed recent local activity. Root cause: Android was already sending local_runtime_evidence with /desktop/chat, but runtime_messaging.py ignored the field.
+- Fixed runtime_messaging.py so local runtime telemetry is parsed into compact machine evidence and included in the active chat prompt. It is explicitly treated as data, not instructions. When recent events/cycle activity exists, JANUS Chat must not claim there was no verified background activity. It must still distinguish functional process evidence from claims of subjective experience.
+- A second bridge gap was found: core_activity_bridge.py persisted synced local events to Activity/Memory, but the proactive Messages promoter only watched server background_reflection events. Local Interface conclusions therefore remained stranded in Observe.
+- Fixed core_activity_bridge.py so substantive autonomous/self-assessment Interface process notes can create real proactive_message outbox records. Routine/user-triggered/idle cycles are excluded; exact duplicates are suppressed and local-background Messages have a five-minute cooldown.
+- core_sync.py now reports profile_messages_recorded in sync responses for operational verification.
+- The existing /desktop/messages reader already includes proactive_message records and decodes their source, so local-background records surface through the normal Messages UI and unread badge without an Android reinstall after the server deploy.
+- Secure desktop routing preserves local_runtime_evidence: secure_chat copies the payload, binds the authenticated profile, removes only the auth token, then forwards the evidence to runtime_messaging's active chat handler.
+
 ## APK delivery
 - GitHub Actions builds the debug APK and force-publishes an orphan branch named apk-download containing downloads/JANUS-Android-v<version>.apk and oauth-build-info.txt.
 - The normal GitHub folder/blob mobile UI is not a reliable one-tap APK download path. Prefer a direct raw file URL to the APK on the apk-download branch (raw.githubusercontent.com/Vardath/JANUS/apk-download/downloads/JANUS-Android-v<version>.apk), or another verified direct-download endpoint.
@@ -32,4 +42,5 @@ Stable debug signing key is cached by the GitHub Actions workflow; oauth-build-i
 ## Working practice
 - Keep this file current after material architecture, build, authentication, UI, persistence or deployment changes.
 - Verify claims against repository/build outputs rather than inferring success from a version bump or commit alone.
+- Trace UI behavior end-to-end across client asset, MainActivity JavaScript injection, client request payload, secure server wrapper, active server route implementation, persistence layer, and UI reader before declaring a fix complete.
 - When supplying an APK to the user, give the direct downloadable APK target rather than merely the GitHub directory containing it.
