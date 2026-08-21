@@ -1,5 +1,27 @@
 import Foundation
 
+struct Account: Decodable {
+    var id: Int
+    var username: String
+    var email: String
+    var email_verified: Bool?
+    var google_linked: Bool?
+    var created_at: Int?
+}
+
+struct AuthResponse: Decodable {
+    var ok: Bool?
+    var access_token: String?
+    var account: Account
+    var verification_required: Bool?
+    var email_delivery: Bool?
+}
+
+struct MeResponse: Decodable {
+    var ok: Bool?
+    var account: Account
+}
+
 struct ChatResponse: Decodable {
     var reply: String?
     var response: String?
