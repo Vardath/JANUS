@@ -56,7 +56,6 @@ def _claim_message(client_message_id: str, profile: str):
                     return json.loads(row["response_json"])
                 except Exception:
                     pass
-            # A processing claim older than three minutes can be recovered.
             if row["status"] == "processing" and now - int(row["updated_at"] or 0) <= 180:
                 return "processing"
             c.execute(
@@ -85,8 +84,60 @@ def _finish_message(client_message_id: str, profile: str, response: dict[str, An
         )
 
 
+def _live_runtime_evidence(runtime: dict[str, Any]) -> str:
+    """Build a compact factual block the interface model may safely rely on."""
+    cores = runtime.get("cores") or {}
+    lines = [
+        "LIVE JANUS RUNTIME EVIDENCE (server-observed, not a hypothetical architecture):",
+        f"architecture={runtime.get('architecture', 'unknown')}",
+        f"topology={runtime.get('topology', 'unknown')}",
+        f"core_count={runtime.get('core_count', len(cores) or 'unknown')}",
+        f"society_phase={runtime.get('phase', 'unknown')}",
+        f"interface_awake={bool(runtime.get('interface_awake', (cores.get('interface') or {}).get('awake', False)))}",
+        f"persistent_storage={bool(runtime.get('persistent_storage', False))}",
+        f"remote_clients={runtime.get('remote_clients', 0)}",
+    ]
+    for name, state in cores.items():
+        lines.append(
+            f"core {name}: awake={bool(state.get('awake'))}; cycles={state.get('cycle_count', 0)}; "
+            f"pending={state.get('pending_messages', 0)}; last_cycle={state.get('last_cycle_at') or 'never'}; "
+            f"last_output={str(state.get('last_output') or '')[:220]}"
+        )
+    try:
+        with sqlite3.connect(DB_PATH, timeout=5) as c:
+            c.row_factory = sqlite3.Row
+            try:
+                row = c.execute(
+                    "SELECT created_at,disagreement_score,action_summary FROM janus_self_assessment ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+                if row:
+                    lines.append(
+                        f"latest_self_assessment: at={row['created_at']}; disagreement={float(row['disagreement_score']):.3f}; "
+                        f"summary={str(row['action_summary'])[:500]}"
+                    )
+            except sqlite3.Error:
+                pass
+            try:
+                rows = c.execute(
+                    "SELECT core_name,peer_core,event_type,detail,created_at FROM janus_core_observe "
+                    "ORDER BY id DESC LIMIT 12"
+                ).fetchall()
+                if rows:
+                    lines.append("recent_observable_core_activity:")
+                    for row in rows:
+                        peer = f" -> {row['peer_core']}" if row['peer_core'] else ""
+                        lines.append(
+                            f"- {row['created_at']} {row['core_name']}{peer} [{row['event_type']}]: "
+                            f"{str(row['detail'])[:260]}"
+                        )
+            except sqlite3.Error:
+                pass
+    except Exception:
+        pass
+    return "\n".join(lines)
+
+
 def install(app):
-    # Replace only the older desktop chat route; leave the rest of dashboard_api.
     app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) != "/desktop/chat"]
 
     @app.post("/desktop/chat", tags=["desktop"])
@@ -104,11 +155,8 @@ def install(app):
         if claimed == "processing":
             raise HTTPException(409, "This message is already being processed; retry shortly")
 
-        # Never lose the user turn, even if the external model is unavailable.
         _store(profile, "user", message, "chat_input")
 
-        # Service any already-queued consensus update immediately. This does not
-        # wake specialist or hemisphere cores during their rest window.
         try:
             service = getattr(janus_sleep_cycle, "service_interface_once", None)
             if service:
@@ -120,11 +168,12 @@ def install(app):
         latest_consensus = str(runtime.get("last_consensus") or "").strip()
         latest_interface = str(runtime.get("last_interface") or "").strip()
         history = _recent_context(profile)
+        evidence = _live_runtime_evidence(runtime)
 
         if not os.environ.get("OPENAI_API_KEY"):
             reply = (
                 "I received and stored your message. My external response model is temporarily unavailable, "
-                "but the JANUS interface core remains active and the other cores can continue their own cycles. "
+                "but my interface core is still active and the 11-core runtime state remains persisted. "
                 "I will retain this turn for follow-up when model access returns."
             )
             _store(profile, "assistant", reply, "chat_fallback", "working")
@@ -139,13 +188,17 @@ def install(app):
 CURRENT RUNTIME POLICY:
 JANUS has 11 functional cores arranged 7 specialists -> 2 hemispheres -> consensus -> interface.
 The interface core is always available to the user while the other ten cores may sleep or wake independently.
-Answer now as the interface core using the latest synchronized consensus and interface state. Do not claim that all cores are currently awake. If specialist updates are stale or absent, answer with appropriate uncertainty rather than waiting. Other cores may continue processing asynchronously and can influence later replies or follow-up messages.
+You are given a LIVE JANUS RUNTIME EVIDENCE block produced by this running server. Treat it as direct runtime telemetry.
+Therefore, when that evidence shows cycle counts, timestamps, core outputs, interactions, pending work, self-assessment records, or awake/resting states, you MAY accurately say that those mechanisms are running or have run and cite the observed facts conversationally.
+Do not retreat to generic statements such as 'I cannot verify the cores exist' when the supplied runtime evidence verifies them.
+Do not claim all cores are awake when telemetry says otherwise, and do not invent unobserved private reasoning. Externalizable process notes are summaries of computation, not hidden chain-of-thought.
+Answer as the main interface core using the latest synchronized consensus, runtime evidence, and conversation history.
 """
         state_block = (
-            f"Latest consensus state: {latest_consensus or '[no recent consensus summary]'}\n"
-            f"Latest interface state: {latest_interface or '[no recent interface summary]'}\n"
-            f"Society phase: {runtime.get('phase', 'unknown')}\n"
-            f"Interface policy: {runtime.get('interface_policy', 'always_available')}"
+            evidence
+            + f"\nLatest consensus state: {latest_consensus or '[no recent consensus summary]'}"
+            + f"\nLatest interface state: {latest_interface or '[no recent interface summary]'}"
+            + f"\nInterface policy: {runtime.get('interface_policy', 'always_available')}"
         )
         inp = (
             state_block
@@ -166,8 +219,8 @@ Answer now as the interface core using the latest synchronized consensus and int
             _store(profile, "system", f"chat_model_deferred: {type(exc).__name__}: {exc}", "chat_error")
             reply = (
                 "I received and stored that. My interface is still here, but the external response model did not "
-                "complete this turn in time. The other JANUS cores may continue processing it independently, and "
-                "I will preserve the thread for the next response rather than losing your message."
+                "complete this turn in time. My persisted 11-core runtime may continue processing it, and I will "
+                "preserve the thread for the next response rather than losing your message."
             )
             _store(profile, "assistant", reply, "chat_fallback", "working")
             result = {
@@ -186,7 +239,7 @@ Answer now as the interface core using the latest synchronized consensus and int
         _store(
             profile,
             "process",
-            "Interface answered from the latest synchronized 11-core state; resting cores may update consensus asynchronously.",
+            "Interface answered from live 11-core runtime evidence plus latest synchronized consensus.",
             "synthesis_note",
         )
         result = {
@@ -196,6 +249,7 @@ Answer now as the interface core using the latest synchronized consensus and int
             "mode": "interface_live",
             "society_phase": runtime.get("phase"),
             "interface_always_available": True,
+            "runtime_evidence": True,
             "client_message_id": client_message_id,
         }
         _finish_message(client_message_id, profile, result)
