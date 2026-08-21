@@ -47,11 +47,13 @@ try:
     from auth_lifecycle import router as auth_lifecycle_router
     from auth_rate_limit import install as install_auth_rate_limit
     from attachment_api import router as attachment_router
+    from attachment_retention import install_storage_auditor
     from chat_receipt_security import install as install_chat_receipt_security
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
     app.include_router(attachment_router)
+    install_storage_auditor(app, janus_sleep_cycle)
     install_chat_receipt_security(interface_chat_module)
     install_auth_rate_limit(app)
 
@@ -117,6 +119,7 @@ try:
             "auth_rate_limit_enabled": True,
             "deliberation_tasks_enabled": True,
             "file_sharing_enabled": True,
+            "file_storage_auditor_enabled": True,
         }
 
     @app.get("/diagnostics/runtime-health")
@@ -139,6 +142,8 @@ try:
             "runtime_health_route_present": "/diagnostics/runtime-health" in routes,
             "deliberation_route_present": "/desktop/deliberations" in routes,
             "file_upload_route_present": "/files/upload" in routes,
+            "file_storage_status_route_present": "/files/storage/status" in routes,
+            "file_audit_route_present": "/files/audit/recent" in routes,
             "auth_rate_limit_enabled": True,
         }
 
@@ -211,6 +216,8 @@ except Exception as exc:
             "runtime_health_route_present": True,
             "deliberation_route_present": False,
             "file_upload_route_present": False,
+            "file_storage_status_route_present": False,
+            "file_audit_route_present": False,
             "auth_rate_limit_enabled": False,
         }
 
