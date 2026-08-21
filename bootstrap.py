@@ -1,11 +1,12 @@
 """Resilient JANUS bootstrap for Render.
 
 Always exposes /health if the full JANUS application fails during import.
-Also exposes minimal non-secret auth diagnostics when the main app loads.
+Also exposes non-secret auth/runtime diagnostics when the main app loads.
 """
 from __future__ import annotations
 
 import os
+import sqlite3
 import traceback
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -14,20 +15,16 @@ _startup_error = None
 _startup_trace = None
 
 try:
-    # Normalize incompatible persistent account schemas before auth.py is imported.
     from auth_db_normalizer import normalize_legacy_accounts
     _auth_normalization = normalize_legacy_accounts()
 
-    # Then catch partially-current legacy session/token tables. Older JANUS
-    # schemas may contain account_id but still lack token_hash/expiry columns.
-    # Those tables are preserved rather than deleted; auth.py recreates the
-    # current tables immediately afterwards.
     from auth_schema_guard import guard_auth_schema, auth_schema_snapshot
     _auth_schema_guard = guard_auth_schema()
 
     from janus_dashboard import app as real_app
     import auth as auth_module
     from auth_lifecycle import router as auth_lifecycle_router
+    from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
 
@@ -39,6 +36,68 @@ try:
             response.status_code = 409
             response.headers["X-JANUS-Original-Status"] = "503"
         return response
+
+    def _runtime_health_snapshot():
+        db_path = os.getenv("JANUS_DB_PATH", "/data/janus.sqlite3")
+        db_ok = False
+        db_error = None
+        quick_check = None
+        try:
+            with sqlite3.connect(db_path, timeout=5) as c:
+                quick_check = c.execute("PRAGMA quick_check").fetchone()[0]
+                # BEGIN IMMEDIATE proves the database/disk is writable without
+                # changing user content. Roll back immediately afterwards.
+                c.execute("BEGIN IMMEDIATE")
+                c.execute("ROLLBACK")
+                db_ok = str(quick_check).lower() == "ok"
+        except Exception as exc:
+            db_error = f"{type(exc).__name__}: {str(exc)[:240]}"
+
+        try:
+            runtime = janus_sleep_cycle.status()
+        except Exception as exc:
+            runtime = {"error": f"{type(exc).__name__}: {str(exc)[:240]}"}
+
+        auth_schema = auth_schema_snapshot()
+        required = {
+            "accounts": {"id", "username", "email", "password_hash"},
+            "sessions": {"token_hash", "account_id", "expires_at"},
+            "auth_tokens": {"token_hash", "account_id", "purpose", "expires_at"},
+        }
+        schema_ok = True
+        try:
+            for table, cols in required.items():
+                present = set(auth_schema.get(table, {}).get("columns", []))
+                if not cols.issubset(present):
+                    schema_ok = False
+                    break
+        except Exception:
+            schema_ok = False
+
+        core_persistent = bool(runtime.get("persistent_storage")) if isinstance(runtime, dict) else False
+        healthy = bool(db_ok and schema_ok and core_persistent)
+        return {
+            "status": "ok" if healthy else "degraded",
+            "service": "janus-global-core",
+            "main_app_loaded": True,
+            "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
+            "database": {
+                "path": db_path,
+                "quick_check": quick_check,
+                "writable": db_ok,
+                "error": db_error,
+            },
+            "auth_schema_ok": schema_ok,
+            "core_persistence_ok": core_persistent,
+            "core_phase": runtime.get("phase") if isinstance(runtime, dict) else None,
+            "core_count": runtime.get("core_count") if isinstance(runtime, dict) else None,
+            "remote_clients": runtime.get("remote_clients") if isinstance(runtime, dict) else None,
+            "background_external_api_budget_used": runtime.get("external_api_budget_used", 0) if isinstance(runtime, dict) else None,
+        }
+
+    @app.get("/diagnostics/runtime-health")
+    def runtime_health():
+        return _runtime_health_snapshot()
 
     @app.get("/diagnostics/auth-config")
     def auth_config():
@@ -55,6 +114,7 @@ try:
             "logout_route_present": "/auth/logout" in routes,
             "logout_all_route_present": "/auth/logout-all" in routes,
             "health_route_present": "/health" in routes,
+            "runtime_health_route_present": "/diagnostics/runtime-health" in routes,
             "auth_schema_normalization": _auth_normalization,
             "auth_schema_guard": _auth_schema_guard,
             "auth_schema": auth_schema_snapshot(),
@@ -75,6 +135,16 @@ except Exception as exc:  # keep Render reachable for diagnosis
                 "startup_error": _startup_error,
             },
         )
+
+    @app.get("/diagnostics/runtime-health")
+    def runtime_health_degraded():
+        return {
+            "status": "degraded",
+            "service": "janus-global-core",
+            "main_app_loaded": False,
+            "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
+            "startup_error": _startup_error,
+        }
 
     @app.get("/diagnostics/startup-error")
     def startup_error():
@@ -100,6 +170,7 @@ except Exception as exc:  # keep Render reachable for diagnosis
             "logout_route_present": False,
             "logout_all_route_present": False,
             "health_route_present": True,
+            "runtime_health_route_present": True,
             "startup_error": _startup_error,
         }
 
