@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.47: synchronize active server deliberations into the local Android scheduler.
+// v0.48: first-class user-directed deliberation owns autonomous cycles until completed.
 android {
     namespace 'com.vardath.janus'
     compileSdk 36
@@ -18,8 +18,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 47
-        versionName '0.47'
+        versionCode 48
+        versionName '0.48'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
