@@ -16,86 +16,69 @@ JANUS Agent is an experimental functional-metacognition/agency system and person
 ## Android checkpoint: v0.45 published
 - Android v0.45 is published and verified on apk-download. It contains the forward-only routing correction plus tightened Messages filtering.
 - Observe UI has readable externalizable process-journal cards, expandable Technical details, incremental DOM updates, scroll-position preservation and a New thoughts indicator.
-- Root cause of earlier apparent failed Observe fixes: MainActivity.java injected a legacy janusLocalEvidence() renderer after index.html loaded, overwriting the newer Observe renderer. Build workflow now guards against this override.
 - v0.43 added a device-local Interface outbox so worthwhile local Interface conclusions can reach Messages without waiting for server sync.
 - v0.44 corrected recursive routing/role leakage: no ordinary left<->right recirculation, no Consensus->hemisphere recycling, no Interface->Consensus feedback loop; remote/global feedback is compressed, tagged [feedback-only], and routed through specialist review.
-- After v0.44, routine self-assessments/Fano telemetry leaked into Messages. v0.45 tightened both client and server surfacing so routine self-assessment, maintenance, telemetry, generic integration text and near-duplicates stay in Observe.
-- Messages are reserved for genuinely new conclusions/findings, questions for the user, warnings, recommendations or other actionable/meaningful follow-ups.
-- v0.45 client rendering also filters already-generated low-value telemetry messages so the existing list cleans up without requiring manual dismissal of every stale item.
+- v0.45 keeps routine self-assessment, maintenance, Fano telemetry and generic integration text in Observe; Messages are reserved for genuinely useful conclusions/questions/warnings/recommendations.
 
-## Background activity -> Interface/Messages checkpoint
-- Verified from Android screenshots that the local 11-core society performs deterministic background processing and that Chat can report the local runtime evidence accurately.
-- runtime_messaging.py now consumes local_runtime_evidence from Android chat requests, so Chat cannot claim there was no verified activity when Observe shows recent cycles.
-- core_activity_bridge.py persists synced local events to Activity/Memory and can promote substantive Interface conclusions into proactive_message records.
-- Android has a complementary local surface path so meaningful Interface conclusions can reach Messages even while server sync is delayed/offline.
-- Observe is the detailed process journal; Messages is a sparse, user-relevant outbox. Internal telemetry belongs in Observe unless it produces a meaningful conclusion worth surfacing.
-
-## Forward-only routing / recursive-echo checkpoint
-- Live JANUS correctly diagnosed prior role leakage/routing noise: hemispheres were repeatedly being fed previous Consensus/Interface text, causing recursive description of integration rather than continued work on the underlying question.
+## Forward-only routing / cross-device checkpoint
 - Correct ordinary cognition path is strict: specialists -> assigned hemisphere -> Consensus -> Interface.
-- Left and right hemispheres do not feed each other directly during ordinary routing. Consensus is the reconciliation point.
-- Interface is a surface/output state, not an automatic new thinking topic. Consensus does not feed its result back into either hemisphere.
-- Cross-device/global feedback is compressed and tagged [feedback-only], then routed through Context + Counterpoint specialist review rather than injected directly into Consensus/Interface.
-- routing_policy.py overrides BOTH ordinary _route_output and accept_remote_summary, so synchronized client Consensus/Interface states cannot re-enter global Consensus directly.
-- Added tests/test_routing_policy.py plus GitHub Actions routing CI. The suite fails if ordinary left/right cross-feed, Consensus->hemisphere feedback, Interface->Consensus feedback, or direct remote-summary injection into Consensus/Interface returns.
-- Android forward-routing patch is verified at build time; routing verifier must only flag actual prohibited edges and must not mistake legitimate Safety fan-out for recursion.
+- routing_policy.py overrides both _route_output and accept_remote_summary. Synchronized client Consensus/Interface state is compressed, tagged [feedback-only], and routed through Context + Counterpoint rather than injected directly into Consensus/Interface.
+- tests/test_routing_policy.py plus GitHub Actions routing CI fail if left/right cross-feed, Consensus->hemisphere feedback, Interface->Consensus feedback, or direct remote-summary injection returns.
+- Remembered remote-device summaries are now bounded (default 100). When the cap is exceeded, the oldest summaries are removed both from memory and janus_core_remote_summary so abandoned/reinstalled device IDs cannot grow indefinitely.
 
-## Core-sync 500 checkpoint
-- Proven root cause was sqlite3.Row being treated like a dict with .get() in core_sync.py.
-- Fixed with safe account-field access and hardened sync stages so one persistence failure returns degraded diagnostics rather than HTTP 500.
-- Android already retries sync periodically; no client rebuild was needed for this server-side crash.
+## Offline chat / receipt security checkpoint
+- Android JanusOfflineQueue gives each queued chat turn a client_message_id, persists undelivered turns locally, retries later and stores deferred replies.
+- Server janus_chat_receipts makes retries idempotent so a response lost after server acceptance does not duplicate the user turn.
+- chat_receipt_security.py now binds every cached receipt to the authenticated profile. A colliding client_message_id from another account cannot read, replay or overwrite the original account's cached result. Regression coverage was added.
+- Temporary chat receipts are retained for 7 days by default and then pruned by retention.py.
+
+## Runtime retention / persistence checkpoint
+- User conversation/memory content remains continuity data and is not globally aged out by the temporary-data cleaner.
+- retention.py now additionally removes janus_chat_receipts older than JANUS_CHAT_RECEIPT_RETENTION_DAYS (default 7), repetitive core_runtime_snapshot events older than JANUS_RUNTIME_SNAPSHOT_RETENTION_DAYS (default 30), and matching snapshot ingest-claim rows.
+- Existing cleanup still removes expired sessions, expired/old-used auth tokens and stale pending deletion requests.
+- This keeps the 1 GB Render disk from filling with retry receipts and cycle-counter telemetry during multi-device/soak testing.
+
+## Render/runtime reliability checkpoint
+- Render now builds directly with `pip install -r requirements.txt` and launches `uvicorn bootstrap:app`; obsolete server.py base64/gzip reconstruction was removed.
+- Duplicate inline Google client configuration was removed from the start command; Render env vars are the single source of truth.
+- bootstrap.py exposes /diagnostics/runtime-health with deployed commit, SQLite quick_check/writability, auth-schema validity, core persistence, core phase/count, remote-client count, background API usage and receipt-guard status. Degraded bootstrap routes remain available if the full app fails to import.
+- Live deployment of the newest diagnostics still requires external verification after Render deploy propagation; do not infer deployment success solely from commit state.
+
+## API/cost-control checkpoint
+- autonomous_hive.py already has per-profile paid-background daily call/token budgets and escalation thresholds.
+- Production Render now sets JANUS_PAID_BACKGROUND_REFLECTION=0 by default. Deterministic local/server hive/core cycles remain active and zero-API; ordinary user-triggered Chat still uses JANUS_MODEL.
+- Conservative dormant caps are configured for any later deliberate re-enable: JANUS_BACKGROUND_DAILY_CALL_CAP=12 and JANUS_BACKGROUND_DAILY_TOKEN_CAP=20000 per profile/day.
+- Do not re-enable paid background reflection broadly until pricing/product policy and scale limits are intentionally decided.
 
 ## Authentication / account lifecycle checkpoint
 - auth.py initializes current auth schema at import; auth_schema_guard.py validates complete required table shapes and preserves incompatible legacy sessions/auth_tokens before recreation.
 - SMTP/email delivery is non-fatal to account creation/reset; delivery status is reported separately.
-- Added local network-free regression tests for register -> login -> /auth/me, duplicate-account rejection, password reset, session invalidation and required auth table columns.
-- Added authenticated logout lifecycle endpoints: /auth/logout revokes the current bearer session; /auth/logout-all revokes all sessions for the account. Regression coverage verifies session invalidation.
-- Added GitHub Actions auth regression workflow so auth/security changes are automatically tested.
-- secure_desktop.py binds private desktop routes to the authenticated account username and ignores client attempts to select another profile. Added regression coverage for cross-user profile spoofing and invalid-session rejection.
-- Google-only account lifecycle edge fixed for new accounts: password_hash is explicitly marked google_only rather than using an unreachable random PBKDF2 password. Password login rejects the marker; account deletion can therefore distinguish Google-only accounts correctly. Existing password accounts linked to Google keep their real password hash.
-- retention.py already performs daily auth hygiene: expired sessions, expired/old-used action tokens and stale pending deletion requests are cleaned automatically.
-- Non-Google account creation/login still requires end-to-end verification against the live Render persistent database from a real client.
+- Regression tests cover register -> login -> /auth/me, duplicate-account rejection, password reset, session invalidation, logout, required auth columns and cross-user profile spoofing.
+- Google-only account lifecycle marker is explicit; password login rejects Google-only accounts while account deletion can distinguish them correctly.
+- Non-Google registration/login still requires end-to-end verification against the deployed Render persistent database from a real client.
 
 ## Windows / PC checkpoint
-- The previously packaged Windows v0.21 client used free-form profile selection and sent no bearer token, so it was structurally incompatible with secure_desktop's authenticated private routes.
-- Added client/janus_client_v022.py as an authenticated compatibility layer over the feature-complete v0.21/v0.20 UI chain.
-- Windows v0.22 adds username/email + password sign-in, Create Account, persisted session restore, bearer-authenticated private Chat/Messages/Observe/Cores/Memory/Activity/Settings requests, and Sign Out.
-- The authenticated account username, not a typed profile, becomes the active JANUS profile.
-- Windows session tokens are now persisted with Windows DPAPI bound to the current Windows user. Plaintext development access_token config is migrated once and removed; passwords are never persisted. If DPAPI is unavailable, JANUS does not persist the token.
-- build-windows.yml syntax-checks the v0.20/v0.21/v0.22 chain before PyInstaller and builds JANUS.exe from v0.22. Artifact name is JANUS-Windows-v0.22.
-- Windows v0.22 still needs real Windows launch/use testing by the user after CI produces the executable.
+- Windows v0.22 is an authenticated compatibility layer over the feature-complete v0.21/v0.20 UI chain.
+- Adds username/email + password sign-in, Create Account, bearer-authenticated private screens, session restore and Sign Out.
+- Session tokens are persisted with Windows DPAPI bound to the current Windows user; passwords are never stored.
+- build-windows.yml syntax-checks the client chain before PyInstaller and builds JANUS.exe from v0.22. Real Windows launch/use testing still requires the user.
 
 ## Apple / iOS checkpoint
-- Existing iOS scaffold was also using arbitrary profile names and unauthenticated private requests.
-- APIClient.swift supports username/email + password login, account registration, /auth/me session restore and /auth/logout, and attaches Authorization headers to private JANUS requests.
-- iOS session tokens are stored in Keychain using a device-bound generic-password entry rather than UserDefaults. APIClient explicitly imports Combine for ObservableObject/@Published compilation.
-- Models.swift contains Account/AuthResponse/MeResponse models for the auth lifecycle.
-- ContentView.swift gates the app on a real JANUS account, provides Sign in/Create account UI, restores saved sessions, uses the authenticated account username as the profile, and exposes Sign out.
-- iOS signing/certificates/Apple Developer account are not required for this source work. Simulator CI should be used to catch Swift compile errors before device signing work.
-- Sign in with Apple and native Apple-device background behaviour remain later tasks requiring platform/account input.
-
-## Android build / APK delivery checkpoint
-- GitHub Actions builds the debug APK and force-publishes orphan branch apk-download with downloads/JANUS-Android-v<version>.apk and oauth-build-info.txt.
-- v0.44 publication was delayed by invalid workflow YAML from embedding a large JavaScript block directly in workflow YAML. Patch logic was moved into dedicated Python scripts and workflow simplified.
-- A further build blocker came from an over-broad routing-verifier assertion that falsely matched legitimate Safety fan-out. The verifier was corrected to check only real forbidden edges.
-- Before giving any APK link, verify the actual apk-download branch contains the requested version. Never infer publication from a version bump or commit alone.
-- Direct-download form: https://raw.githubusercontent.com/Vardath/JANUS/apk-download/downloads/JANUS-Android-v<version>.apk
-
-## Current Android OAuth identity
-Package: com.vardath.janus
-Google web client ID currently configured in source fallback: 236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com
-Stable debug signing key is cached by the GitHub Actions workflow; oauth-build-info.txt records the exact built certificate fingerprints and generated client ID for each APK.
+- iOS now uses real JANUS accounts rather than arbitrary profile names.
+- APIClient supports login/register/me/logout and authenticated private requests; tokens are stored in Keychain, not UserDefaults.
+- ContentView gates the app on a valid account and exposes Sign in/Create account/Sign out.
+- Build JANUS iOS Simulator workflow exists for unsigned simulator compilation; real Apple signing/TestFlight/device testing still requires Apple-account/device input.
 
 ## Near-term product backlog
 - Live-verify non-Google registration/login on deployed Render and fix any remaining persistent-schema/runtime issue.
 - Configure/test email verification and password-reset SMTP flow.
 - Re-test Google login end-to-end and account linking/merging.
-- Verify Windows v0.22 CI artifact and then test executable on a real Windows PC.
-- Compile/test iOS simulator build; later add Sign in with Apple, signing, TestFlight/device testing and background-behaviour adaptation.
-- Cross-device identity/state synchronization, offline recovery, security/privacy audit, deployment reliability, cost controls and multi-day soak testing.
+- Verify Windows v0.22 CI artifact and test executable on a real Windows PC.
+- Verify iOS simulator CI result; later add Sign in with Apple, signing, TestFlight/device testing and Apple background-behaviour adaptation.
+- Continue privacy/security audit, multi-day soak testing and decide eventual user-triggered/paid-background quota policy before scaling.
 
 ## Working practice
 - Keep this file current after material architecture, build, authentication, UI, persistence or deployment changes.
 - Verify claims against repository/build outputs rather than inferring success from a version bump or commit alone.
 - Trace UI behavior end-to-end across client asset, platform code injection, client request payload, secure server wrapper, active server route implementation, persistence layer, and UI reader before declaring a fix complete.
-- When supplying an APK, give the verified direct-download target rather than merely a GitHub directory or expected filename.
+- Before giving any APK link, verify the actual apk-download branch contains the requested version.
