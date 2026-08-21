@@ -23,10 +23,13 @@ try:
 
     from janus_dashboard import app as real_app
     import auth as auth_module
+    import interface_chat as interface_chat_module
     from auth_lifecycle import router as auth_lifecycle_router
+    from chat_receipt_security import install as install_chat_receipt_security
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
+    install_chat_receipt_security(interface_chat_module)
 
     @app.middleware("http")
     async def preserve_google_auth_error(request, call_next):
@@ -45,8 +48,6 @@ try:
         try:
             with sqlite3.connect(db_path, timeout=5) as c:
                 quick_check = c.execute("PRAGMA quick_check").fetchone()[0]
-                # BEGIN IMMEDIATE proves the database/disk is writable without
-                # changing user content. Roll back immediately afterwards.
                 c.execute("BEGIN IMMEDIATE")
                 c.execute("ROLLBACK")
                 db_ok = str(quick_check).lower() == "ok"
@@ -93,6 +94,7 @@ try:
             "core_count": runtime.get("core_count") if isinstance(runtime, dict) else None,
             "remote_clients": runtime.get("remote_clients") if isinstance(runtime, dict) else None,
             "background_external_api_budget_used": runtime.get("external_api_budget_used", 0) if isinstance(runtime, dict) else None,
+            "chat_receipt_profile_guard": bool(getattr(interface_chat_module, "_profile_receipt_guard_installed", False)),
         }
 
     @app.get("/diagnostics/runtime-health")
@@ -115,11 +117,12 @@ try:
             "logout_all_route_present": "/auth/logout-all" in routes,
             "health_route_present": "/health" in routes,
             "runtime_health_route_present": "/diagnostics/runtime-health" in routes,
+            "chat_receipt_profile_guard": bool(getattr(interface_chat_module, "_profile_receipt_guard_installed", False)),
             "auth_schema_normalization": _auth_normalization,
             "auth_schema_guard": _auth_schema_guard,
             "auth_schema": auth_schema_snapshot(),
         }
-except Exception as exc:  # keep Render reachable for diagnosis
+except Exception as exc:
     _startup_error = f"{type(exc).__name__}: {exc}"
     _startup_trace = traceback.format_exc(limit=12)
     app = FastAPI(title="JANUS bootstrap", version="degraded")
