@@ -17,11 +17,13 @@ from core_sync import router as core_sync_router
 from src.janus_sleep_cycle import janus_sleep_cycle
 from interface_runtime_policy import install as install_interface_runtime_policy
 from interface_chat import install as install_interface_chat
+from core_observer import install as install_core_observer
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
 janus_sleep_cycle.wake_seconds = max(10, int(os.environ.get("JANUS_WAKE_SECONDS", "300")))
 janus_sleep_cycle.sleep_seconds = max(10, int(os.environ.get("JANUS_SLEEP_SECONDS", "600")))
 install_interface_runtime_policy(janus_sleep_cycle)
+install_core_observer(app, janus_sleep_cycle)
 
 def _connect():
     c=sqlite3.connect(DB_PATH,timeout=10); c.row_factory=sqlite3.Row
@@ -41,7 +43,7 @@ def _decode_message(event_type:str,detail:str):
             p=json.loads(raw)
             if isinstance(p,dict) and str(p.get('text') or '').strip(): return str(p.get('message_type') or 'Follow-up'),str(p.get('text')).strip(),str(p.get('source') or 'janus')
         except Exception: pass
-    return _message_type(event_type,raw),raw,'legacy'
+    return _message_type(event_type,raw),'legacy' if False else raw,'legacy'
 
 def _message_rows(profile:str,limit:int=50,include_dismissed:bool=False):
     c=_connect()
