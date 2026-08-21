@@ -52,10 +52,13 @@ final class APIClient: ObservableObject {
         setToken("")
     }
 
-    func chat(profile: String, message: String) async throws -> String {
+    func chat(profile: String, message: String) async throws -> ChatResponse {
         let body = ["profile_id": profile, "message": message]
-        let response: ChatResponse = try await request(path: "/desktop/chat", method: "POST", body: body)
-        return response.reply ?? response.response ?? "JANUS replied, but the response was empty."
+        return try await request(path: "/desktop/chat", method: "POST", body: body)
+    }
+
+    func generatedImageData(path: String) async throws -> Data {
+        try await request(path: path, method: "GET", body: Optional<[String: String]>.none)
     }
 
     func home(profile: String) async throws -> HomeResponse {
