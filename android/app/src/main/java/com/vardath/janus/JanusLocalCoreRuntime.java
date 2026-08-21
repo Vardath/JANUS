@@ -37,11 +37,13 @@ public final class JanusLocalCoreRuntime {
         loadObserveEvents();
         String id=prefs.getString("core_installation_id",""); if(id==null||id.isEmpty()){id=UUID.randomUUID().toString();prefs.edit().putString("core_installation_id",id).apply();} installationId=id;
         lastConsensus=prefs.getString("core_consensus",""); lastInterface=prefs.getString("core_interface","");
+        lastSyncAt=prefs.getLong("core_last_sync_at",0L);
     }
 
     private synchronized void record(String core,String peer,String type,String detail){
         try{
-            JSONObject e=new JSONObject().put("source","local").put("core_name",core).put("event_type",type).put("detail",detail).put("created_at",System.currentTimeMillis());
+            long ts=System.currentTimeMillis();
+            JSONObject e=new JSONObject().put("event_id",UUID.randomUUID().toString()).put("source","local").put("core_name",core).put("event_type",type).put("detail",detail).put("created_at",ts);
             if(peer!=null&&!peer.isEmpty())e.put("peer_core",peer);
             observeEvents.addLast(e);
             while(observeEvents.size()>MAX_OBSERVE_EVENTS)observeEvents.pollFirst();
@@ -52,6 +54,13 @@ public final class JanusLocalCoreRuntime {
         try{JSONArray a=new JSONArray(raw);for(int i=Math.max(0,a.length()-MAX_OBSERVE_EVENTS);i<a.length();i++){JSONObject x=a.optJSONObject(i);if(x!=null)observeEvents.addLast(x);}}catch(Exception ignored){}
     }
     private JSONArray observeArray(){JSONArray a=new JSONArray();for(JSONObject x:observeEvents)a.put(x);return a;}
+    private JSONArray unsyncedObserveArray(){
+        JSONArray a=new JSONArray(); int kept=0;
+        for(JSONObject x:observeEvents){
+            if(x.optLong("created_at",0L)>lastSyncAt){a.put(x);kept++;if(kept>=100)break;}
+        }
+        return a;
+    }
 
     synchronized void start(){ if(started)return; started=true; executor.scheduleAtFixedRate(this::tickSafe,0,5,TimeUnit.SECONDS); executor.scheduleAtFixedRate(this::syncSafe,20,60,TimeUnit.SECONDS); }
     private void tickSafe(){try{tick();}catch(Exception ignored){}}
@@ -102,18 +111,18 @@ public final class JanusLocalCoreRuntime {
         String raw=prefs.getString("core_fano_"+c.name,"");if(raw==null||raw.isEmpty())return;
         try{JSONArray a=new JSONArray(raw);for(int i=0;i<8&&i<a.length();i++)c.fano[i]=Math.max(1,a.optLong(i,1));c.fanoSteps=prefs.getLong("core_fano_steps_"+c.name,0);c.activeDirection=prefs.getInt("core_fano_active_"+c.name,0);}catch(Exception ignored){}
     }
-    private void persist(){SharedPreferences.Editor e=prefs.edit().putString("core_phase",phase).putString("core_consensus",lastConsensus).putString("core_interface",lastInterface).putString("core_observe_events",observeArray().toString());for(Core c:cores.values()){e.putLong("core_cycles_"+c.name,c.cycles).putString("core_last_"+c.name,c.last);JSONArray a=new JSONArray();for(long v:c.fano)a.put(v);e.putString("core_fano_"+c.name,a.toString()).putLong("core_fano_steps_"+c.name,c.fanoSteps).putInt("core_fano_active_"+c.name,c.activeDirection);}e.apply();}
+    private void persist(){SharedPreferences.Editor e=prefs.edit().putString("core_phase",phase).putString("core_consensus",lastConsensus).putString("core_interface",lastInterface).putString("core_observe_events",observeArray().toString()).putLong("core_last_sync_at",lastSyncAt);for(Core c:cores.values()){e.putLong("core_cycles_"+c.name,c.cycles).putString("core_last_"+c.name,c.last);JSONArray a=new JSONArray();for(long v:c.fano)a.put(v);e.putString("core_fano_"+c.name,a.toString()).putLong("core_fano_steps_"+c.name,c.fanoSteps).putInt("core_fano_active_"+c.name,c.activeDirection);}e.apply();}
 
     synchronized JSONObject statusJson() throws Exception{
         JSONObject root=new JSONObject().put("architecture","11 Fano/JANUS cores").put("topology","7 -> 2 -> 1 -> 1").put("phase",phase).put("background_phase",phase).put("interface_available",true).put("running",started).put("installation_id",installationId).put("consensus",lastConsensus).put("interface",lastInterface).put("last_sync_at",lastSyncAt).put("sync_state",lastSyncState).put("persistent_storage",true).put("storage_backend","Android app-private SharedPreferences").put("observe_events",observeArray());
         JSONObject cj=new JSONObject();for(Core c:cores.values()){JSONObject x=new JSONObject().put("awake","interface".equals(c.name)||"wake".equals(phase)).put("cycle_count",c.cycles).put("pending_messages",c.inbox.size()).put("last_output",c.last);JSONArray w=new JSONArray();for(long v:c.fano)w.put(v);long line=c.fano[1]+c.fano[2]+c.fano[3],off=c.fano[4]+c.fano[5]+c.fano[6]+c.fano[7];x.put("fano",new JSONObject().put("weights",w).put("step_count",c.fanoSteps).put("active_direction",c.activeDirection).put("projection_1_3_4",new JSONObject().put("origin",c.fano[0]).put("line",line).put("off_line",off)));cj.put(c.name,x);}root.put("cores",cj);return root;
     }
 
-    private JSONObject summary() throws Exception{JSONObject cycles=new JSONObject();for(Core c:cores.values())cycles.put(c.name,c.cycles);return new JSONObject().put("device_id",installationId).put("phase",phase).put("background_phase",phase).put("interface_available",true).put("consensus",lastConsensus).put("interface",lastInterface).put("cycles",cycles);}
+    private JSONObject summary() throws Exception{JSONObject cycles=new JSONObject();for(Core c:cores.values())cycles.put(c.name,c.cycles);return new JSONObject().put("device_id",installationId).put("phase",phase).put("consensus",lastConsensus).put("interface",lastInterface).put("cycles",cycles).put("observe_events",unsyncedObserveArray());}
     private void syncSafe(){try{sync();}catch(Exception e){lastSyncState="offline";}}
     private void sync() throws Exception{
         String token=prefs.getString("access_token","");if(token==null||token.trim().isEmpty()){lastSyncState="not-signed-in";return;}
-        HttpURLConnection c=(HttpURLConnection)new URL(SERVER+"/core-sync/exchange").openConnection();c.setRequestMethod("POST");c.setDoOutput(true);c.setConnectTimeout(15000);c.setReadTimeout(30000);c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Authorization","Bearer "+token.trim());try(OutputStream os=c.getOutputStream()){os.write(summary().toString().getBytes(StandardCharsets.UTF_8));}
-        int code=c.getResponseCode();BufferedReader r=new BufferedReader(new InputStreamReader(code>=400?c.getErrorStream():c.getInputStream(),StandardCharsets.UTF_8));StringBuilder b=new StringBuilder();String line;while((line=r.readLine())!=null)b.append(line);r.close();if(code<400){JSONObject server=new JSONObject(b.toString()).optJSONObject("server");if(server!=null){String rc=server.optString("consensus","");String ri=server.optString("interface","");if(!rc.isEmpty())send("interface","consensus","global: "+rc);if(!ri.isEmpty())send("consensus","interface","global: "+ri);}lastSyncAt=System.currentTimeMillis();lastSyncState="connected";}else lastSyncState="server-error-"+code;
+        HttpURLConnection c=(HttpURLConnection)new URL(SERVER+"/core-sync/exchange").openConnection();c.setRequestMethod("POST");c.setDoOutput(true);c.setConnectTimeout(15000);c.setReadTimeout(30000);c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Authorization","Bearer "+token.trim());long syncStarted=System.currentTimeMillis();try(OutputStream os=c.getOutputStream()){os.write(summary().toString().getBytes(StandardCharsets.UTF_8));}
+        int code=c.getResponseCode();BufferedReader r=new BufferedReader(new InputStreamReader(code>=400?c.getErrorStream():c.getInputStream(),StandardCharsets.UTF_8));StringBuilder b=new StringBuilder();String line;while((line=r.readLine())!=null)b.append(line);r.close();if(code<400){JSONObject server=new JSONObject(b.toString()).optJSONObject("server");if(server!=null){String rc=server.optString("consensus","");String ri=server.optString("interface","");if(!rc.isEmpty())send("interface","consensus","global: "+rc);if(!ri.isEmpty())send("consensus","interface","global: "+ri);}lastSyncAt=syncStarted;lastSyncState="connected";persist();}else lastSyncState="server-error-"+code;
     }
 }
