@@ -96,37 +96,7 @@ def install(app) -> None:
         safe["profile_id"] = profile
         safe["username"] = profile
         safe.pop("_janus_token", None)
-        result = await chat_impl(safe)
-        if not isinstance(result, dict):
-            return result
-
-        # Stage-1 visual generation is account-bound and occurs only after the
-        # authenticated chat implementation has completed. A rendering failure
-        # must never destroy an otherwise valid text answer.
-        try:
-            from image_generation import maybe_generate_for_chat
-            reply = str(result.get("reply") or result.get("response") or "")
-            clean_reply, image_result = await maybe_generate_for_chat(
-                profile,
-                str(safe.get("message") or safe.get("text") or ""),
-                reply,
-            )
-            if "reply" in result or "response" not in result:
-                result["reply"] = clean_reply
-            else:
-                result["response"] = clean_reply
-            if image_result is not None:
-                result["image_generation"] = image_result
-                if image_result.get("generated") and isinstance(image_result.get("image"), dict):
-                    # Clients get only the account-bound file identity/path.
-                    # They still need the bearer token to fetch the bytes.
-                    result["generated_image"] = image_result["image"]
-        except Exception as exc:
-            result["image_generation"] = {
-                "generated": False,
-                "reason": f"image presentation deferred: {type(exc).__name__}",
-            }
-        return result
+        return await chat_impl(safe)
 
     @app.get("/desktop/observe", tags=["desktop"])
     def secure_observe(request: Request):
