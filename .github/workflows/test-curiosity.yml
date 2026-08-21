@@ -5,7 +5,10 @@ on:
     branches: [main]
     paths:
       - 'curiosity_search.py'
+      - 'epistemic_search_bridge.py'
+      - 'self_assessment.py'
       - 'janus_dashboard.py'
+      - 'tests/test_epistemic_regulation.py'
       - 'render.yaml'
       - '.env.example'
       - '.github/workflows/test-curiosity.yml'
@@ -23,9 +26,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install minimal dependencies
-        run: pip install 'openai>=1.99,<2'
-      - name: Compile curiosity integration
-        run: python -m py_compile curiosity_search.py janus_dashboard.py
+        run: pip install 'openai>=1.99,<2' pytest
+      - name: Compile curiosity and regulation integration
+        run: python -m py_compile curiosity_search.py epistemic_search_bridge.py self_assessment.py janus_dashboard.py
       - name: Verify policy constants and modes
         env:
           JANUS_DB_PATH: /tmp/janus-curiosity-test.sqlite3
@@ -55,3 +58,5 @@ jobs:
           assert choice and choice[0]=='relevant', choice
           print('curiosity policy test passed:', choice[0])
           PY
+      - name: Verify epistemic regulation
+        run: pytest -q tests/test_epistemic_regulation.py
