@@ -18,12 +18,17 @@ from src.janus_sleep_cycle import janus_sleep_cycle
 from interface_runtime_policy import install as install_interface_runtime_policy
 from interface_chat import install as install_interface_chat
 from core_observer import install as install_core_observer
+from autonomous_hive import install as install_autonomous_hive
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
+# The autonomous hive owns background cognition now. Keep the older dashboard
+# reflection loop off unless explicitly re-enabled, avoiding duplicate paid calls.
+os.environ.setdefault("JANUS_SELF_EVALUATION", "0")
 janus_sleep_cycle.wake_seconds = max(10, int(os.environ.get("JANUS_WAKE_SECONDS", "300")))
 janus_sleep_cycle.sleep_seconds = max(10, int(os.environ.get("JANUS_SLEEP_SECONDS", "600")))
 install_interface_runtime_policy(janus_sleep_cycle)
 install_core_observer(app, janus_sleep_cycle)
+install_autonomous_hive(app)
 
 def _connect():
     c=sqlite3.connect(DB_PATH,timeout=10); c.row_factory=sqlite3.Row
@@ -74,7 +79,7 @@ async def _stop_local_core_cycle(): janus_sleep_cycle.stop()
 
 @app.get('/desktop/runtime-cores',tags=['desktop'])
 def desktop_runtime_cores(username:str|None=Query(default=None)):
-    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':janus_sleep_cycle.status(),'paid_background_api_enabled':os.environ.get('JANUS_SELF_EVALUATION','0')=='1','note':'The interface core remains available continuously; the other ten cores may rest and publish updates asynchronously. The zero-cost core cycle makes no external model/API calls.'}
+    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':janus_sleep_cycle.status(),'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'note':'The interface core remains continuously available. The society receives one-minute zero-API-cost autonomous pulses; occasional language reflection is separately rate-limited.'}
 
 @app.get('/desktop/messages',tags=['desktop'])
 def desktop_messages(username:str=Query(...),limit:int=Query(default=50,ge=1,le=100),include_dismissed:bool=Query(default=False)):
@@ -98,11 +103,8 @@ def desktop_home(username:str=Query(...)):
     try:
         row=c.execute('SELECT event_type,detail,created_at FROM desktop_events WHERE profile_id=? ORDER BY id DESC LIMIT 1',(username,)).fetchone(); latest=dict(row) if row else None
     finally: c.close()
-    runtime=janus_sleep_cycle.status(); return {'profile':username,'status':_presence(username,latest),'architecture':'11-core','unread_messages':sum(1 for x in messages if x['state']=='unread'),'latest_activity':latest,'background_interval_minutes':int(os.environ.get('JANUS_INTERVAL_MINUTES','15')),'core_phase':runtime.get('phase'),'core_runtime':runtime,'external_api_budget_used_by_core_cycle':0,'messaging_action':True}
+    runtime=janus_sleep_cycle.status(); return {'profile':username,'status':_presence(username,latest),'architecture':'11-core','unread_messages':sum(1 for x in messages if x['state']=='unread'),'latest_activity':latest,'background_interval_minutes':1,'core_phase':runtime.get('phase'),'core_runtime':runtime,'external_api_budget_used_by_core_cycle':0,'messaging_action':True}
 
-# The reconstructed core still carries an older /auth/google endpoint. FastAPI
-# resolves routes in registration order, so remove all existing Google handlers,
-# then register a compatibility wrapper before the current auth router.
 app.router.routes = [route for route in app.router.routes if getattr(route, 'path', None) != '/auth/google']
 
 @app.post('/auth/google', tags=['auth'])
@@ -111,7 +113,6 @@ def google_auth_android_compat(req: GoogleRequest):
     account = result.get('account') or {}
     username = str(account.get('username') or '').strip()
     account_id = account.get('id')
-    # Older Android builds expect these identity/session fields at top level.
     result['username'] = username
     result['profile_id'] = username
     result['account_id'] = account_id
