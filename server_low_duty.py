@@ -34,8 +34,6 @@ def install(cycle):
             with self._lock:
                 now=time.monotonic()
                 if now>=next_background:
-                    # A complete low-duty community pass. Awake here means
-                    # actively processing this turn, not an external API call.
                     for stage in (SPECIALIST_CORES,HEMISPHERE_CORES,(CONSENSUS_CORE,)):
                         for name in stage:
                             core=self.cores[name]
@@ -43,8 +41,6 @@ def install(cycle):
                             self._cycle_core(name)
                             core.awake=False
                     next_background=now+rest_seconds
-                # Consensus and safety routing can leave work for the interface.
-                # Service it immediately; the interface never sleeps.
                 if self.cores[INTERFACE_CORE].inbox:
                     self._cycle_core(INTERFACE_CORE)
             self.checkpoint()
@@ -61,10 +57,17 @@ def install(cycle):
         for name,core in (result.get("cores") or {}).items():
             core["available"]=True
             if name==INTERFACE_CORE:
+                core["awake"]=True
                 core["processing_mode"]="continuous"
             elif result.get("phase")=="wake":
+                core["awake"]=True
                 core["processing_mode"]="full-rate"
             else:
+                # The core is not continuously executing, but it remains an active
+                # member of the society and receives a deterministic maintenance
+                # turn every rest_seconds. Report that explicitly rather than
+                # presenting it to the UI as dormant/resting.
+                core["awake"]=True
                 core["processing_mode"]="low-duty"
         return result
     cycle.status=status_with_policy
@@ -74,6 +77,7 @@ def install(cycle):
         result=original_compact()
         result["rest_background_seconds"]=rest_seconds
         result["core_cycle_api_calls"]=0
+        result["rest_policy"]="low-duty processing; interface continuous"
         return result
     cycle.compact_summary=compact_with_policy
     return cycle
