@@ -1,0 +1,30 @@
+name: Test JANUS Routing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'routing_policy.py'
+      - 'src/janus_sleep_cycle.py'
+      - 'core_sync.py'
+      - 'tests/test_routing_policy.py'
+      - '.github/workflows/test-routing.yml'
+  pull_request:
+    paths:
+      - 'routing_policy.py'
+      - 'src/janus_sleep_cycle.py'
+      - 'core_sync.py'
+      - 'tests/test_routing_policy.py'
+      - '.github/workflows/test-routing.yml'
+  workflow_dispatch:
+
+jobs:
+  routing-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run forward-routing regression suite
+        run: python -m unittest -v tests.test_routing_policy
