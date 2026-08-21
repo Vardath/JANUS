@@ -45,7 +45,7 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
     # Three coordinated persistence layers:
     # 1) detailed Observe journal,
     # 2) idempotent per-core runtime snapshots,
-    # 3) normal profile Activity/Memory so JANUS itself and the UI see the same evidence.
+    # 3) normal profile Activity/Memory/Messages so JANUS itself and the UI see the same evidence.
     observed=ingest_remote_events(device_key, data.get("observe_events") or [], profile_id=profile_id)
     snapshots=record_remote_snapshot(device_key, data, profile_id=profile_id)
     profile_records=ingest_profile_core_activity(profile_id, device_key, data)
@@ -59,6 +59,7 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
         "runtime_snapshots_recorded": snapshots,
         "profile_activity_recorded": int(profile_records.get("activity", 0)),
         "profile_memory_recorded": int(profile_records.get("memory", 0)),
+        "profile_messages_recorded": int(profile_records.get("messages", 0)),
         "profile_snapshots_recorded": int(profile_records.get("snapshots", 0)),
     }
 
