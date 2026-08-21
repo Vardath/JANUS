@@ -44,6 +44,10 @@ services:
         value: "1"
       - key: JANUS_AUTH_TOKEN_CLEANUP_DAYS
         value: "7"
+      - key: JANUS_CHAT_RECEIPT_RETENTION_DAYS
+        value: "7"
+      - key: JANUS_RUNTIME_SNAPSHOT_RETENTION_DAYS
+        value: "30"
       - key: JANUS_DELETION_REQUEST_RETENTION_DAYS
         value: "90"
       - key: JANUS_INTERVAL_MINUTES
@@ -70,6 +74,12 @@ services:
         value: "1"
       - key: JANUS_COMPUTE_BUDGET
         value: balanced
+      - key: JANUS_PAID_BACKGROUND_REFLECTION
+        value: "0"
+      - key: JANUS_BACKGROUND_DAILY_CALL_CAP
+        value: "12"
+      - key: JANUS_BACKGROUND_DAILY_TOKEN_CAP
+        value: "20000"
       - key: JANUS_ALLOW_LEGACY_BRIDGE_AUTH
         value: "0"
       - key: JANUS_AUTH_DEV_TOKENS
