@@ -105,5 +105,6 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
           JANUS_DB_PATH: /tmp/janus-cognition-suite.sqlite3
+          JANUS_FILE_DIR: /tmp/janus-cognition-files
           OPENAI_API_KEY: test-key-not-used
         run: python -m pytest -q tests/test_epistemic_regulation.py tests/test_proactive_quality.py tests/test_background_cognition.py tests/test_continuity_ledger.py tests/test_continuity_governance.py tests/test_research_workspace.py tests/test_reliability_audit.py tests/test_profile_boundary_hardening.py tests/test_federated_sync.py tests/test_cost_governor.py tests/test_maintenance_review.py tests/test_proactive_threads.py tests/test_outbound_artifacts.py tests/test_visual_explanation.py tests/test_visual_deliberation.py
