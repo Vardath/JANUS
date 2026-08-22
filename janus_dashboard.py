@@ -23,6 +23,7 @@ from epistemic_search_bridge import install as install_epistemic_search_bridge
 from saturation_regulation import install as install_saturation_regulation
 from core_observer import install as install_core_observer
 from autonomous_hive import install as install_autonomous_hive
+from autonomous_messages import install as install_autonomous_messages, filtered_items as filter_autonomous_items
 from self_assessment import install as install_self_assessment
 from server_low_duty import install as install_server_low_duty
 from routing_policy import install as install_routing_policy
@@ -63,11 +64,16 @@ def _decode_message(event_type:str,detail:str):
 def _message_rows(profile:str,limit:int=50,include_dismissed:bool=False):
     c=_connect()
     try:
-        rows=c.execute("SELECT e.id,e.event_type,e.detail,e.created_at,COALESCE(s.state,'unread') state FROM desktop_events e LEFT JOIN janus_message_state s ON s.profile_id=e.profile_id AND s.event_id=e.id WHERE e.profile_id=? AND e.event_type IN ('message_candidate','proactive_message','question') ORDER BY e.id DESC LIMIT ?",(profile,limit*2 if not include_dismissed else limit)).fetchall(); items=[]
+        rows=c.execute("SELECT e.id,e.event_type,e.detail,e.created_at,COALESCE(s.state,'unread') state FROM desktop_events e LEFT JOIN janus_message_state s ON s.profile_id=e.profile_id AND s.event_id=e.id WHERE e.profile_id=? AND e.event_type IN ('message_candidate','proactive_message','question') ORDER BY e.id DESC LIMIT ?",(profile,limit*3 if not include_dismissed else limit*2)).fetchall(); items=[]
         for row in rows:
             item=dict(row)
             if not include_dismissed and item['state']=='dismissed': continue
-            mt,text,source=_decode_message(item['event_type'],item['detail']); item.update(message_type=mt,detail=text,source=source); items.append(item)
+            mt,text,source=_decode_message(item['event_type'],item['detail']); item.update(message_type=mt,detail=text,source=source)
+            # Step 6: legacy autonomous telemetry/process chatter is not a user
+            # notification. Explicit/manual/chat Messages remain untouched.
+            if not filter_autonomous_items([item]):
+                continue
+            items.append(item)
             if len(items)>=limit: break
         return items
     finally: c.close()
@@ -124,7 +130,7 @@ def desktop_runtime_cores(username:str|None=Query(default=None)):
 
 @app.get('/desktop/messages',tags=['desktop'])
 def desktop_messages(username:str=Query(...),limit:int=Query(default=50,ge=1,le=100),include_dismissed:bool=Query(default=False)):
-    items=_message_rows(username,limit,include_dismissed); return {'profile':username,'items':items,'unread':sum(1 for x in items if x['state']=='unread'),'message_types':['Question','Observation','Memory','Follow-up'],'purpose':"JANUS's persistent outbox to the user.",'runtime_action':True}
+    items=_message_rows(username,limit,include_dismissed); return {'profile':username,'items':items,'unread':sum(1 for x in items if x['state']=='unread'),'message_types':['Question','Observation','Memory','Follow-up'],'purpose':"JANUS's persistent outbox to the user.",'runtime_action':True,'quality_policy':'autonomous messages must contain concrete novelty/usefulness; telemetry and repetitive process chatter are suppressed'}
 
 @app.post('/desktop/messages/{event_id}/state',tags=['desktop'])
 def desktop_message_state(event_id:int,payload:dict[str,Any]):
@@ -166,6 +172,7 @@ install_deliberation_tasks(app)
 install_curiosity_search(app)
 install_epistemic_search_bridge(app)
 install_runtime_messaging(app)
+install_autonomous_messages(app)
 install_diagnostic_chat_guard(app, janus_sleep_cycle)
 install_secure_desktop(app)
 install_retention(app)
