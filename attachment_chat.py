@@ -55,17 +55,15 @@ def _wants_visual_analysis(message: str) -> bool:
 
 def _document_intent(message: str) -> bool:
     m = " ".join((message or "").lower().split())
-    keys = (
+    return any(k in m for k in (
         "document", "file", "pdf", "text i sent", "attachment", "attached", "uploaded",
         "report i sent", "paper i sent", "notes i sent", "read earlier", "in that pdf",
         "in the pdf", "in the document", "in the file", "from the document", "from the file",
         "the report", "the paper", "my notes", "the upload",
-    )
-    return any(k in m for k in keys)
+    ))
 
 
 async def _call_impl(impl, request: Request, payload: dict[str, Any]):
-    """Preserve compatibility with whichever authenticated chat wrapper is installed."""
     params = inspect.signature(impl).parameters
     if "request" in params:
         result = impl(request=request, payload=payload)
@@ -90,13 +88,24 @@ def _file_rows(account_id: int, file_ids: list[str]) -> list[Any]:
     return rows
 
 
-def _load_grounding(account_id: int, file_ids: list[str], query: str, visual: dict[str, dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], str, list[dict[str, Any]]]:
+def _load_grounding(
+    account_id: int,
+    file_ids: list[str],
+    visual: dict[str, dict[str, Any]] | None = None,
+    query: str = "",
+) -> tuple[list[dict[str, Any]], str]:
+    """Compatibility-preserving attachment grounding helper.
+
+    The public helper still returns (items, grounding) as earlier tests/callers
+    expect; internally the text path now uses durable query-aware chunks.
+    """
     visual = visual or {}
     attachment_retention.init_retention_schema()
     items: list[dict[str, Any]] = []
     image_blocks: list[str] = []
-
     rows = _file_rows(account_id, file_ids)
+    effective_query = query or "review summarize important claims evidence conclusions attached file"
+
     for row in rows:
         file_id = str(row["id"])
         attachment_retention.touch_file(file_id, int(account_id), referenced=True)
@@ -105,7 +114,6 @@ def _load_grounding(account_id: int, file_ids: list[str], query: str, visual: di
         image_like = Path(str(row["original_name"])).suffix.lower() in IMAGE_EXTENSIONS or str(row["mime_type"] or "").startswith("image/")
         v = visual.get(file_id) or {}
         assessment = str(v.get("assessment") or "").strip()
-
         item = attachment_api._metadata(row)
         item["grounded"] = bool(text or assessment)
         item["grounding_status"] = status
@@ -122,22 +130,22 @@ def _load_grounding(account_id: int, file_ids: list[str], query: str, visual: di
                     + assessment[:4000]
                 )
             elif not text:
+                status_text = str(v.get("status") or "not_requested")
                 image_blocks.append(
-                    f"SOURCE IMAGE: {row['original_name']}\nImage bytes are stored, but no visual assessment is available for this turn."
+                    f"SOURCE IMAGE: {row['original_name']}\nImage bytes are stored correctly, but visual assessment status is {status_text}. "
+                    "Do not ask the user to re-upload merely to expose the image; the missing capability/status is on the JANUS analysis side."
                 )
         items.append(item)
 
-    doc_grounding, retrieved = document_grounding.format_grounding(
-        account_id, query, file_ids=file_ids, char_budget=max(4000, MAX_TOTAL_GROUNDING_CHARS - 4500)
+    doc_grounding, _ = document_grounding.format_grounding(
+        account_id, effective_query, file_ids=file_ids, char_budget=max(4000, MAX_TOTAL_GROUNDING_CHARS - 4500)
     ) if file_ids else ("", [])
-
     blocks = [x for x in (doc_grounding, "\n\n---\n\n".join(image_blocks)) if x]
     grounding = "\n\n---\n\n".join(blocks)[:MAX_TOTAL_GROUNDING_CHARS]
-    return items, grounding, retrieved
+    return items, grounding
 
 
 def _library_grounding(account_id: int, query: str) -> tuple[str, list[dict[str, Any]]]:
-    """Recall useful passages from previously uploaded documents without reattachment."""
     return document_grounding.format_grounding(account_id, query, file_ids=None, char_budget=min(MAX_TOTAL_GROUNDING_CHARS, 14000))
 
 
@@ -145,7 +153,6 @@ def _publish_specialist_grounding(janus_sleep_cycle, grounding: str) -> None:
     if not grounding:
         return
     specialist_payload = grounding[:10000]
-    # All subject-matter paths that should react to document evidence receive it.
     for target in ("evidence", "logic", "counterpoint", "context", "memory", "novelty", "safety"):
         try:
             janus_sleep_cycle.send("interface", target, specialist_payload, "document_grounding")
@@ -178,7 +185,6 @@ def install(app, janus_sleep_cycle) -> None:
         original = str(payload.get("message") or payload.get("text") or "").strip()
         if not original:
             original = "Please assess the attached file or files." if ids else ""
-
         if not ids and not _document_intent(original):
             return await _call_impl(impl, request, payload)
 
@@ -192,7 +198,8 @@ def install(app, janus_sleep_cycle) -> None:
         if ids:
             if _wants_visual_analysis(original):
                 visual = await vision_analysis.assess_images(account_id, ids, original)
-            items, grounding, retrieved = _load_grounding(account_id, ids, original, visual)
+            items, grounding = _load_grounding(account_id, ids, visual, query=original)
+            retrieved = document_grounding.retrieve(account_id, original, file_ids=ids)
         else:
             grounding, retrieved = _library_grounding(account_id, original)
 
@@ -216,10 +223,7 @@ def install(app, janus_sleep_cycle) -> None:
             result["attachment_grounding"] = bool(grounding)
             result["document_library_recall"] = bool((not ids) and grounding)
             result["document_grounding_chars"] = len(grounding)
-            result["document_passages"] = [
-                {k: v for k, v in row.items() if k != "content"}
-                for row in retrieved[:16]
-            ]
+            result["document_passages"] = [{k: v for k, v in row.items() if k != "content"} for row in retrieved[:16]]
         return result
 
     app.state.janus_attachment_chat_bridge = True
