@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from openai import AsyncOpenAI
 from dashboard_api import JANUS_SELF_KNOWLEDGE, _recent_context, _store
 from memory_retrieval import format_recall, promote_user_correction
+from continuity_ledger import continuity_context
 from src.janus_sleep_cycle import janus_sleep_cycle
 
 DB_PATH=os.environ.get("JANUS_DB_PATH","/data/janus.sqlite3")
@@ -76,8 +77,10 @@ def _live_runtime_evidence(runtime,profile):
  for n,s in cores.items():lines.append(f"{n}: cycles={s.get('cycle_count',0)} pending={s.get('pending_messages',0)} last_output={str(s.get('last_output') or '')[:900]}")
  return '\n'.join(lines)
 
-def _foreground_notes(profile,message,recalled):
- enriched=message+("\n\nRELEVANT RETAINED MEMORY:\n"+recalled if recalled else "")
+def _foreground_notes(profile,message,recalled,continuity):
+ enriched=message
+ if continuity: enriched+="\n\nOPEN PROJECT/QUESTION CONTINUITY:\n"+continuity
+ if recalled: enriched+="\n\nRELEVANT RETAINED MEMORY:\n"+recalled
  try:
   import curiosity_search
   result=curiosity_search.foreground_deliberate(profile,enriched)
@@ -107,14 +110,15 @@ def install(app):
     _store(profile,'assistant',verified,'chat_output'); result={'reply':verified,'profile':profile,'mode':'device_runtime_verification','stored':True,'client_message_id':mid}; _finish_message(mid,profile,result); return result
 
   recalled=format_recall(profile,message,limit=20)
-  deliberation,research,notes=await asyncio.to_thread(_foreground_notes,profile,message,recalled)
+  continuity=continuity_context(profile,limit=20)
+  deliberation,research,notes=await asyncio.to_thread(_foreground_notes,profile,message,recalled,continuity)
   runtime=janus_sleep_cycle.status(); recent=_recent_context(profile); control=_control_translation(runtime)
   if not os.environ.get('OPENAI_API_KEY'):
    reply=str(notes.get('interface') or notes.get('consensus') or 'The core society processed the question, but the response model is unavailable.')
   else:
    model=os.environ.get('JANUS_MODEL','gpt-5.6')
-   instructions=JANUS_SELF_KNOWLEDGE+'''\n\nJANUS INTERFACE CONTRACT:\nYou are the final Interface of an 11-core 7->2->1->1 deliberation. CORE DELIBERATION and RELEVANT RETAINED MEMORY are primary. The memory block may contain older conversation turns selected from the whole persisted history, not merely the last few messages. Prefer the user's own retained statements over later assistant paraphrases when reconstructing what the user believes, means, or previously explained. Respect later corrections over earlier conflicting summaries. Never say a subject was not retained until you have checked RELEVANT RETAINED MEMORY. If a user corrects you, treat the correction as durable episodic information for future retrieval.\n\nAnswer the actual question from substantive findings. Do not independently write a generic assistant answer and append telemetry. Never show raw Fano weights, direction numbers, 1|3|4 values, hashes, cycle arithmetic, or other internal control numbers in ordinary conversation. Translate control state into plain English only when it genuinely helps. Surface useful conclusions, surprising connections, genuine disagreements, hypotheses, evidence gaps, and worthwhile next questions. Preserve uncertainty.\n\nRESEARCH TRUTH RULE: RESEARCH STATUS is authoritative about web/model capability and completed retrievals. Distinguish capability from actual retrieval. Never expose or claim private chain-of-thought; core notes are externalizable summaries.'''
-   inp='RELEVANT RETAINED MEMORY (whole-history retrieval):\n'+(recalled or '[no relevant older memory found]')+'\n\nCORE DELIBERATION:\n'+json.dumps(notes,ensure_ascii=False)+"\n\nFOREGROUND RESEARCH THIS TURN:\n"+json.dumps(deliberation,ensure_ascii=False)+"\n\nRESEARCH STATUS/CAPABILITY:\n"+json.dumps(research,ensure_ascii=False)+"\n\nHUMAN-READABLE CONTROL STATE (secondary):\n"+json.dumps(control,ensure_ascii=False)+"\n\nSERVER STATE (diagnostic only):\n"+_live_runtime_evidence(runtime,profile)+(f"\n\nRecent conversation tail:\n{recent}" if recent else '')+f"\n\nUSER QUESTION:\n{message}"
+   instructions=JANUS_SELF_KNOWLEDGE+'''\n\nJANUS INTERFACE CONTRACT:\nYou are the final Interface of an 11-core 7->2->1->1 deliberation. OPEN PROJECT/QUESTION CONTINUITY, CORE DELIBERATION and RELEVANT RETAINED MEMORY are primary. The continuity ledger is explicit durable work state: use it to distinguish unfinished work from completed/superseded history and to answer questions such as what remains, what was deferred, or what JANUS was asked to keep thinking about. Do not silently invent ledger changes from conversational implication.\n\nThe memory block may contain older conversation turns selected from the whole persisted history, not merely the last few messages. Prefer the user's own retained statements over later assistant paraphrases when reconstructing what the user believes, means, or previously explained. Respect later corrections over earlier conflicting summaries. Never say a subject was not retained until you have checked RELEVANT RETAINED MEMORY. If a user corrects you, treat the correction as durable episodic information for future retrieval.\n\nAnswer the actual question from substantive findings. Do not independently write a generic assistant answer and append telemetry. Never show raw Fano weights, direction numbers, 1|3|4 values, hashes, cycle arithmetic, or other internal control numbers in ordinary conversation. Translate control state into plain English only when it genuinely helps. Surface useful conclusions, surprising connections, genuine disagreements, hypotheses, evidence gaps, and worthwhile next questions. Preserve uncertainty.\n\nRESEARCH TRUTH RULE: RESEARCH STATUS is authoritative about web/model capability and completed retrievals. Distinguish capability from actual retrieval. Never expose or claim private chain-of-thought; core notes are externalizable summaries.'''
+   inp='OPEN PROJECT/QUESTION CONTINUITY:\n'+continuity+'\n\nRELEVANT RETAINED MEMORY (whole-history retrieval):\n'+(recalled or '[no relevant older memory found]')+'\n\nCORE DELIBERATION:\n'+json.dumps(notes,ensure_ascii=False)+"\n\nFOREGROUND RESEARCH THIS TURN:\n"+json.dumps(deliberation,ensure_ascii=False)+"\n\nRESEARCH STATUS/CAPABILITY:\n"+json.dumps(research,ensure_ascii=False)+"\n\nHUMAN-READABLE CONTROL STATE (secondary):\n"+json.dumps(control,ensure_ascii=False)+"\n\nSERVER STATE (diagnostic only):\n"+_live_runtime_evidence(runtime,profile)+(f"\n\nRecent conversation tail:\n{recent}" if recent else '')+f"\n\nUSER QUESTION:\n{message}"
    try:
     async def call():
      r=await AsyncOpenAI().responses.create(model=model,instructions=instructions,input=inp); return (r.output_text or '').strip()
@@ -122,5 +126,5 @@ def install(app):
     if not reply:raise RuntimeError('empty response')
    except Exception as exc:
     _store(profile,'system',f'chat_model_deferred: {type(exc).__name__}: {exc}','chat_error'); reply=str(notes.get('interface') or notes.get('consensus') or 'The core society processed the question, but the final response model did not complete this turn.')
-  _store(profile,'assistant',reply,'chat_output'); _store(profile,'process','Interface answered after whole-history memory retrieval and mandatory foreground 11-core deliberation.','synthesis_note')
-  result={'reply':reply,'profile':profile,'mode':'core_deliberation_primary','society_phase':runtime.get('phase'),'substantive_core_deliberation':True,'memory_retrieval':bool(recalled),'core_notes_present':sorted(notes.keys()),'foreground_research':deliberation,'research_status':research,'control_translation':control,'client_message_id':mid}; _finish_message(mid,profile,result); return result
+  _store(profile,'assistant',reply,'chat_output'); _store(profile,'process','Interface answered after continuity-ledger grounding, whole-history memory retrieval and mandatory foreground 11-core deliberation.','synthesis_note')
+  result={'reply':reply,'profile':profile,'mode':'core_deliberation_primary','society_phase':runtime.get('phase'),'substantive_core_deliberation':True,'memory_retrieval':bool(recalled),'continuity_grounding':True,'core_notes_present':sorted(notes.keys()),'foreground_research':deliberation,'research_status':research,'control_translation':control,'client_message_id':mid}; _finish_message(mid,profile,result); return result
