@@ -26,6 +26,7 @@ from autonomous_hive import install as install_autonomous_hive
 from self_assessment import install as install_self_assessment
 from server_low_duty import install as install_server_low_duty
 from routing_policy import install as install_routing_policy
+from diagnostic_chat_guard import install as install_diagnostic_chat_guard
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
 os.environ.setdefault("JANUS_SELF_EVALUATION", "0")
@@ -71,7 +72,17 @@ def _message_rows(profile:str,limit:int=50,include_dismissed:bool=False):
         return items
     finally: c.close()
 
+def _ensure_runtime_started():
+    """Make the server society self-healing if an ASGI startup hook was skipped/reloaded."""
+    try:
+        thread=getattr(janus_sleep_cycle,'_thread',None)
+        if not thread or not thread.is_alive():
+            janus_sleep_cycle.start()
+    except Exception:
+        pass
+
 def _presence(profile,latest):
+    _ensure_runtime_started()
     runtime=janus_sleep_cycle.status()
     if runtime.get('interface_awake'): return 'Active'
     if runtime.get('interface_available'): return 'Active'
@@ -83,6 +94,7 @@ def _presence(profile,latest):
     except Exception: return 'Dormant'
 
 def _runtime_with_presence(username:str|None):
+    _ensure_runtime_started()
     runtime=janus_sleep_cycle.status()
     clients=presence_for_profile(username or '') if username else []
     online=[x for x in clients if x.get('online')]
@@ -90,6 +102,7 @@ def _runtime_with_presence(username:str|None):
     runtime['registered_clients']=len(clients)
     runtime['clients']=clients[:50]
     runtime['presence_state']='connected' if online else ('registered-offline' if clients else 'awaiting-authenticated-heartbeat')
+    runtime['server_runtime_thread_alive']=bool(getattr(janus_sleep_cycle,'_thread',None) and janus_sleep_cycle._thread.is_alive())
     if online:
         latest=online[0]
         runtime['latest_remote_phase']=latest.get('phase') or 'unknown'
@@ -100,14 +113,14 @@ def _runtime_with_presence(username:str|None):
     return runtime
 
 @app.on_event('startup')
-async def _start_local_core_cycle(): janus_sleep_cycle.start()
+async def _start_local_core_cycle(): _ensure_runtime_started()
 @app.on_event('shutdown')
 async def _stop_local_core_cycle(): janus_sleep_cycle.stop()
 
 @app.get('/desktop/runtime-cores',tags=['desktop'])
 def desktop_runtime_cores(username:str|None=Query(default=None)):
     runtime=_runtime_with_presence(username)
-    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':runtime,'presence':{'online':runtime.get('remote_clients',0),'registered':runtime.get('registered_clients',0),'clients':runtime.get('clients',[])},'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','curiosity_web_enabled':os.environ.get('JANUS_CURIOSITY_WEB','1')=='1','curiosity_daily_search_cap':int(os.environ.get('JANUS_CURIOSITY_DAILY_SEARCH_CAP','4')),'hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'rest_background_seconds':runtime.get('rest_background_seconds',30),'core_cycle_api_calls':0,'note':'The interface remains continuously available. Local/server core cycles are deterministic and zero-API; authenticated client heartbeat/presence is reported separately from the server runtime so local device cycles are never mistaken for server cycles.'}
+    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':runtime,'presence':{'online':runtime.get('remote_clients',0),'registered':runtime.get('registered_clients',0),'clients':runtime.get('clients',[])},'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','curiosity_web_enabled':os.environ.get('JANUS_CURIOSITY_WEB','1')=='1','curiosity_daily_search_cap':int(os.environ.get('JANUS_CURIOSITY_DAILY_SEARCH_CAP','4')),'hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'rest_background_seconds':runtime.get('rest_background_seconds',30),'core_cycle_api_calls':0,'note':'The interface remains continuously available. Server core cycles are deterministic and zero-API. Authenticated device presence is reported separately so local cycles are never mislabeled as server cycles.'}
 
 @app.get('/desktop/messages',tags=['desktop'])
 def desktop_messages(username:str=Query(...),limit:int=Query(default=50,ge=1,le=100),include_dismissed:bool=Query(default=False)):
@@ -152,4 +165,7 @@ install_interface_chat(app)
 install_deliberation_tasks(app)
 install_curiosity_search(app)
 install_epistemic_search_bridge(app)
-install_runtime_messaging(app); install_secure_desktop(app); install_retention(app)
+install_runtime_messaging(app)
+install_diagnostic_chat_guard(app, janus_sleep_cycle)
+install_secure_desktop(app)
+install_retention(app)
