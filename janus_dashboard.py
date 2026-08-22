@@ -29,6 +29,7 @@ from self_assessment import install as install_self_assessment
 from server_low_duty import install as install_server_low_duty
 from routing_policy import install as install_routing_policy
 from diagnostic_chat_guard import install as install_diagnostic_chat_guard
+from owner_observability import install as install_owner_observability
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
 os.environ.setdefault("JANUS_SELF_EVALUATION", "0")
@@ -146,5 +147,6 @@ install_epistemic_search_bridge(app)
 install_runtime_messaging(app)
 install_autonomous_messages(app)
 install_diagnostic_chat_guard(app, janus_sleep_cycle)
+install_owner_observability(app,_runtime_with_presence)
 install_secure_desktop(app)
 install_retention(app)
