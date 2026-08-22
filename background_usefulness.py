@@ -73,15 +73,43 @@ def _db() -> sqlite3.Connection:
     return c
 
 
+def _normalize_word(word: str) -> str:
+    """Small deterministic morphology normalizer for repetition detection.
+
+    This intentionally is not a language model or full stemmer. It only removes a
+    few common English inflections so near-identical background queries such as
+    node/nodes and fail/failures cannot evade the duplicate gate through wording.
+    """
+    w = word.lower()
+    irregular = {"failures": "fail", "failure": "fail", "nodes": "node"}
+    if w in irregular:
+        return irregular[w]
+    if len(w) > 5 and w.endswith("ies"):
+        return w[:-3] + "y"
+    if len(w) > 5 and w.endswith("ing"):
+        return w[:-3]
+    if len(w) > 4 and w.endswith("ed"):
+        return w[:-2]
+    if len(w) > 4 and w.endswith("es"):
+        return w[:-2]
+    if len(w) > 3 and w.endswith("s"):
+        return w[:-1]
+    return w
+
+
 def _tokens(text: str) -> set[str]:
-    return {w.lower() for w in _WORD.findall(str(text or ""))}
+    return {_normalize_word(w) for w in _WORD.findall(str(text or ""))}
 
 
 def similarity(a: str, b: str) -> float:
     x, y = _tokens(a), _tokens(b)
     if not x or not y:
         return 0.0
-    return len(x & y) / max(1, len(x | y))
+    # Jaccard keeps broad topic overlap from looking identical. A containment term
+    # catches short reformulations of the same query. Use the stronger signal.
+    jaccard = len(x & y) / max(1, len(x | y))
+    containment = len(x & y) / max(1, min(len(x), len(y)))
+    return max(jaccard, containment)
 
 
 def recent_queries(profile: str, limit: int = 24) -> list[str]:
@@ -168,6 +196,20 @@ def _record(profile: str, event_kind: str, assessment: dict[str, Any], *, source
 def gate_candidate(profile: str, core: str, mode: str, query: str, rationale: str = "") -> dict[str, Any]:
     recent = recent_queries(profile)
     assessment = assess_text(" ".join(x for x in (query, rationale) if x), recent)
+
+    # Similarity must be judged on the actual proposed query as well as the combined
+    # query+rationale. Otherwise an appended rationale can dilute an exact duplicate.
+    query_sim = max((similarity(query, old) for old in recent if str(old or "").strip()), default=0.0)
+    if query_sim > float(assessment.get("max_similarity", 0.0)):
+        assessment["max_similarity"] = round(query_sim, 3)
+        assessment["novelty"] = round(max(0.0, 1.0 - query_sim), 3)
+        if query_sim >= REPETITION_BLOCK:
+            assessment["pass"] = False
+            if "near-duplicate" not in assessment["reasons"]:
+                assessment["reasons"].append("near-duplicate")
+        elif query_sim >= REPETITION_WARN and "repetitive" not in assessment["reasons"]:
+            assessment["reasons"].append("repetitive")
+
     _record(profile, "candidate", assessment, core=core, mode=mode, topic=query)
     return assessment
 
