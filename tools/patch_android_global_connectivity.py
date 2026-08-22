@@ -12,4 +12,10 @@ if old not in s:
     raise SystemExit('expected Android sync block not found')
 s = s.replace(old, new)
 p.write_text(s, encoding='utf-8')
-print('Patched Android authenticated presence + tagged selective global grounding')
+
+html = Path('android/app/src/main/assets/index.html')
+h = html.read_text(encoding='utf-8')
+h = h.replace("api('GET','/desktop/runtime-cores?username='+encodeURIComponent(profile))", "api('GET','/core-sync/status')")
+h = h.replace("let rt=r.runtime||{},cs=rt.cores||{};", "let rt=r.runtime||r||{},cs=rt.cores||{};")
+html.write_text(h, encoding='utf-8')
+print('Patched Android authenticated presence + tagged selective global grounding + live global status')
