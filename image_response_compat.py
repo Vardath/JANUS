@@ -13,6 +13,7 @@ import visual_explanation
 import visual_deliberation
 import research_workspace
 import reliability_audit
+import secure_desktop
 
 cost_governor_hooks.install()
 visual_explanation.install(image_generation)
@@ -27,6 +28,11 @@ def _reply_event_id(payload: dict):
             except Exception:
                 return None
     return None
+
+
+def _authenticated_profile(request: Request, payload: dict | None = None) -> str:
+    """Resolve the only profile allowed to receive profile-scoped side effects."""
+    return secure_desktop._profile(request, payload)
 
 
 def install(app) -> None:
@@ -63,16 +69,22 @@ def install(app) -> None:
 
     @app.post("/desktop/chat", tags=["desktop"])
     async def normalized_image_chat(request: Request, payload: dict):
-        profile = str(payload.get("profile_id") or payload.get("username") or "local-user")
-        message = str(payload.get("message") or payload.get("text") or "").strip()
-        thread_context, thread = proactive_threads.format_chat_context(profile, message, _reply_event_id(payload))
+        # This wrapper is installed after secure_desktop. Authenticate before any
+        # thread, memory, research or cost-ledger access so a forged profile_id can
+        # never create/read side effects in another account's partition.
+        profile = _authenticated_profile(request, payload)
+        safe = dict(payload)
+        safe["profile_id"] = profile
+        safe["username"] = profile
+        message = str(safe.get("message") or safe.get("text") or "").strip()
+        thread_context, thread = proactive_threads.format_chat_context(profile, message, _reply_event_id(safe))
         if thread_context:
             dashboard_api._store(profile, "thread_context", thread_context, "proactive_thread_context", "working")
         research_context = research_workspace.workspace_context(profile)
         if not research_context.startswith("No JANUS research workspace"):
             dashboard_api._store(profile, "research_context", research_context, "research_workspace_context", "working")
         with budget.scope(profile, "chat"):
-            result = await impl(request=request, payload=payload)
+            result = await impl(request=request, payload=safe)
         if isinstance(result, dict):
             image = result.get("generated_image") or result.get("image")
             if isinstance(image, dict):
@@ -93,8 +105,9 @@ def install(app) -> None:
     paths={getattr(r,"path","") for r in app.router.routes}
     if "/desktop/cost-status" not in paths:
         @app.get("/desktop/cost-status", tags=["desktop"])
-        def cost_status(username: str):
-            return {"ok": True, **budget.status(username)}
+        def cost_status(request: Request):
+            profile = _authenticated_profile(request)
+            return {"ok": True, **budget.status(profile)}
 
     app.state.janus_cost_governor_enabled = True
     app.state.janus_proactive_thread_chat_enabled = True
@@ -102,5 +115,6 @@ def install(app) -> None:
     app.state.janus_visual_deliberation_scaffolding_enabled = True
     app.state.janus_research_workspace_enabled = True
     app.state.janus_reliability_audit_enabled = True
+    app.state.janus_profile_boundary_hardening_enabled = True
     app.state.janus_background_multi_core_image_generation_enabled = False
     app.state.janus_image_response_compat = True
