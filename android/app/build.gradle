@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.64: server Cores telemetry is driven by the authenticated heartbeat snapshot.
+// v0.65: capture the full server runtime snapshot from the successful native heartbeat.
 android {
     namespace 'com.vardath.janus'
     compileSdk 36
@@ -18,8 +18,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 64
-        versionName '0.64'
+        versionCode 65
+        versionName '0.65'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
