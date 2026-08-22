@@ -50,6 +50,35 @@ def test_gate_records_suppression_without_search_spend(tmp_path, monkeypatch):
     assert row == ('suppress','candidate')
 
 
+def test_rationale_cannot_dilute_exact_duplicate(tmp_path, monkeypatch):
+    bu,path=_module(tmp_path, monkeypatch)
+    with sqlite3.connect(path) as c:
+        c.execute('''CREATE TABLE janus_curiosity_searches(
+            id INTEGER PRIMARY KEY AUTOINCREMENT, profile_id TEXT, core_name TEXT, mode TEXT,
+            query TEXT, rationale TEXT, result TEXT, sources_json TEXT, status TEXT, created_at TEXT, completed_at TEXT)''')
+        c.execute("INSERT INTO janus_curiosity_searches(profile_id,core_name,mode,query,rationale,result,sources_json,status,created_at) VALUES('p','evidence','relevant','distributed memory quorum recovery','', '', '[]','complete','2026-08-22T00:00:00Z')")
+    out=bu.gate_candidate(
+        'p','logic','relevant','distributed memory quorum recovery',
+        'A much longer rationale about engineering tradeoffs, failure domains, source quality, and alternate mechanisms that must not make the duplicated query look novel.'
+    )
+    assert out['pass'] is False
+    assert out['max_similarity'] >= bu.REPETITION_BLOCK
+    assert 'near-duplicate' in out['reasons']
+
+
+def test_morphology_normalization_catches_failure_variants(tmp_path, monkeypatch):
+    bu,_=_module(tmp_path, monkeypatch)
+    old='Find current evidence about distributed memory fault recovery and quorum behaviour under node failures'
+    variants=[
+        'Find current evidence about distributed memory fault recovery and quorum behaviour when nodes fail',
+        'Find current evidence about distributed memory fault recovery and quorum behaviour under node failure',
+    ]
+    for new in variants:
+        out=bu.assess_text(new,[old])
+        assert out['pass'] is False
+        assert out['max_similarity'] >= bu.REPETITION_BLOCK
+
+
 def test_audit_reports_useful_and_repetitive_outputs(tmp_path, monkeypatch):
     bu,path=_module(tmp_path, monkeypatch)
     with sqlite3.connect(path) as c:
