@@ -1,0 +1,103 @@
+name: Phase 2 Release Checkpoint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.py'
+      - 'tests/**'
+      - 'android/**'
+      - 'tools/patch_android_runtime_cores_v068.py'
+      - 'requirements.txt'
+      - 'JANUS_PHASE2_RELEASE_CHECKPOINT.md'
+      - '.github/workflows/phase2-release-checkpoint.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  server-stability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Reconstruct deployed server
+        run: python tools/rebuild_server.py
+      - name: Compile critical Phase 2 modules
+        env:
+          JANUS_DB_PATH: /tmp/janus-phase2-compile.sqlite3
+          JANUS_AUTH_DB: /tmp/janus-phase2-compile.sqlite3
+          JANUS_FILE_DIR: /tmp/janus-phase2-files
+          OPENAI_API_KEY: test-key-not-used
+        run: python -m py_compile server.py auth.py auth_schema_guard.py secure_desktop.py persistence_matrix.py memory_quality.py background_usefulness.py federated_sync.py core_sync.py cost_governor.py cost_governor_hooks.py owner_observability.py maintenance_review.py outbound_artifacts.py visual_explanation.py visual_deliberation.py janus_dashboard.py
+      - name: Auth and authorization regressions
+        env:
+          JANUS_AUTH_DB: /tmp/janus-phase2-auth.sqlite3
+          JANUS_DB_PATH: /tmp/janus-phase2-auth.sqlite3
+          JANUS_FILE_DIR: /tmp/janus-phase2-auth-files
+        run: python -m unittest -v tests.test_auth_local tests.test_secure_desktop
+      - name: Integrated Phase 2 regressions
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          JANUS_DB_PATH: /tmp/janus-phase2-suite.sqlite3
+          JANUS_AUTH_DB: /tmp/janus-phase2-suite.sqlite3
+          JANUS_FILE_DIR: /tmp/janus-phase2-files
+          OPENAI_API_KEY: test-key-not-used
+        run: >-
+          python -m pytest -q
+          tests/test_epistemic_regulation.py
+          tests/test_proactive_quality.py
+          tests/test_background_cognition.py
+          tests/test_background_usefulness.py
+          tests/test_memory_quality.py
+          tests/test_continuity_ledger.py
+          tests/test_continuity_governance.py
+          tests/test_research_workspace.py
+          tests/test_reliability_audit.py
+          tests/test_persistence_matrix.py
+          tests/test_profile_boundary_hardening.py
+          tests/test_federated_sync.py
+          tests/test_sync_soak.py
+          tests/test_cost_governor.py
+          tests/test_failure_degradation.py
+          tests/test_owner_observability.py
+          tests/test_maintenance_review.py
+          tests/test_proactive_threads.py
+          tests/test_outbound_artifacts.py
+          tests/test_visual_explanation.py
+          tests/test_visual_deliberation.py
+
+  android-v069:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Apply consolidated Android v0.69 patch
+        run: python tools/patch_android_runtime_cores_v068.py
+      - name: Verify Android version checkpoint
+        shell: bash
+        run: |
+          grep -q "versionName '0.69'" android/app/build.gradle
+          grep -q "versionCode 69" android/app/build.gradle
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: '8.11.1'
+      - name: Create debug signing key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+      - name: Assemble Android v0.69
+        working-directory: android
+        run: gradle :app:assembleDebug --stacktrace
