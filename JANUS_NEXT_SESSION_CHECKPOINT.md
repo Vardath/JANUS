@@ -41,46 +41,70 @@ Root cause: the consolidated v0.69 Android workflow had stopped applying the ret
 
 Do not revert later Android/core/sync/Observe/System Status work to restore attachments. The intended baseline is the current consolidated client plus restored attachment functionality.
 
-## Phase 3 status
+A later live screenshot confirmed that the `+` attachment button is visibly restored beside the Chat composer. Treat the UI restoration portion as validated; still retain end-to-end attachment upload/grounding regression coverage so it cannot disappear again.
+
+## Newly observed research/browser gap
+
+A live conversation exposed an important mismatch between JANUS's implemented research fabric and what the Interface believes it can do. When asked whether it could read YouTube transcripts, JANUS replied that it could only analyse transcript text supplied manually and could not automatically open a YouTube channel, enumerate videos, or retrieve transcript material.
+
+Repository review shows that `curiosity_search.py` already gives the 11-core research fabric bounded OpenAI model consultation and live web search, including foreground web escalation for requests containing terms such as search, latest, current, internet, web, research, source, evidence, and verify. Therefore the problem is not that JANUS has no internet research capability at all. The gap is a missing or unexposed **URL/media ingestion layer** and inaccurate capability self-reporting.
+
+Tomorrow, fix this forward rather than teaching JANUS to tell users to manually copy everything it could reasonably retrieve itself.
+
+Required behavior for URL/video research:
+1. A user can paste a normal web URL into Chat and JANUS should attempt to retrieve/read the relevant public content using its existing bounded research path.
+2. A user can paste a YouTube video URL and JANUS should attempt to obtain available transcript/caption text or a reliable indexed transcript representation when permitted/available, then ground its answer in that material.
+3. For a YouTube channel URL or request such as “review this channel,” JANUS should be able to discover/enumerate a bounded set of relevant/recent videos, then inspect available transcripts selectively rather than claiming channel access is categorically impossible.
+4. Do not fabricate transcripts. If captions/transcript text are unavailable or blocked, say exactly that and fall back to title/description/search-result evidence.
+5. Keep source URL, video title, retrieval time, transcript availability, and provenance with any stored research note.
+6. Cache fetched transcript/text by canonical URL/content identity so repeated analysis does not repeatedly spend model/web budget.
+7. Respect background/foreground cost governance. Foreground user-requested URL research gets priority; autonomous channel crawling must remain bounded and off by default unless explicitly enabled.
+8. Route acquired transcript/document text through the same Evidence/Logic/Counterpoint/Context/Memory/Novelty fabric rather than letting Interface answer from an unexamined scrape.
+9. Teach Interface capability reporting to distinguish: web search available; direct URL ingestion available; transcript available/unavailable for this particular video; channel enumeration supported within bounded limits. Do not make generic claims that the environment cannot access the web when the research bridge is enabled.
+10. Add regression tests for a successful URL research path, unavailable transcript fallback, no-fabrication behavior, caching, provenance, account isolation, and provider failure degradation.
+
+## Phase 3 status and revised next-session order
 
 Phase 3 is Android/server productization. Step 1 is complete: the capability/deferred registry was reconciled so already-built server capabilities are no longer incorrectly listed as future work.
 
-The attachment foundation is now restored into the authoritative Android build path. Before calling Phase 3 Step 2 fully complete, verify the newly built APK visibly restores the `+` control and that pick → upload → chip → send → grounded server use works end to end on-device without breaking current v0.69 functionality.
+The Android attachment control has now been visibly restored. The schedule is revised because the live transcript conversation exposed a more important capability/integration hole than the previously planned artifact UI work.
 
-### Next implementation priority
+### Tomorrow — revised implementation order
 
-**Phase 3 Step 2 — finish and validate the Android attachment workflow.**
+**Priority 1 — URL / YouTube / transcript research integration and truthful capability reporting.**
+Implement the behavior specified above using the existing curiosity/web research fabric wherever possible. Prefer a small ingestion/provenance bridge over a second independent research system.
 
-Use the existing authenticated server attachment/document-grounding/vision stack. Do not create a parallel upload subsystem.
+**Priority 2 — finish end-to-end Android attachment validation.**
+Verify pick → authenticated upload → visible chip → send → server grounding/vision/extraction → response provenance. Add a build assertion that generated Android HTML contains the attachment control and that the Java bridge contains the picker callback.
 
-Required product behavior:
-1. Native file/image picker from Chat (and design so Messages can reuse it later).
-2. Visible selected-attachment chips/list before sending.
-3. Authenticated upload with useful progress/error state.
-4. Account-bound attachment list and deletion controls.
-5. Chat messages can reference uploaded attachment IDs so Evidence/Context/Memory/Logic and other specialists can use grounded extracted/vision material.
-6. Prefer cached extraction/vision analysis; do not repeatedly spend API budget on unchanged files/images.
-7. Surface whether an attachment was locally/server parsed or escalated to paid vision/model analysis.
-8. Preserve privacy/deletion behavior and account isolation.
-9. Add regression/build checks and bump Android version only when the feature is actually wired into the authoritative build path.
-10. Add a build/regression assertion that the generated Android HTML contains the attachment button and that the Java bridge contains the file-picker callback so this regression cannot recur silently.
+**Priority 3 — Android generated-artifact workflow.**
+Expose JANUS-created research notes, continuity reports, project snapshots and digests with open/download/share actions.
 
-## Remaining Phase 3 order after attachments
+**Priority 4 — Research workspace UI.**
+Separate proven mathematical results, hypotheses, negative results, open questions, evidence and proposed tests. URL/transcript research gathered in Priority 1 should be able to feed this workspace with provenance.
 
-3. Android generated-artifact workflow — expose JANUS-created research notes, continuity reports, project snapshots and digests with open/download/share actions.
-4. Research workspace UI — separate proven mathematical results, hypotheses, negative results, open questions, evidence and proposed tests.
-5. Maintenance/upgrade approval UI — show the roughly 90-day maintenance proposal and approve/defer/reject state without enabling autonomous self-modification.
-6. Background research provenance UI — readable completed research, sources, suppression reasons and external-compute use.
-7. Protocol/capability negotiation — explicit server/client capability document and graceful old-client degradation.
-8. Android release hardening — reduce patch-script fragility/stale version text, improve narrow-screen diagnostic presentation, and add UI-level regression checks.
-9. Phase 3 release checkpoint — freeze features, run full server+Android matrix, document limits and establish known-good APK/server protocol baseline.
+**Priority 5 — Maintenance/upgrade approval UI.**
+Show the roughly 90-day maintenance proposal and approve/defer/reject state without enabling autonomous self-modification.
+
+**Priority 6 — Background research provenance UI.**
+Readable completed research, sources, transcript/document provenance, suppression reasons and external-compute use.
+
+**Priority 7 — Protocol/capability negotiation.**
+Expose an explicit server/client capability document so JANUS and older clients can truthfully know whether attachments, direct URL ingestion, web search, transcripts, image analysis and generated artifacts are available.
+
+**Priority 8 — Android release hardening.**
+Reduce patch-script fragility/stale version text, improve narrow-screen diagnostic presentation, and add UI-level regression checks.
+
+**Priority 9 — Phase 3 release checkpoint.**
+Freeze features, run the full server+Android matrix, document limits and establish a known-good APK/server protocol baseline.
 
 ## Deferred after Phase 3 / economic gates
 
 - Windows/PC parity and Apple/iOS parity remain deferred until explicitly resumed.
 - Full autonomous visual candidate render/inspect/revise loops remain revenue/cost gated. The existing visual-deliberation scaffolding may reason about concepts without rendering.
 - Future JANUS cores may use images more deeply as a communication/representation medium only after cost controls and product economics justify it.
+- Unbounded autonomous YouTube/channel crawling is not part of the baseline; channel/video research should remain user-directed or tightly budgeted.
 
 ## Working method for next session
 
-Before changing code, review this checkpoint, JANUS_PHASE3_PRODUCTIZATION.md, DEFERRED_FEATURES.md and the latest GitHub Actions results. Preserve all later commits and fix failures forward rather than reverting successful features. Keep showing the GitHub Actions progress page after implementation commits when useful.
+Before changing code, review this checkpoint, `JANUS_PHASE3_PRODUCTIZATION.md`, `DEFERRED_FEATURES.md`, `curiosity_search.py`, the attachment bridge, and the latest GitHub Actions results. Preserve all later commits and fix failures forward rather than reverting successful features. Keep showing the GitHub Actions progress page after implementation commits when useful.
