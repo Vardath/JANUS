@@ -23,13 +23,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Prepare Android v0.68 consolidated runtime
+      - name: Prepare Android v0.69 consolidated runtime
         shell: bash
         run: |
           set -euxo pipefail
-          # v0.68 is the authoritative consolidated patch. Older stacked
-          # telemetry/deliberation patches are intentionally not replayed here:
-          # they target pre-consolidation source and can fail before Gradle runs.
+          # Apply the retained file-attachment feature to the clean Android base first.
+          # The consolidated runtime patch then adds the current core/sync/status work
+          # without replaying obsolete pre-consolidation telemetry patches.
+          python tools/patch_android_file_attachments.py
           python tools/patch_android_runtime_cores_v068.py
 
       - uses: actions/setup-java@v5
