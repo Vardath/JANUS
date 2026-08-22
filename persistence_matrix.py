@@ -1,7 +1,7 @@
 """JANUS durable-schema registry and startup compatibility guard.
 
 Phase 2 Step 3 makes persistence ownership explicit and refuses to start the full
-application when an already-existing critical table is structurally incompatible.
+application when an already-existing durable table is structurally incompatible.
 Missing tables are allowed during preflight because their owning subsystem creates
 them during normal import/install. No user table is deleted, renamed or rewritten
 by this module.
@@ -82,9 +82,10 @@ def _inspect(c: sqlite3.Connection) -> list[dict[str, Any]]:
 def preflight_existing() -> dict[str, Any]:
     """Validate already-existing schemas before application modules can write.
 
-    Missing tables are normal on a clean installation. An existing table missing a
-    required column is incompatible. Critical incompatibilities raise immediately;
-    optional incompatibilities are reported so their subsystem can be reviewed.
+    Missing tables are normal on a clean installation. Any existing registered
+    table missing a required column is incompatible and fails closed. This avoids
+    letting CREATE TABLE IF NOT EXISTS silently accept an old shape and corrupt or
+    misroute later writes.
     """
     with _db() as c:
         try:
@@ -94,12 +95,11 @@ def preflight_existing() -> dict[str, Any]:
         if quick.lower() != "ok":
             raise RuntimeError(f"JANUS persistence quick_check failed: {quick}")
         rows=_inspect(c)
-    critical=[x for x in rows if x["present"] and not x["compatible"] and x["critical"]]
-    optional=[x for x in rows if x["present"] and not x["compatible"] and not x["critical"]]
-    if critical:
-        detail="; ".join(f"{x['table']} missing {','.join(x['missing_columns'])}" for x in critical)
+    incompatible=[x for x in rows if x["present"] and not x["compatible"]]
+    if incompatible:
+        detail="; ".join(f"{x['table']} missing {','.join(x['missing_columns'])}" for x in incompatible)
         raise RuntimeError("Incompatible JANUS persistence schema; refusing full startup before writes: " + detail)
-    return {"ok": True, "matrix_version": MATRIX_VERSION, "critical_incompatibilities": [], "optional_incompatibilities": optional, "tables": rows}
+    return {"ok": True, "matrix_version": MATRIX_VERSION, "incompatible": [], "tables": rows}
 
 
 def record_current_matrix() -> dict[str, Any]:
