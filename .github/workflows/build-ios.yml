@@ -55,7 +55,7 @@ jobs:
       - name: Upload simulator app
         uses: actions/upload-artifact@v4
         with:
-          name: JANUS-iOS-simulator-v0.2
+          name: JANUS-iOS-simulator-v0.4
           path: artifacts/JANUS-iOS-simulator.zip
           if-no-files-found: error
 
