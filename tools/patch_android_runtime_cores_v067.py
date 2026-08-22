@@ -1,0 +1,66 @@
+from pathlib import Path
+import re
+
+runtime = Path('android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java')
+r = runtime.read_text(encoding='utf-8')
+
+# Canonical heartbeat snapshot storage. This single patch supersedes v0.61-v0.66 telemetry patches.
+if 'private volatile String lastServerStatus=' not in r:
+    r = r.replace('private final String installationId;', 'private final String installationId;\n    private volatile String lastServerStatus="";')
+if 'lastServerStatus=prefs.getString("core_server_status","")' not in r:
+    r = r.replace('lastSyncAt=prefs.getLong("core_last_sync_at",0L);', 'lastSyncAt=prefs.getLong("core_last_sync_at",0L); lastServerStatus=prefs.getString("core_server_status","");')
+if 'synchronized String serverStatusJson()' not in r:
+    r = r.replace('private JSONObject summary() throws Exception', 'synchronized String serverStatusJson(){return lastServerStatus==null?"":lastServerStatus;}\n\n    private JSONObject summary() throws Exception')
+
+# Capture the exact successful /core-sync/exchange server object before any further processing.
+pat = r'JSONObject\s+server\s*=\s*new\s+JSONObject\(b\.toString\(\)\)\.optJSONObject\("server"\);'
+m = re.search(pat, r)
+if not m:
+    raise SystemExit('v0.67: heartbeat server parse point not found')
+stmt = m.group(0)
+cap = 'if(server!=null){lastServerStatus=server.toString();prefs.edit().putString("core_server_status",lastServerStatus).apply();}'
+if cap not in r:
+    r = r[:m.end()] + cap + r[m.end():]
+
+# Truthful client version in native sync payload if present.
+r = re.sub(r'("client_version"\s*,\s*")0\.(?:6[0-6]|5[0-9])("\s*\))', r'\g<1>0.67\2', r)
+runtime.write_text(r, encoding='utf-8')
+
+activity = Path('android/app/src/main/java/com/vardath/janus/MainActivity.java')
+a = activity.read_text(encoding='utf-8')
+
+# Native bridge exposes only the already-authenticated heartbeat snapshot; no second HTTP request.
+if '@JavascriptInterface public String serverCoreStatus()' not in a:
+    marker = '@JavascriptInterface public void googleSignIn()'
+    if marker not in a:
+        raise SystemExit('v0.67: MainActivity bridge marker missing')
+    a = a.replace(marker, '@JavascriptInterface public String serverCoreStatus() { try { return JanusLocalCoreRuntime.get(MainActivity.this).serverStatusJson(); } catch (Exception e) { return ""; } }\n        ' + marker, 1)
+
+# Final override is injected immediately before evaluateJavascript, after all older JS definitions.
+if '__janusTelemetryV067' not in a:
+    marker = 'view.evaluateJavascript(js, null);'
+    if marker not in a:
+        raise SystemExit('v0.67: evaluateJavascript marker missing')
+    override = '''js += "window.__janusTelemetryV067=true;window.refreshCoreTopology=function(){var host=document.getElementById('coreTopology');if(!host)return;var local={};try{local=JSON.parse(Android.localCoreStatus()||'{}');}catch(e){}var raw='';try{raw=Android.serverCoreStatus()||'';}catch(e){}var server={};try{if(raw)server=JSON.parse(raw);}catch(e){}var has=server&&server.cores&&Object.keys(server.cores).length>0;var intro='<div class=\\\"card\\\"><b>JANUS 11-core topology</b><div class=\\\"small\\\">This device and Server JANUS are independent runtimes. Server values below come from the authenticated sync heartbeat already marked connected on this device.</div></div>';var sh=has?window.renderCoreSide('SERVER JANUS · LIVE',server,false):'<div class=\\\"card\\\"><b>SERVER JANUS · WAITING FOR HEARTBEAT</b><div class=\\\"small\\\">Local sync: '+esc(local.sync_state||'unknown')+'. Native snapshot bytes: '+esc(raw?raw.length:0)+'. If sync is connected and this remains zero, the heartbeat capture itself has failed.</div></div>';host.innerHTML=intro+window.renderCoreSide('THIS DEVICE JANUS · LIVE',local,true)+sh;};if(!window.__janusTelemetryPollV067){window.__janusTelemetryPollV067=setInterval(function(){try{var v=document.getElementById('cores');if(v&&v.classList.contains('active'))window.refreshCoreTopology();}catch(e){}},3000);}";\n                '''
+    a = a.replace(marker, override + marker, 1)
+
+for v in ('0.60','0.61','0.62','0.63','0.64','0.65','0.66'):
+    a = a.replace(f'LIVE LOCAL JANUS · v{v}', 'LIVE LOCAL JANUS · v0.67')
+activity.write_text(a, encoding='utf-8')
+
+html = Path('android/app/src/main/assets/index.html')
+h = html.read_text(encoding='utf-8')
+
+# Feed concrete retained subjects into chat evidence so "what have you been thinking about?"
+# is answered from actual remembered topics instead of generic process vocabulary.
+needle = "let ev=(r.observe_events||[]).slice(-48).map(x=>({at:x.created_at,core:x.core_name,peer:x.peer_core||'',type:x.event_type,summary:x.detail||''}));return JSON.stringify"
+if needle in h and 'memory_context' not in h:
+    repl = "let ev=(r.observe_events||[]).slice(-36).map(x=>({at:x.created_at,core:x.core_name,peer:x.peer_core||'',type:x.event_type,summary:x.detail||''}));let mem=(r.local_memories||[]).slice(-12);mem.forEach(function(m){ev.push({at:0,core:'memory',peer:'',type:'memory_context',summary:String(m).slice(0,700)});});return JSON.stringify"
+    h = h.replace(needle, repl, 1)
+
+for v in ('0.59','0.60','0.61','0.62','0.63','0.64','0.65','0.66'):
+    h = h.replace(f'LIVE LOCAL JANUS · v{v}', 'LIVE LOCAL JANUS · v0.67')
+    h = h.replace(f"client_version:'{v}'", "client_version:'0.67'")
+html.write_text(h, encoding='utf-8')
+
+print('v0.67 consolidated telemetry: native heartbeat snapshot + live rendering + concrete memory-context evidence')
