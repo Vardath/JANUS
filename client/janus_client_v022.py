@@ -7,7 +7,7 @@ from tkinter import ttk, messagebox
 
 import janus_client_v021 as v021
 
-APP_NAME = "JANUS - Global 7-2-1-1 v0.22"
+APP_NAME = "JANUS - Global 7-2-1-1 v0.23"
 
 
 class DATA_BLOB(ctypes.Structure):
@@ -103,6 +103,19 @@ class AuthAPI(v021.API):
                 detail = body or str(e)
             raise RuntimeError(f"HTTP {e.code}: {detail}")
 
+    def download(self, path, timeout=60):
+        from urllib import request, error
+        headers = {"Accept": "image/png,image/*;q=0.9,*/*;q=0.1"}
+        if self.token:
+            headers["Authorization"] = "Bearer " + self.token
+        req = request.Request(v021.base.SERVER + path, headers=headers, method="GET")
+        try:
+            with request.urlopen(req, timeout=timeout) as r:
+                return r.read()
+        except error.HTTPError as e:
+            body = e.read().decode(errors="replace")
+            raise RuntimeError(f"HTTP {e.code}: {body or e.reason}")
+
     def login(self, identifier, password):
         return self.call("POST", "/auth/login", {"identifier": identifier, "password": password})
 
@@ -121,6 +134,7 @@ v021.base.API = AuthAPI
 
 class App(v021.App):
     def __init__(self):
+        self._chat_image_refs = []
         super().__init__()
         self.title(APP_NAME)
         # Migrate any short-lived plaintext v0.22 development token once, then
@@ -258,6 +272,7 @@ class App(v021.App):
                 pass
         self.api.token = ""
         self.user = ""
+        self._chat_image_refs = []
         self.cfg.pop("session_protected", None)
         self.cfg.pop("access_token", None)
         v021.base.save_cfg(self.cfg)
@@ -279,6 +294,33 @@ class App(v021.App):
         if settings is not None:
             ttk.Separator(settings).pack(fill="x", pady=12)
             ttk.Button(settings, text="Sign out of JANUS", command=self.logout_account).pack(anchor="w")
+
+    def chat_done(self, result):
+        self.say("JANUS", result.get("reply", result.get("response", "")))
+        generated = result.get("generated_image") or {}
+        path = str(generated.get("download_path") or "").strip() if isinstance(generated, dict) else ""
+        self.status.set("Active")
+        self.refresh("messages")
+        if path:
+            self.status.set("Fetching JANUS image")
+            self.bg(lambda: self.api.download(path), self._image_done)
+
+    def _image_done(self, data):
+        try:
+            encoded = base64.b64encode(data).decode("ascii")
+            image = tk.PhotoImage(data=encoded, format="png")
+            # Keep a Python reference for as long as the transcript is alive;
+            # Tk images disappear when their PhotoImage object is collected.
+            self._chat_image_refs.append(image)
+            self.chat.config(state="normal")
+            self.chat.image_create("end", image=image)
+            self.chat.insert("end", "\n\n")
+            self.chat.config(state="disabled")
+            self.chat.see("end")
+            self.status.set("Active")
+        except Exception as exc:
+            self.say("System", f"JANUS generated an image, but Windows could not display it: {exc}")
+            self.status.set("Active")
 
 
 if __name__ == "__main__":

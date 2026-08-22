@@ -6,6 +6,10 @@ on:
     paths:
       - 'client/**'
       - '.github/workflows/build-windows.yml'
+  pull_request:
+    paths:
+      - 'client/**'
+      - '.github/workflows/build-windows.yml'
   workflow_dispatch:
 
 permissions:
@@ -26,17 +30,17 @@ jobs:
       - name: Syntax-check Windows client chain
         shell: pwsh
         run: |
-          python -m py_compile client/janus_client_v020.py client/janus_client_v021.py client/janus_client_v022.py
+          python -m py_compile client/janus_client_v020.py client/janus_client_v021.py client/janus_client_v022.py client/janus_client_v023.py
       - name: Build JANUS.exe
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v022.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v023.py
           Copy-Item client/JANUS.bat dist/JANUS.bat
-          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.22`r`n`r`nAuthenticated desktop client using JANUS username/email + password accounts.`r`nSessions persist across restarts and private Chat, Messages, Observe, Cores, Memory, Activity and Settings requests use the bearer session token.`r`nCreate Account and Sign Out are available from the desktop client.`r`n`r`nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface.`r`nLocal/server deterministic core cycles make no external model/API calls; user-triggered chat may use the configured cloud model.`r`n`r`nServer: https://janus-global-core.onrender.com"
+          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.24`r`n`r`nAuthenticated desktop client using JANUS username/email + password accounts.`r`nSessions persist across restarts and private Chat, Messages, Observe, Cores, Memory, Activity and Settings requests use the bearer session token.`r`nChat supports up to four account-bound file attachments per turn; text/code/log content is locally extracted by the server and routed into JANUS as tagged grounding.`r`nGenerated JANUS images are fetched through the authenticated file endpoint and displayed inline in Chat.`r`nCreate Account and Sign Out are available from the desktop client.`r`n`r`nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface.`r`nLocal/server deterministic core cycles make no external model/API calls; user-triggered chat may use the configured cloud model.`r`n`r`nServer: https://janus-global-core.onrender.com"
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Windows-v0.22
+          name: JANUS-Windows-v0.24
           path: |
             dist/JANUS.exe
             dist/JANUS.bat

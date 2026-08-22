@@ -7,6 +7,11 @@ on:
       - 'android/**'
       - 'tools/patch_android_*.py'
       - '.github/workflows/build-android.yml'
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'tools/patch_android_*.py'
+      - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
 permissions:
@@ -29,6 +34,7 @@ jobs:
           python tools/patch_android_deliberation_sync.py
           python tools/patch_android_deliberation_primary.py
           python tools/patch_android_saturation_regulation.py
+          python tools/patch_android_file_attachments.py
 
       - uses: actions/setup-java@v5
         with:
@@ -92,6 +98,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish direct-download APK branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
         env:
           VERSION: ${{ steps.app_version.outputs.version }}

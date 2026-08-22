@@ -22,9 +22,50 @@ struct MeResponse: Decodable {
     var account: Account
 }
 
+struct GeneratedImage: Decodable {
+    var id: String?
+    var file_id: String
+    var mime_type: String?
+    var size_bytes: Int?
+    var quality: String?
+    var size: String?
+    var origin: String?
+    var model: String?
+    var download_path: String
+}
+
+struct UploadedFile: Identifiable, Decodable {
+    var id: String
+    var filename: String
+    var mime_type: String
+    var size_bytes: Int
+    var sha256: String?
+    var extraction_status: String?
+    var has_extracted_text: Bool?
+    var created_at: Int?
+    var download_path: String?
+}
+
+struct UploadResponse: Decodable {
+    var ok: Bool?
+    var file: UploadedFile
+}
+
+struct ChatRequest: Encodable {
+    var profile_id: String
+    var message: String
+    var attachment_ids: [String]
+}
+
 struct ChatResponse: Decodable {
     var reply: String?
     var response: String?
+    var image: GeneratedImage?
+    var generated_image: GeneratedImage?
+    var attachments: [UploadedFile]?
+    var attachment_grounding: Bool?
+
+    var attachedImage: GeneratedImage? { generated_image ?? image }
 }
 
 struct MessageListResponse: Decodable {

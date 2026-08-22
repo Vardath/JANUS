@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UniformTypeIdentifiers
 
 @MainActor
 final class APIClient: ObservableObject {
@@ -8,6 +9,7 @@ final class APIClient: ObservableObject {
     @Published var accessToken: String = KeychainStore.readToken()
 
     private let decoder = JSONDecoder()
+    private let maxFileBytes = 8 * 1024 * 1024
 
     func health() async {
         do {
@@ -52,10 +54,38 @@ final class APIClient: ObservableObject {
         setToken("")
     }
 
-    func chat(profile: String, message: String) async throws -> String {
-        let body = ["profile_id": profile, "message": message]
-        let response: ChatResponse = try await request(path: "/desktop/chat", method: "POST", body: body)
-        return response.reply ?? response.response ?? "JANUS replied, but the response was empty."
+    func chat(profile: String, message: String, attachmentIDs: [String] = []) async throws -> ChatResponse {
+        let body = ChatRequest(profile_id: profile, message: message, attachment_ids: attachmentIDs)
+        return try await request(path: "/desktop/chat", method: "POST", body: body)
+    }
+
+    func uploadFile(url: URL) async throws -> UploadedFile {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let values = try url.resourceValues(forKeys: [.fileSizeKey])
+        if let size = values.fileSize, size > maxFileBytes {
+            throw NSError(domain: "JANUS", code: 413, userInfo: [NSLocalizedDescriptionKey: "JANUS currently accepts files up to 8 MiB."])
+        }
+        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        guard !data.isEmpty else {
+            throw NSError(domain: "JANUS", code: 400, userInfo: [NSLocalizedDescriptionKey: "Empty files are not supported."])
+        }
+        guard data.count <= maxFileBytes else {
+            throw NSError(domain: "JANUS", code: 413, userInfo: [NSLocalizedDescriptionKey: "JANUS currently accepts files up to 8 MiB."])
+        }
+        let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+        struct FileBody: Encodable {
+            let filename: String
+            let mime_type: String
+            let data_base64: String
+        }
+        let body = FileBody(filename: url.lastPathComponent, mime_type: mime, data_base64: data.base64EncodedString())
+        let response: UploadResponse = try await request(path: "/files/upload", method: "POST", body: body)
+        return response.file
+    }
+
+    func generatedImageData(path: String) async throws -> Data {
+        try await request(path: path, method: "GET", body: Optional<[String: String]>.none)
     }
 
     func home(profile: String) async throws -> HomeResponse {

@@ -1,0 +1,33 @@
+name: Test JANUS Images
+
+on:
+  pull_request:
+    paths:
+      - 'image_generation.py'
+      - 'attachment_api.py'
+      - 'bootstrap.py'
+      - 'tests/test_image_generation.py'
+      - '.github/workflows/test-images.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'image_generation.py'
+      - 'attachment_api.py'
+      - 'bootstrap.py'
+      - 'tests/test_image_generation.py'
+      - '.github/workflows/test-images.yml'
+  workflow_dispatch:
+
+jobs:
+  image-policy-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run image generation policy tests
+        run: python -m unittest -v tests.test_image_generation

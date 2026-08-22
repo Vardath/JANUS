@@ -112,14 +112,18 @@ def _topic_for_request(profile: str, message: str) -> tuple[str, str]:
 
     text = " ".join(str(message or "").split())
     explicit = ""
+    generic_refs = {"it", "that", "this", "this one", "that one"}
     # Handle useful explicit forms such as "keep thinking about whether X".
+    # Bare pronouns refer back to the previous substantive user topic.
     m = re.search(r"(?:keep|continue)\s+(?:on\s+)?thinking\s+about\s+(.+)$", text, re.I)
     if m:
-        explicit = m.group(1).strip(" .!?\"")
+        candidate = m.group(1).strip(" .!?\"")
+        if candidate.lower() not in generic_refs:
+            explicit = candidate
     m2 = re.search(r"(?:mull|ponder)\s+(.+?)(?:\s+over)?[.!?]*$", text, re.I)
     if m2:
         candidate = m2.group(1).strip(" .!?\"")
-        if candidate.lower() not in {"it", "that", "this", "this one", "that one"}:
+        if candidate.lower() not in generic_refs:
             explicit = candidate
 
     topic = explicit or previous_user or text

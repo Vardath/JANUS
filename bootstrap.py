@@ -46,10 +46,23 @@ try:
     import interface_chat as interface_chat_module
     from auth_lifecycle import router as auth_lifecycle_router
     from auth_rate_limit import install as install_auth_rate_limit
+    from attachment_api import router as attachment_router
+    from attachment_retention import install_storage_auditor
+    from attachment_chat import install as install_attachment_chat
+    from image_generation import router as image_generation_router, install_chat_image_bridge
+    from image_inline import router as image_inline_router
+    from image_response_compat import install as install_image_response_compat
     from chat_receipt_security import install as install_chat_receipt_security
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
+    app.include_router(attachment_router)
+    app.include_router(image_generation_router)
+    app.include_router(image_inline_router)
+    install_storage_auditor(app, janus_sleep_cycle)
+    install_attachment_chat(app, janus_sleep_cycle)
+    install_chat_image_bridge(app, interface_chat_module)
+    install_image_response_compat(app)
     install_chat_receipt_security(interface_chat_module)
     install_auth_rate_limit(app)
 
@@ -114,6 +127,12 @@ try:
             "chat_receipt_profile_guard": bool(getattr(interface_chat_module, "_profile_receipt_guard_installed", False)),
             "auth_rate_limit_enabled": True,
             "deliberation_tasks_enabled": True,
+            "file_sharing_enabled": True,
+            "file_chat_grounding_enabled": bool(getattr(app.state, "janus_attachment_chat_bridge", False)),
+            "file_storage_auditor_enabled": True,
+            "lightweight_image_generation_enabled": True,
+            "image_inline_transport_enabled": True,
+            "background_multi_core_image_generation_enabled": False,
         }
 
     @app.get("/diagnostics/runtime-health")
@@ -135,6 +154,14 @@ try:
             "logout_all_route_present": "/auth/logout-all" in routes,
             "runtime_health_route_present": "/diagnostics/runtime-health" in routes,
             "deliberation_route_present": "/desktop/deliberations" in routes,
+            "file_upload_route_present": "/files/upload" in routes,
+            "file_storage_status_route_present": "/files/storage/status" in routes,
+            "file_audit_route_present": "/files/audit/recent" in routes,
+            "file_chat_grounding_enabled": bool(getattr(app.state, "janus_attachment_chat_bridge", False)),
+            "image_generate_route_present": "/images/generate" in routes,
+            "image_usage_route_present": "/images/usage" in routes,
+            "image_inline_route_present": any(path.startswith("/images/{file_id}/inline") for path in routes),
+            "background_multi_core_image_generation_enabled": False,
             "auth_rate_limit_enabled": True,
         }
 
@@ -206,6 +233,14 @@ except Exception as exc:
             "logout_all_route_present": False,
             "runtime_health_route_present": True,
             "deliberation_route_present": False,
+            "file_upload_route_present": False,
+            "file_storage_status_route_present": False,
+            "file_audit_route_present": False,
+            "file_chat_grounding_enabled": False,
+            "image_generate_route_present": False,
+            "image_usage_route_present": False,
+            "image_inline_route_present": False,
+            "background_multi_core_image_generation_enabled": False,
             "auth_rate_limit_enabled": False,
         }
 
