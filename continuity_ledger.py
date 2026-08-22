@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Iterable
@@ -80,6 +81,10 @@ def _validate(kind: str, state: str) -> None:
         raise ValueError(f"unsupported continuity kind: {kind}")
     if state not in STATES:
         raise ValueError(f"unsupported continuity state: {state}")
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"\W+", " ", str(text or "").lower()).strip()[:1200]
 
 
 def create_item(profile_id: str, kind: str, title: str, detail: str = "", *,
@@ -176,6 +181,21 @@ def list_items(profile_id: str, *, open_only: bool = False, kind: str | None = N
     return result
 
 
+def upsert_open(profile_id: str, kind: str, title: str, detail: str = "", *, state: str = "active",
+                priority: int = 50, source: str = "janus", tags: Iterable[str] = ()) -> dict[str, Any]:
+    """Create or reaffirm an equivalent open item without duplicating it."""
+    _validate(kind, state)
+    norm = _norm(title)
+    for item in list_items(profile_id, open_only=True, kind=kind, limit=200):
+        if _norm(item["title"]) == norm:
+            if detail and detail != item["detail"]:
+                item = revise(profile_id, item["id"], detail=detail, priority=max(priority, item["priority"]), note="Reaffirmed/updated from active continuity source")
+            if item["state"] != state and item["state"] in {"proposed", "approved", "reopened"}:
+                item = transition(profile_id, item["id"], state, "Advanced by active continuity source")
+            return item
+    return create_item(profile_id, kind, title, detail, state=state, priority=priority, source=source, tags=tags)
+
+
 def events(profile_id: str, item_id: int, limit: int = 100) -> list[dict[str, Any]]:
     with _db() as db:
         rows=db.execute("SELECT * FROM janus_continuity_events WHERE profile_id=? AND item_id=? ORDER BY id DESC LIMIT ?",
@@ -190,5 +210,5 @@ def continuity_context(profile_id: str, limit: int = 20) -> str:
         return "No open project/question continuity items."
     lines = ["Open JANUS continuity ledger (explicit durable commitments/questions):"]
     for x in items:
-        lines.append(f"- [{x['kind']}:{x['state']}] {x['title']}" + (f" — {x['detail'][:240]}" if x['detail'] else ""))
+        lines.append(f"- [#{x['id']} {x['kind']}:{x['state']}] {x['title']}" + (f" — {x['detail'][:240]}" if x['detail'] else ""))
     return "\n".join(lines)
