@@ -25,6 +25,7 @@ on:
       - 'image_response_compat.py'
       - 'image_generation.py'
       - 'visual_explanation.py'
+      - 'visual_deliberation.py'
       - 'vision_analysis.py'
       - 'autonomous_messages.py'
       - 'proactive_quality.py'
@@ -40,6 +41,7 @@ on:
       - 'tests/test_proactive_threads.py'
       - 'tests/test_outbound_artifacts.py'
       - 'tests/test_visual_explanation.py'
+      - 'tests/test_visual_deliberation.py'
       - 'tools/rebuild_server.py'
       - 'src/server.py.gz.b64.*'
       - 'render.yaml'
@@ -63,7 +65,7 @@ jobs:
       - name: Reconstruct legacy base server
         run: python tools/rebuild_server.py
       - name: Compile cognition, continuity, sync, cost, maintenance, threads, artifacts and visual policy
-        run: python -m py_compile server.py curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py background_cognition.py autonomous_messages.py proactive_threads.py continuity_ledger.py continuity_governance.py continuity_api.py federated_sync.py core_sync.py cost_governor.py cost_governor_hooks.py maintenance_review.py attachment_api.py outbound_artifacts.py bootstrap.py image_response_compat.py image_generation.py visual_explanation.py vision_analysis.py interface_chat.py deliberation_tasks.py janus_dashboard.py
+        run: python -m py_compile server.py curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py background_cognition.py autonomous_messages.py proactive_threads.py continuity_ledger.py continuity_governance.py continuity_api.py federated_sync.py core_sync.py cost_governor.py cost_governor_hooks.py maintenance_review.py attachment_api.py outbound_artifacts.py bootstrap.py image_response_compat.py image_generation.py visual_explanation.py visual_deliberation.py vision_analysis.py interface_chat.py deliberation_tasks.py janus_dashboard.py
       - name: Verify policy constants and modes
         env:
           JANUS_DB_PATH: /tmp/janus-curiosity-test.sqlite3
@@ -96,4 +98,4 @@ jobs:
       - name: Verify epistemic, proactive, continuity, sync, cost, maintenance, threads, artifacts and visual policy
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: python -m pytest -q tests/test_epistemic_regulation.py tests/test_proactive_quality.py tests/test_background_cognition.py tests/test_continuity_ledger.py tests/test_continuity_governance.py tests/test_federated_sync.py tests/test_cost_governor.py tests/test_maintenance_review.py tests/test_proactive_threads.py tests/test_outbound_artifacts.py tests/test_visual_explanation.py
+        run: python -m pytest -q tests/test_epistemic_regulation.py tests/test_proactive_quality.py tests/test_background_cognition.py tests/test_continuity_ledger.py tests/test_continuity_governance.py tests/test_federated_sync.py tests/test_cost_governor.py tests/test_maintenance_review.py tests/test_proactive_threads.py tests/test_outbound_artifacts.py tests/test_visual_explanation.py tests/test_visual_deliberation.py
