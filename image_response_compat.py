@@ -1,4 +1,4 @@
-"""Normalize image artifacts, apply unified cost scope, preserve Message threads, and activate visual-explanation policy."""
+"""Normalize image artifacts, apply unified cost scope, preserve Message threads, and activate visual policy."""
 from __future__ import annotations
 
 from fastapi import Request
@@ -9,6 +9,7 @@ import dashboard_api
 import proactive_threads
 import image_generation
 import visual_explanation
+import visual_deliberation
 
 # Bootstrap imports this module after the chat/vision/image modules are loaded, so it
 # is a stable point to install cross-cutting paid-call and thread-continuity policy.
@@ -33,6 +34,11 @@ def install(app) -> None:
     if getattr(app.state, "janus_image_response_compat", False):
         return
     proactive_threads.install(app)
+    # Step 9 scaffolding is safe to expose now because the module contains no
+    # renderer call and reports autonomous/background rendering as disabled.
+    paths = {getattr(r, "path", "") for r in app.router.routes}
+    if "/visual-deliberations" not in paths:
+        app.include_router(visual_deliberation.router)
     route = next(
         (r for r in app.router.routes if getattr(r, "path", None) == "/desktop/chat" and "POST" in getattr(r, "methods", set())),
         None,
@@ -81,4 +87,6 @@ def install(app) -> None:
     app.state.janus_cost_governor_enabled = True
     app.state.janus_proactive_thread_chat_enabled = True
     app.state.janus_visual_explanation_enabled = True
+    app.state.janus_visual_deliberation_scaffolding_enabled = True
+    app.state.janus_background_multi_core_image_generation_enabled = False
     app.state.janus_image_response_compat = True
