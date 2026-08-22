@@ -17,6 +17,7 @@ import secure_desktop
 import persistence_matrix
 import curiosity_search
 import background_usefulness
+import memory_quality
 
 cost_governor_hooks.install()
 visual_explanation.install(image_generation)
@@ -52,6 +53,7 @@ def install(app) -> None:
     if getattr(app.state, "janus_image_response_compat", False):
         return
     proactive_threads.install(app)
+    memory_quality.install(app)
     paths = {getattr(r, "path", "") for r in app.router.routes}
     if "/visual-deliberations" not in paths:
         app.include_router(visual_deliberation.router)
@@ -84,11 +86,18 @@ def install(app) -> None:
 
     @app.post("/desktop/chat", tags=["desktop"])
     async def normalized_image_chat(request: Request, payload: dict):
-        # This wrapper is installed after secure_desktop. Authenticate before any
-        # thread, memory, research or cost-ledger access so a forged profile_id can
-        # never create/read side effects in another account's partition.
+        # Authenticate before any thread, memory, research or cost-ledger access.
         profile, safe = _authenticated_payload(request, payload)
         message = str(safe.get("message") or safe.get("text") or "").strip()
+
+        # Whole-history semantic retrieval is inserted as a persisted, externalizable
+        # context record before the existing recent-window chat implementation runs.
+        # This lets old corrections, remembered threads and relevant episodic material
+        # re-enter the final prompt without replacing the ordinary recent conversation.
+        memory_context = memory_quality.format_context(profile, message)
+        if memory_context:
+            dashboard_api._store(profile, "memory_context", memory_context, "memory_retrieval_context", "working")
+
         thread_context, thread = proactive_threads.format_chat_context(profile, message, _reply_event_id(safe))
         if thread_context:
             dashboard_api._store(profile, "thread_context", thread_context, "proactive_thread_context", "working")
@@ -97,6 +106,8 @@ def install(app) -> None:
             dashboard_api._store(profile, "research_context", research_context, "research_workspace_context", "working")
         with budget.scope(profile, "chat"):
             result = await impl(request=request, payload=safe)
+
+        reinforcement = memory_quality.reinforce_after_turn(profile, message)
         if isinstance(result, dict):
             image = result.get("generated_image") or result.get("image")
             if isinstance(image, dict):
@@ -104,6 +115,10 @@ def install(app) -> None:
                 result.setdefault("image", image)
             result["cost_governor"] = budget.status(profile)
             result["research_workspace_active"] = not research_context.startswith("No JANUS research workspace")
+            result["memory_quality"] = {
+                "whole_history_context_used": bool(memory_context),
+                "reinforcement": reinforcement,
+            }
             if thread:
                 result["proactive_thread"] = {
                     "event_id": thread.get("event_id"),
@@ -128,6 +143,7 @@ def install(app) -> None:
     app.state.janus_research_workspace_enabled = True
     app.state.janus_reliability_audit_enabled = True
     app.state.janus_background_usefulness_enabled = True
+    app.state.janus_memory_quality_enabled = True
     app.state.janus_profile_boundary_hardening_enabled = True
     app.state.janus_background_multi_core_image_generation_enabled = False
     app.state.janus_persistence_matrix = persistence_matrix.record_current_matrix()
