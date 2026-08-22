@@ -1,0 +1,6 @@
+JANUS Android OAuth build identity
+Version: 0.69
+Package: com.vardath.janus
+Signing certificate from build keystore:
+	 SHA1: F1:59:5D:15:66:98:7B:81:66:8E:BA:0E:EF:97:C9:8B:0D:1E:EC:E4
+	 SHA256: 5F:0E:E1:6C:AD:2D:51:5A:87:E0:84:75:C0:91:C1:66:47:6A:7B:F2:65:13:ED:06:75:60:93:41:E6:5E:F2:24
