@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.62: direct authenticated server core telemetry on the Cores screen.
+// v0.63: direct authenticated server status with strict telemetry validation.
 android {
     namespace 'com.vardath.janus'
     compileSdk 36
@@ -18,8 +18,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 62
-        versionName '0.62'
+        versionCode 63
+        versionName '0.63'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
