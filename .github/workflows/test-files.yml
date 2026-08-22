@@ -6,6 +6,7 @@ on:
       - 'attachment_api.py'
       - 'attachment_retention.py'
       - 'attachment_chat.py'
+      - 'document_grounding.py'
       - 'vision_analysis.py'
       - 'account_deletion.py'
       - 'requirements.txt'
@@ -13,6 +14,7 @@ on:
       - 'tests/test_file_sharing.py'
       - 'tests/test_attachment_retention.py'
       - 'tests/test_attachment_chat.py'
+      - 'tests/test_document_grounding.py'
       - 'tests/test_vision_analysis.py'
       - 'tests/test_pdf_extraction.py'
       - '.github/workflows/test-files.yml'
@@ -22,6 +24,7 @@ on:
       - 'attachment_api.py'
       - 'attachment_retention.py'
       - 'attachment_chat.py'
+      - 'document_grounding.py'
       - 'vision_analysis.py'
       - 'account_deletion.py'
       - 'requirements.txt'
@@ -29,6 +32,7 @@ on:
       - 'tests/test_file_sharing.py'
       - 'tests/test_attachment_retention.py'
       - 'tests/test_attachment_chat.py'
+      - 'tests/test_document_grounding.py'
       - 'tests/test_vision_analysis.py'
       - 'tests/test_pdf_extraction.py'
       - '.github/workflows/test-files.yml'
@@ -45,5 +49,5 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
-      - name: Run file-sharing, retention, PDF, vision and Chat-grounding tests
-        run: python -m pytest -q tests/test_file_sharing.py tests/test_attachment_retention.py tests/test_attachment_chat.py tests/test_vision_analysis.py tests/test_pdf_extraction.py
+      - name: Run file-sharing, retention, document, PDF, vision and Chat-grounding tests
+        run: python -m pytest -q tests/test_file_sharing.py tests/test_attachment_retention.py tests/test_attachment_chat.py tests/test_document_grounding.py tests/test_vision_analysis.py tests/test_pdf_extraction.py
