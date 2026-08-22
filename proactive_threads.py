@@ -11,8 +11,11 @@ import os
 import re
 import sqlite3
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
+from fastapi import Header
+
+import auth
 import continuity_ledger
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
@@ -190,8 +193,13 @@ def _latest_proactive_event(profile: str) -> tuple[int, dict[str, Any]] | None:
     return int(row["id"]), detail if isinstance(detail, dict) else {"text": str(detail)}
 
 
+def _profile_for_authorization(authorization: Optional[str]) -> str:
+    account = auth.require_account(authorization)
+    return str(account["username"])
+
+
 def install(app) -> None:
-    """Patch autonomous outbox storage and expose thread diagnostics/API."""
+    """Patch autonomous outbox storage and expose account-bound thread diagnostics/API."""
     if getattr(app.state, "janus_proactive_threads_installed", False):
         return
     import autonomous_messages
@@ -224,11 +232,14 @@ def install(app) -> None:
         autonomous_messages._store = threaded_store
 
     @app.get("/desktop/message-thread", tags=["desktop"])
-    def message_thread(username: str, event_id: int):
-        return {"profile": username, "thread": get_thread(username, event_id)}
+    def message_thread(event_id: int, authorization: Optional[str] = Header(default=None)):
+        profile = _profile_for_authorization(authorization)
+        return {"profile": profile, "thread": get_thread(profile, event_id)}
 
     @app.get("/desktop/message-thread-status", tags=["desktop"])
-    def message_thread_status(username: str):
-        return {"profile": username, **status(username)}
+    def message_thread_status(authorization: Optional[str] = Header(default=None)):
+        profile = _profile_for_authorization(authorization)
+        return {"profile": profile, **status(profile)}
 
     app.state.janus_proactive_threads_installed = True
+    app.state.janus_proactive_thread_routes_session_bound = True
