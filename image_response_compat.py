@@ -1,6 +1,7 @@
 """Normalize image artifacts, apply unified cost scope, preserve Message threads, and activate visual/research policy."""
 from __future__ import annotations
 
+import os
 from fastapi import Request
 
 import cost_governor as budget
@@ -42,6 +43,20 @@ def install(app) -> None:
         app.include_router(visual_deliberation.router)
     if "/research/workspace" not in paths:
         app.include_router(research_workspace.router)
+
+    # Seed only the explicitly configured owner profile. This avoids leaking the
+    # creator's private research programme into unrelated user accounts. Reuse the
+    # maintenance-owner setting when a separate research-owner setting is absent.
+    owner_profile = (os.getenv("JANUS_RESEARCH_OWNER_PROFILE", "").strip()
+                     or os.getenv("JANUS_MAINTENANCE_OWNER_PROFILE", "").strip())
+    if owner_profile:
+        try:
+            research_workspace.seed_janus_program(owner_profile)
+        except Exception:
+            # Research seeding must never prevent Chat/server startup; the authenticated
+            # /research/workspace/seed route remains available for explicit retry.
+            pass
+
     route = next(
         (r for r in app.router.routes if getattr(r, "path", None) == "/desktop/chat" and "POST" in getattr(r, "methods", set())),
         None,
