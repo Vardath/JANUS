@@ -125,13 +125,8 @@ def _record_presence(account_id: int, profile_id: str, summary: CoreSummary, err
         errors.append(f"presence-persistence: {type(exc).__name__}: {str(exc)[:240]}")
 
 
-def _presence(account_id: int):
+def _decode_presence_rows(rows):
     now = int(time.time())
-    with _db() as c:
-        rows = c.execute(
-            "SELECT device_id,platform,client_version,phase,cycles_json,last_seen_at,last_sync_ok,last_sync_error FROM janus_client_presence WHERE account_id=? ORDER BY last_seen_at DESC",
-            (account_id,),
-        ).fetchall()
     items = []
     for row in rows:
         age = max(0, now - int(row["last_seen_at"] or 0))
@@ -146,6 +141,32 @@ def _presence(account_id: int):
             "last_sync_ok": bool(row["last_sync_ok"]), "last_sync_error": row["last_sync_error"],
         })
     return items
+
+
+def _presence(account_id: int):
+    with _db() as c:
+        rows = c.execute(
+            "SELECT device_id,platform,client_version,phase,cycles_json,last_seen_at,last_sync_ok,last_sync_error FROM janus_client_presence WHERE account_id=? ORDER BY last_seen_at DESC",
+            (account_id,),
+        ).fetchall()
+    return _decode_presence_rows(rows)
+
+
+def presence_for_profile(profile_id: str):
+    """Return presence rows for the authenticated profile selected by secure desktop routes.
+
+    This is intentionally profile-scoped; secure_desktop resolves the profile from the
+    bearer session before the desktop runtime endpoint calls it.
+    """
+    profile = str(profile_id or "").strip()
+    if not profile:
+        return []
+    with _db() as c:
+        rows = c.execute(
+            "SELECT device_id,platform,client_version,phase,cycles_json,last_seen_at,last_sync_ok,last_sync_error FROM janus_client_presence WHERE profile_id=? ORDER BY last_seen_at DESC",
+            (profile,),
+        ).fetchall()
+    return _decode_presence_rows(rows)
 
 
 def _shared_state(profile_id: str):
