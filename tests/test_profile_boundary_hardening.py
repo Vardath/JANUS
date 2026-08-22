@@ -1,6 +1,8 @@
-import types
+import inspect
 
 import image_response_compat as compat
+import proactive_threads
+import secure_desktop
 
 
 class DummyRequest:
@@ -45,9 +47,50 @@ def test_authenticated_payload_uses_server_identity_before_side_effects(monkeypa
 
 
 def test_cost_status_no_longer_accepts_client_username():
-    # Contract guard: the live route obtains identity from Request/authentication,
-    # not from a username query argument. This prevents cross-profile cost reads.
-    import inspect
     source = inspect.getsource(compat.install)
     assert "def cost_status(request: Request)" in source
     assert "def cost_status(username" not in source
+
+
+def test_remaining_profile_desktop_routes_are_session_bound():
+    source = inspect.getsource(secure_desktop.install)
+    required_wrappers = {
+        "secure_core_observe",
+        "secure_hive_budget",
+        "secure_core_research_status",
+        "secure_message_quality",
+        "secure_self_assessment",
+        "secure_continuity_list",
+        "secure_continuity_create",
+        "secure_continuity_state",
+        "secure_continuity_events",
+    }
+    for name in required_wrappers:
+        assert f"def {name}" in source
+    # The underlying legacy APIs may still accept username for compatibility,
+    # but every exposed wrapper must derive it from the authenticated request.
+    assert "continuity_list_impl(username=_profile(request)" in source
+    assert "core_observe_impl(username=_profile(request)" in source
+    assert "message_quality_impl(username=_profile(request))" in source
+    assert "_profile(request)  # require a valid account" in source
+
+
+def test_post_security_thread_routes_do_not_accept_username_selector():
+    source = inspect.getsource(proactive_threads.install)
+    assert "def message_thread(username" not in source
+    assert "def message_thread_status(username" not in source
+    assert "_profile_for_authorization(authorization)" in source
+    auth_source = inspect.getsource(proactive_threads._profile_for_authorization)
+    assert "auth.require_account(authorization)" in auth_source
+
+
+def test_private_route_inventory_includes_profile_scoped_surfaces():
+    expected = {
+        "/desktop/core-observe",
+        "/desktop/hive-budget",
+        "/desktop/core-research-status",
+        "/desktop/message-quality",
+        "/desktop/self-assessment",
+        "/desktop/continuity",
+    }
+    assert expected.issubset(secure_desktop.PRIVATE_PATHS)
