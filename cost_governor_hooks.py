@@ -1,8 +1,12 @@
-"""Install Step-4 cost-governor scopes around JANUS paid/external calls.
+"""Install JANUS cost-governor scopes around paid/external calls.
 
 This keeps the policy centralized without duplicating budget logic through every
 feature. It wraps the OpenAI client aliases already imported by JANUS modules and
 sets capability/profile context around chat, curiosity, vision and image paths.
+
+Phase 2 degradation rule: provider failures are recorded for observability but do
+not consume the estimated budget reservation. This prevents a provider outage or
+malformed upstream response from cascading into artificial budget exhaustion.
 """
 from __future__ import annotations
 
@@ -18,6 +22,15 @@ _installed=False
 class BudgetDenied(RuntimeError):
     pass
 
+def _failure_status(exc:Exception)->str:
+    name=type(exc).__name__.lower(); msg=str(exc).lower()
+    if "timeout" in name or "timeout" in msg or "timed out" in msg:return "timeout"
+    if "json" in name or "decode" in name or "malformed" in msg or "invalid response" in msg:return "malformed"
+    return "error"
+
+def _failure_detail(exc:Exception)->str:
+    return f"provider call failed: {type(exc).__name__}: {str(exc)[:700]}"
+
 class _CallableProxy:
     def __init__(self, fn): self._fn=fn
     def __call__(self,*args,**kwargs):
@@ -26,8 +39,8 @@ class _CallableProxy:
             raise BudgetDenied(str(decision.get("reason") or "JANUS external-compute budget reached"))
         try:
             result=self._fn(*args,**kwargs)
-        except Exception:
-            budget.record_current(model=str(kwargs.get("model") or ""),status="error",detail="provider call raised before completion")
+        except Exception as exc:
+            budget.record_current(model=str(kwargs.get("model") or ""),estimated_usd=0.0,status=_failure_status(exc),detail=_failure_detail(exc))
             raise
         budget.record_current(model=str(kwargs.get("model") or ""),response=result,status="complete")
         return result
@@ -40,8 +53,8 @@ class _AsyncCallableProxy:
             raise BudgetDenied(str(decision.get("reason") or "JANUS external-compute budget reached"))
         try:
             result=await self._fn(*args,**kwargs)
-        except Exception:
-            budget.record_current(model=str(kwargs.get("model") or ""),status="error",detail="provider call raised before completion")
+        except Exception as exc:
+            budget.record_current(model=str(kwargs.get("model") or ""),estimated_usd=0.0,status=_failure_status(exc),detail=_failure_detail(exc))
             raise
         budget.record_current(model=str(kwargs.get("model") or ""),response=result,status="complete")
         return result
