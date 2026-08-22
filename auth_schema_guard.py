@@ -1,9 +1,9 @@
-"""Pre-import auth schema guard for JANUS Render persistence.
+"""Pre-import auth and persistence schema guard for JANUS Render persistence.
 
-Handles legacy tables that look partly current (for example, sessions has
-account_id) but are still missing columns required by the current auth code.
-No legacy table is deleted; incompatible tables are renamed and auth.py creates
-fresh current tables afterwards.
+Handles legacy auth tables that look partly current and then runs the Phase 2
+persistence matrix before application modules can perform ordinary writes. No
+legacy table is deleted; incompatible auth tables are preserved and incompatible
+registered non-auth schemas fail closed for manual review.
 """
 from __future__ import annotations
 
@@ -76,14 +76,21 @@ def guard_auth_schema() -> dict:
                 actions.append(f"{table}:preserved-as:{legacy}")
 
         c.commit()
-        return {
-            "ok": True,
-            "database": str(DB_PATH),
-            "actions": actions,
-            "preserved": preserved,
-        }
     finally:
         c.close()
+
+    # This executes before janus_dashboard/auth and therefore before ordinary
+    # application subsystem writes. Missing tables are valid for clean installs;
+    # incompatible registered tables fail closed rather than being silently used.
+    from persistence_matrix import preflight_existing
+    persistence = preflight_existing()
+    return {
+        "ok": True,
+        "database": str(DB_PATH),
+        "actions": actions,
+        "preserved": preserved,
+        "persistence_preflight": persistence,
+    }
 
 
 def auth_schema_snapshot() -> dict:
