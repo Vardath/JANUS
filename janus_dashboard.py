@@ -13,7 +13,7 @@ from account_deletion import router as account_deletion_router
 from privacy_policy import router as privacy_policy_router
 from terms_of_service import router as terms_router
 from ai_reports import router as ai_reports_router
-from core_sync import router as core_sync_router
+from core_sync import router as core_sync_router, presence_for_profile
 from src.janus_sleep_cycle import janus_sleep_cycle
 from interface_runtime_policy import install as install_interface_runtime_policy
 from interface_chat import install as install_interface_chat
@@ -82,6 +82,23 @@ def _presence(profile,latest):
         return 'Active' if age<=interval*2 else 'Dormant'
     except Exception: return 'Dormant'
 
+def _runtime_with_presence(username:str|None):
+    runtime=janus_sleep_cycle.status()
+    clients=presence_for_profile(username or '') if username else []
+    online=[x for x in clients if x.get('online')]
+    runtime['remote_clients']=len(online)
+    runtime['registered_clients']=len(clients)
+    runtime['clients']=clients[:50]
+    runtime['presence_state']='connected' if online else ('registered-offline' if clients else 'awaiting-authenticated-heartbeat')
+    if online:
+        latest=online[0]
+        runtime['latest_remote_phase']=latest.get('phase') or 'unknown'
+        runtime['latest_remote_cycles']=latest.get('cycles') or {}
+        runtime['latest_remote_device_id']=latest.get('device_id') or ''
+        runtime['latest_remote_client_version']=latest.get('client_version') or 'unknown'
+        runtime['latest_remote_last_seen_at']=latest.get('last_seen_at') or 0
+    return runtime
+
 @app.on_event('startup')
 async def _start_local_core_cycle(): janus_sleep_cycle.start()
 @app.on_event('shutdown')
@@ -89,8 +106,8 @@ async def _stop_local_core_cycle(): janus_sleep_cycle.stop()
 
 @app.get('/desktop/runtime-cores',tags=['desktop'])
 def desktop_runtime_cores(username:str|None=Query(default=None)):
-    runtime=janus_sleep_cycle.status()
-    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':runtime,'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','curiosity_web_enabled':os.environ.get('JANUS_CURIOSITY_WEB','1')=='1','curiosity_daily_search_cap':int(os.environ.get('JANUS_CURIOSITY_DAILY_SEARCH_CAP','4')),'hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'rest_background_seconds':runtime.get('rest_background_seconds',30),'core_cycle_api_calls':0,'note':'The interface remains continuously available. Local/server core cycles are deterministic and zero-API; occasional bounded web curiosity is separate, inspectable, cached in memory, and budget-capped. Self-assessment can now execute saturation escape: retain a checkpoint, suppress recursive churn, redirect grounding, and request bounded relevant search when needed.'}
+    runtime=_runtime_with_presence(username)
+    return {'profile':username or 'unspecified','architecture':'11-core: 7 specialists + 2 hemispheres + consensus + interface','runtime':runtime,'presence':{'online':runtime.get('remote_clients',0),'registered':runtime.get('registered_clients',0),'clients':runtime.get('clients',[])},'paid_background_api_enabled':os.environ.get('JANUS_PAID_BACKGROUND_REFLECTION','1')=='1','curiosity_web_enabled':os.environ.get('JANUS_CURIOSITY_WEB','1')=='1','curiosity_daily_search_cap':int(os.environ.get('JANUS_CURIOSITY_DAILY_SEARCH_CAP','4')),'hive_pulse_seconds':int(os.environ.get('JANUS_HIVE_PULSE_SECONDS','60')),'paid_reflection_seconds':int(os.environ.get('JANUS_BACKGROUND_REFLECTION_SECONDS','1800')),'self_assess_seconds':int(os.environ.get('JANUS_SELF_ASSESS_SECONDS','300')),'background_model':os.environ.get('JANUS_BACKGROUND_MODEL','gpt-5.6-luna'),'rest_background_seconds':runtime.get('rest_background_seconds',30),'core_cycle_api_calls':0,'note':'The interface remains continuously available. Local/server core cycles are deterministic and zero-API; authenticated client heartbeat/presence is reported separately from the server runtime so local device cycles are never mistaken for server cycles.'}
 
 @app.get('/desktop/messages',tags=['desktop'])
 def desktop_messages(username:str=Query(...),limit:int=Query(default=50,ge=1,le=100),include_dismissed:bool=Query(default=False)):
@@ -114,7 +131,7 @@ def desktop_home(username:str=Query(...)):
     try:
         row=c.execute('SELECT event_type,detail,created_at FROM desktop_events WHERE profile_id=? ORDER BY id DESC LIMIT 1',(username,)).fetchone(); latest=dict(row) if row else None
     finally: c.close()
-    runtime=janus_sleep_cycle.status(); return {'profile':username,'status':_presence(username,latest),'architecture':'11-core','unread_messages':sum(1 for x in messages if x['state']=='unread'),'latest_activity':latest,'background_interval_minutes':1,'core_phase':runtime.get('phase'),'core_runtime':runtime,'external_api_budget_used_by_core_cycle':0,'messaging_action':True}
+    runtime=_runtime_with_presence(username); return {'profile':username,'status':_presence(username,latest),'architecture':'11-core','unread_messages':sum(1 for x in messages if x['state']=='unread'),'latest_activity':latest,'background_interval_minutes':1,'core_phase':runtime.get('phase'),'core_runtime':runtime,'external_api_budget_used_by_core_cycle':0,'messaging_action':True}
 
 app.router.routes = [route for route in app.router.routes if getattr(route, 'path', None) != '/auth/google']
 
