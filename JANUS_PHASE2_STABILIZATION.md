@@ -8,7 +8,7 @@ The original post-Step-7 implementation roadmap (Steps 1–11) is functionally c
 2. **Route/security inventory** — enumerate all profile/account-bearing routes and prove each is public-by-design, admin-token-bound or account-session-bound. Remove accidental query-parameter identity selectors from private endpoints. **IMPLEMENTED; CI validation pending.**
 3. **Persistence and migration matrix** — record schema ownership/version for every durable table, test clean install + legacy upgrade + repeated restart paths, and detect incompatible old schemas before accepting writes. **IMPLEMENTED; CI validation pending.**
 4. **Background usefulness audit** — measure useful novel outputs versus repetition/self-reference; suppress low-information loops and keep curiosity/research budget focused on concrete questions and evidence. **IMPLEMENTED; CI validation pending.**
-5. **Memory quality audit** — test conversation-thread retention, corrections, contradictions, salience promotion, duplicate consolidation and whole-history retrieval on realistic multi-session conversations.
+5. **Memory quality audit** — test conversation-thread retention, corrections, contradictions, salience promotion, duplicate consolidation and whole-history retrieval on realistic multi-session conversations. **IMPLEMENTED; CI validation pending.**
 6. **Server/local synchronization soak** — long-running selective-sync tests covering reconnects, duplicate devices, stale clients, conflict provenance, no-overwrite guarantees and heartbeat loss/recovery.
 7. **Cost/failure degradation audit** — exercise exhausted web/model/image budgets, provider timeouts, malformed responses and partial outages; ordinary chat and deterministic local/server cognition should degrade cleanly.
 8. **Operational observability** — expose human-readable owner/admin health summaries for reliability, budgets, migrations, synchronization and background usefulness without leaking private account content.
@@ -16,38 +16,26 @@ The original post-Step-7 implementation roadmap (Steps 1–11) is functionally c
 
 ## Phase 2 Step 1
 
-`image_response_compat.py` previously wrapped the already-secured `/desktop/chat` route but performed thread lookup, research-context storage and cost accounting using the client-supplied `profile_id`/`username` before invoking the secure inner route. That could allow cross-profile side effects even though the final chat implementation itself was session-bound.
-
-The wrapper now resolves identity through `secure_desktop._profile()` before any profile-scoped work. The authenticated username overwrites client identity fields in a copied payload before thread lookup, research grounding, cost scope and the inner chat call. `/desktop/cost-status` is likewise session-bound and no longer accepts an arbitrary username query selector.
-
-`tests/test_profile_boundary_hardening.py` guards the normalization contract and the cost-status signature. The main cognition CI now compiles the security wrapper and runs these regressions.
+`image_response_compat.py` authenticates before any profile-scoped thread, research, memory or cost work. The authenticated username replaces client-selected identity fields before side effects, and `/desktop/cost-status` is session-bound.
 
 ## Phase 2 Step 2
 
-A route-by-route inventory found several older `/desktop/*` APIs whose implementation functions still accepted client-selected usernames even though the primary Chat/Memory/Message surfaces had already been secured. The affected externally reachable surfaces included continuity lifecycle/history, detailed core observation, hive budget, core-research status, autonomous-message quality and self-assessment telemetry.
-
-`secure_desktop.install()` now captures those legacy implementations and re-exposes them only through authenticated wrappers. Reads derive the profile from the session; continuity writes overwrite any supplied `profile_id`/`username` in a copied payload before forwarding it. Self-assessment remains global operational telemetry but now requires an authenticated account rather than being anonymously readable.
-
-A second issue existed in routes installed later by `bootstrap.py`: proactive Message thread diagnostics were created after the main secure-desktop pass and still accepted a `username` query selector. `proactive_threads.py` now authenticates those routes internally through `auth.require_account()` and derives the profile from that account. Old clients may still send an unused username query parameter, but it is no longer part of the route contract and cannot select a partition.
-
-`JANUS_ROUTE_SECURITY_INVENTORY.md` records the explicit boundary classes: public-by-design, administrator-token-bound, router-authenticated account APIs, secure-desktop compatibility wrappers and late-installed internally authenticated routes. `tests/test_profile_boundary_hardening.py` now protects these route contracts in CI.
+`secure_desktop.py` and late-installed thread routes now bind private profile/account APIs to authenticated sessions. `JANUS_ROUTE_SECURITY_INVENTORY.md` records the public/admin/account boundary classes.
 
 ## Phase 2 Step 3
 
-`persistence_matrix.py` now provides a single minimum-compatibility registry for the main durable JANUS tables. It records each table's owning subsystem, a registry schema version and the columns current code requires. The registry deliberately tolerates extra additive columns rather than demanding byte-for-byte SQL identity.
-
-Startup ordering is now explicit. The existing auth normalizer first preserves the oldest incompatible account layouts; `auth_schema_guard.py` performs safe additive auth fixes and preserves incompatible legacy session/token tables; then `persistence_matrix.preflight_existing()` runs before `janus_dashboard` is imported. A missing table is valid on a clean installation, but an already-existing registered table missing required columns causes a fail-closed degraded startup before ordinary application modules can write through the incompatible shape.
-
-After the normal subsystems have initialized, `image_response_compat.install()` records the observed matrix version and table compatibility snapshot into `janus_schema_meta`. This gives repeated restarts a durable schema checkpoint without rewriting user tables. Outside the pre-existing auth compatibility migrations, the new guard is intentionally non-destructive: it does not guess at unknown legacy conversions, delete rows or silently rebuild tables.
-
-`JANUS_PHASE2_PERSISTENCE_MATRIX.md` documents table ownership and startup policy. `tests/test_persistence_matrix.py` covers clean installation, incompatible legacy shape rejection, additive-column compatibility and repeated restart/idempotence. The cognition CI now compiles and runs the persistence registry tests.
+`persistence_matrix.py` registers minimum compatible durable schemas, tolerates additive columns, rejects incompatible existing shapes before ordinary writes, and records the observed matrix after initialization.
 
 ## Phase 2 Step 4
 
-`background_usefulness.py` adds a deterministic, zero-API quality gate in front of autonomous curiosity searches. It scores each proposed background query for concrete subject matter, novelty relative to recent research, process/self-reference density and near-duplicate similarity. Candidates dominated by JANUS cycle/core/Consensus/Interface telemetry or candidates that substantially repeat recent searches are suppressed before the web/model request is scheduled, so rejected loops consume no external research budget.
+`background_usefulness.py` adds a deterministic zero-API gate before autonomous research spending, suppressing repetitive/process-heavy self-reference while leaving explicit foreground research untouched. It records account-scoped usefulness metrics for inspection.
 
-The gate affects autonomous background search selection only. Foreground user-requested research and explicit Chat questions are not blocked by it. Existing diversity controls in `background_cognition.py` and Message-level filtering in `proactive_quality.py` remain separate downstream safeguards.
+## Phase 2 Step 5
 
-The new persistent `janus_background_usefulness` table records accepted/suppressed candidate decisions with numeric novelty, process ratio, similarity, score and human-readable reason labels. Completed research is also audited retrospectively to estimate usefulness rate, repetition and process-heavy output. `/background-usefulness/status` is authenticated and account-scoped, allowing the current user to inspect their own metrics without exposing another profile's material.
+`memory_quality.py` adds deterministic whole-history retrieval over retained user-visible conversation records rather than relying only on the latest fixed-size Chat window. Relevant older material can re-enter the live Chat prompt through a concise persisted `memory_context` record, while ordinary recent conversation remains intact.
 
-`persistence_matrix.py` now registers the usefulness table and advances its matrix version. `tests/test_background_usefulness.py` covers concrete novel research, recursive self-reference suppression, near-duplicate suppression, durable gate decisions, completed-output auditing and installation of the gate onto the background curiosity selector. The main cognition CI compiles the new module and runs the new regressions.
+User corrections and clarifications are explicitly marked with precedence over earlier conflicting material. Phrases such as “think about this”, “ponder”, “mull it over”, “remember this” and “come back to this” are treated as continuity markers and receive gentle trace→working→episodic reinforcement instead of being discarded as ordinary transient turns. Long substantive user turns also receive a conservative trace→working promotion.
+
+Exact repeated user turns are measured and near-identical retrieved memories are collapsed from the injected context so repetition cannot crowd out independent older history. Retrieval is profile-scoped, does not promote unrelated material merely because it was searched, and never exposes hidden chain-of-thought: only persisted conversation/memory records are eligible.
+
+`/memory-quality/status` exposes account-scoped audit counts, and `janus_memory_quality` records reinforcement events. `persistence_matrix.py` registers this table and advances the durable matrix version. `tests/test_memory_quality.py` covers old-history retrieval beyond the recent window, correction precedence, ponder/remember promotion, duplicate suppression, account isolation and non-promotion of irrelevant turns. The main cognition CI compiles and runs the new suite.
