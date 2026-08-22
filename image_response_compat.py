@@ -15,9 +15,12 @@ import research_workspace
 import reliability_audit
 import secure_desktop
 import persistence_matrix
+import curiosity_search
+import background_usefulness
 
 cost_governor_hooks.install()
 visual_explanation.install(image_generation)
+background_usefulness.install(curiosity_search)
 
 
 def _reply_event_id(payload: dict):
@@ -56,6 +59,8 @@ def install(app) -> None:
         app.include_router(research_workspace.router)
     if "/reliability/status" not in paths:
         app.include_router(reliability_audit.router)
+    if "/background-usefulness/status" not in paths:
+        app.include_router(background_usefulness.router)
 
     owner_profile = (os.getenv("JANUS_RESEARCH_OWNER_PROFILE", "").strip()
                      or os.getenv("JANUS_MAINTENANCE_OWNER_PROFILE", "").strip())
@@ -122,6 +127,7 @@ def install(app) -> None:
     app.state.janus_visual_deliberation_scaffolding_enabled = True
     app.state.janus_research_workspace_enabled = True
     app.state.janus_reliability_audit_enabled = True
+    app.state.janus_background_usefulness_enabled = True
     app.state.janus_profile_boundary_hardening_enabled = True
     app.state.janus_background_multi_core_image_generation_enabled = False
     app.state.janus_persistence_matrix = persistence_matrix.record_current_matrix()
