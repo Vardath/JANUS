@@ -153,11 +153,7 @@ def _presence(account_id: int):
 
 
 def presence_for_profile(profile_id: str):
-    """Return presence rows for the authenticated profile selected by secure desktop routes.
-
-    This is intentionally profile-scoped; secure_desktop resolves the profile from the
-    bearer session before the desktop runtime endpoint calls it.
-    """
+    """Return presence rows for the authenticated profile selected by secure desktop routes."""
     profile = str(profile_id or "").strip()
     if not profile:
         return []
@@ -211,10 +207,13 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
 
     _record_presence(account_id, profile_id, summary, errors)
     presence = _presence(account_id)
-    server_summary = janus_sleep_cycle.compact_summary()
+
+    # Return the full authoritative server runtime on the heartbeat itself. Android
+    # already performs this authenticated exchange every 15 seconds, so the UI can
+    # display exactly the same server society without a second WebView HTTP path.
+    server_summary = janus_sleep_cycle.status()
     server_summary["remote_clients"] = sum(1 for x in presence if x["online"])
     server_summary["registered_clients"] = len(presence)
-    server_summary["persistent_storage"] = bool(server_summary.get("persistent"))
     active_deliberation = active_for_profile(profile_id)
 
     return {
