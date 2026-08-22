@@ -116,7 +116,8 @@ def status(profile_id:str)->dict[str,Any]:
  with _db() as c:
   rows=c.execute("SELECT capability,COUNT(*) calls,COALESCE(SUM(estimated_usd),0) usd,COALESCE(SUM(input_tokens),0) input_tokens,COALESCE(SUM(output_tokens),0) output_tokens FROM janus_cost_events WHERE profile_id=? AND created_at>=? GROUP BY capability ORDER BY usd DESC",(profile,day)).fetchall()
   denied=c.execute("SELECT COUNT(*) FROM janus_cost_denials WHERE profile_id=? AND created_at>=?",(profile,day)).fetchone()[0]
- return {"profile_id":profile,"today_estimated_usd":round(daily,6),"month_estimated_usd":round(monthly,6),"background_today_estimated_usd":round(background,6),"daily_limit_usd":PROFILE_DAILY_USD,"monthly_limit_usd":PROFILE_MONTHLY_USD,"background_daily_limit_usd":BACKGROUND_DAILY_USD,"denied_today":int(denied or 0),"by_capability":[dict(r) for r in rows],"estimate_notice":"Budget estimates are configurable planning values, not provider invoices."}
+  failures=c.execute("SELECT capability,status,detail,created_at FROM janus_cost_events WHERE profile_id=? AND created_at>=? AND status IN ('error','timeout','malformed') ORDER BY id DESC LIMIT 10",(profile,day)).fetchall()
+ return {"profile_id":profile,"today_estimated_usd":round(daily,6),"month_estimated_usd":round(monthly,6),"background_today_estimated_usd":round(background,6),"daily_limit_usd":PROFILE_DAILY_USD,"monthly_limit_usd":PROFILE_MONTHLY_USD,"background_daily_limit_usd":BACKGROUND_DAILY_USD,"denied_today":int(denied or 0),"recent_failures":[dict(r) for r in failures],"by_capability":[dict(r) for r in rows],"estimate_notice":"Budget estimates are configurable planning values, not provider invoices."}
 
 @contextlib.contextmanager
 def scope(profile_id:str,capability:str):
@@ -129,5 +130,5 @@ def current()->tuple[str,str]: return _current_profile.get(),_current_capability
 def authorize_current()->dict[str,Any]:
  p,c=current(); return authorize(p,c)
 
-def record_current(*,model:str="",response:Any=None,status:str="complete",detail:str="")->int:
- p,c=current(); return record(p,c,model=model,response=response,status=status,detail=detail)
+def record_current(*,model:str="",estimated_usd:float|None=None,response:Any=None,status:str="complete",detail:str="")->int:
+ p,c=current(); return record(p,c,model=model,estimated_usd=estimated_usd,response=response,status=status,detail=detail)
