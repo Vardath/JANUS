@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var api = APIClient()
@@ -16,6 +17,9 @@ struct ContentView: View {
     @State private var chatText = ""
     @State private var chat: [(String, String)] = [("JANUS", "Ready.")]
     @State private var chatImages: [Int: Data] = [:]
+    @State private var pendingAttachments: [UploadedFile] = []
+    @State private var showFileImporter = false
+    @State private var uploadingAttachment = false
     @State private var messages: [JanusMessage] = []
     @State private var unread = 0
     @State private var home: HomeResponse?
@@ -126,13 +130,53 @@ struct ContentView: View {
                 .onChange(of: chat.count) { _, _ in proxy.scrollTo(max(chat.count - 1, 0), anchor: .bottom) }
             }
             Divider()
+            if !pendingAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(pendingAttachments) { file in
+                            HStack(spacing: 6) {
+                                Image(systemName: "paperclip")
+                                Text(file.filename).lineLimit(1)
+                                Button {
+                                    pendingAttachments.removeAll { $0.id == file.id }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Remove \(file.filename)")
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(Color.secondary.opacity(0.12))
+                            .clipShape(Capsule())
+                        }
+                    }.padding(.horizontal).padding(.top, 8)
+                }
+            }
             HStack(alignment: .bottom) {
+                Button {
+                    showFileImporter = true
+                } label: {
+                    Image(systemName: uploadingAttachment ? "hourglass" : "paperclip")
+                }
+                .buttonStyle(.bordered)
+                .disabled(uploadingAttachment || pendingAttachments.count >= 4)
+                .accessibilityLabel("Attach file")
+
                 TextField("Message JANUS", text: $chatText, axis: .vertical)
                     .textFieldStyle(.roundedBorder).lineLimit(1...5)
                 Button("Send") { Task { await sendChat() } }
                     .buttonStyle(.borderedProminent)
-                    .disabled(chatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(chatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingAttachments.isEmpty)
             }.padding()
+        }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            Task { await importFiles(result) }
         }
     }
 
@@ -255,6 +299,7 @@ struct ContentView: View {
     private func signOut() async {
         await api.logout()
         profile = ""
+        pendingAttachments = []
         messages = []; unread = 0; home = nil; observeItems = []; activityItems = []; memoryItems = []; chatImages = [:]
         identifier = savedIdentifier
     }
@@ -269,12 +314,41 @@ struct ContentView: View {
         }
     }
 
+    private func importFiles(_ result: Result<[URL], Error>) async {
+        switch result {
+        case .failure(let error):
+            errorText = error.localizedDescription
+        case .success(let urls):
+            let slots = max(0, 4 - pendingAttachments.count)
+            let selected = Array(urls.prefix(slots))
+            guard !selected.isEmpty else { return }
+            uploadingAttachment = true
+            defer { uploadingAttachment = false }
+            for url in selected {
+                do {
+                    let file = try await api.uploadFile(url: url)
+                    if !pendingAttachments.contains(where: { $0.id == file.id }) {
+                        pendingAttachments.append(file)
+                    }
+                } catch {
+                    errorText = error.localizedDescription
+                    break
+                }
+            }
+        }
+    }
+
     private func sendChat() async {
-        let text = chatText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        chatText = ""; chat.append(("You", text))
+        var text = chatText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let attachments = pendingAttachments
+        guard !text.isEmpty || !attachments.isEmpty else { return }
+        if text.isEmpty { text = "Please assess the attached file or files." }
+        chatText = ""
+        pendingAttachments = []
+        let attachmentLines = attachments.map { "[Attached: \($0.filename)]" }.joined(separator: "\n")
+        chat.append(("You", attachmentLines.isEmpty ? text : text + "\n\n" + attachmentLines))
         do {
-            let response = try await api.chat(profile: profile, message: text)
+            let response = try await api.chat(profile: profile, message: text, attachmentIDs: attachments.map(\.id))
             let reply = response.reply ?? response.response ?? "JANUS replied, but the response was empty."
             let replyIndex = chat.count
             chat.append(("JANUS", reply))
