@@ -1,4 +1,4 @@
-"""Normalize image artifacts, apply unified cost scope, preserve Message threads, and activate visual policy."""
+"""Normalize image artifacts, apply unified cost scope, preserve Message threads, and activate visual/research policy."""
 from __future__ import annotations
 
 from fastapi import Request
@@ -10,6 +10,7 @@ import proactive_threads
 import image_generation
 import visual_explanation
 import visual_deliberation
+import research_workspace
 
 # Bootstrap imports this module after the chat/vision/image modules are loaded, so it
 # is a stable point to install cross-cutting paid-call and thread-continuity policy.
@@ -39,6 +40,8 @@ def install(app) -> None:
     paths = {getattr(r, "path", "") for r in app.router.routes}
     if "/visual-deliberations" not in paths:
         app.include_router(visual_deliberation.router)
+    if "/research/workspace" not in paths:
+        app.include_router(research_workspace.router)
     route = next(
         (r for r in app.router.routes if getattr(r, "path", None) == "/desktop/chat" and "POST" in getattr(r, "methods", set())),
         None,
@@ -56,10 +59,13 @@ def install(app) -> None:
         profile = str(payload.get("profile_id") or payload.get("username") or "local-user")
         message = str(payload.get("message") or payload.get("text") or "").strip()
         thread_context, thread = proactive_threads.format_chat_context(profile, message, _reply_event_id(payload))
-        # Store a bounded process-context record rather than changing the user's text.
-        # interface_chat's normal recent-context path will see it later in this turn.
+        # Store bounded process-context records rather than changing the user's text.
+        # interface_chat's normal recent-context path will see them later in this turn.
         if thread_context:
             dashboard_api._store(profile, "thread_context", thread_context, "proactive_thread_context", "working")
+        research_context = research_workspace.workspace_context(profile)
+        if not research_context.startswith("No JANUS research workspace"):
+            dashboard_api._store(profile, "research_context", research_context, "research_workspace_context", "working")
         with budget.scope(profile, "chat"):
             result = await impl(request=request, payload=payload)
         if isinstance(result, dict):
@@ -68,6 +74,7 @@ def install(app) -> None:
                 result["generated_image"] = image
                 result.setdefault("image", image)
             result["cost_governor"] = budget.status(profile)
+            result["research_workspace_active"] = not research_context.startswith("No JANUS research workspace")
             if thread:
                 result["proactive_thread"] = {
                     "event_id": thread.get("event_id"),
@@ -88,5 +95,6 @@ def install(app) -> None:
     app.state.janus_proactive_thread_chat_enabled = True
     app.state.janus_visual_explanation_enabled = True
     app.state.janus_visual_deliberation_scaffolding_enabled = True
+    app.state.janus_research_workspace_enabled = True
     app.state.janus_background_multi_core_image_generation_enabled = False
     app.state.janus_image_response_compat = True
