@@ -5,20 +5,24 @@ on:
     paths:
       - 'attachment_api.py'
       - 'attachment_retention.py'
+      - 'attachment_chat.py'
       - 'account_deletion.py'
       - 'bootstrap.py'
       - 'tests/test_file_sharing.py'
       - 'tests/test_attachment_retention.py'
+      - 'tests/test_attachment_chat.py'
       - '.github/workflows/test-files.yml'
   push:
     branches: [main]
     paths:
       - 'attachment_api.py'
       - 'attachment_retention.py'
+      - 'attachment_chat.py'
       - 'account_deletion.py'
       - 'bootstrap.py'
       - 'tests/test_file_sharing.py'
       - 'tests/test_attachment_retention.py'
+      - 'tests/test_attachment_chat.py'
       - '.github/workflows/test-files.yml'
   workflow_dispatch:
 
@@ -33,5 +37,5 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
-      - name: Run file-sharing and retention tests
-        run: python -m pytest -q tests/test_file_sharing.py tests/test_attachment_retention.py
+      - name: Run file-sharing, retention and Chat-grounding tests
+        run: python -m pytest -q tests/test_file_sharing.py tests/test_attachment_retention.py tests/test_attachment_chat.py
