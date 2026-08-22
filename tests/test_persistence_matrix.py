@@ -14,7 +14,7 @@ def test_clean_install_allows_missing_tables(tmp_path, monkeypatch):
     p, path=_module(tmp_path, monkeypatch)
     out=p.preflight_existing()
     assert out['ok'] is True
-    assert not out['critical_incompatibilities']
+    assert not out['incompatible']
     assert path.exists()
 
 
@@ -47,10 +47,12 @@ def test_additive_extra_columns_are_restart_safe(tmp_path, monkeypatch):
     assert status['meta']['persistence_matrix_version']['value']==str(p.MATRIX_VERSION)
 
 
-def test_optional_legacy_shape_is_reported_without_blocking_core_start(tmp_path, monkeypatch):
+def test_incompatible_optional_registered_table_also_fails_closed(tmp_path, monkeypatch):
     p, path=_module(tmp_path, monkeypatch)
     with sqlite3.connect(path) as c:
         c.execute('CREATE TABLE janus_message_threads(event_id INTEGER PRIMARY KEY,profile_id TEXT)')
-    out=p.preflight_existing()
-    assert out['ok']
-    assert any(x['table']=='janus_message_threads' for x in out['optional_incompatibilities'])
+    try:
+        p.preflight_existing()
+        assert False, 'expected incompatible schema failure'
+    except RuntimeError as exc:
+        assert 'janus_message_threads' in str(exc)
