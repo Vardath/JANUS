@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.68: consolidated server telemetry plus substantive server-core research grounding.
+// v0.69: consolidated telemetry plus owner-facing system observability.
 android {
     namespace 'com.vardath.janus'
     compileSdk 36
@@ -18,8 +18,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 68
-        versionName '0.68'
+        versionCode 69
+        versionName '0.69'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
