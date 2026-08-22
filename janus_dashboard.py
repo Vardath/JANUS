@@ -18,6 +18,7 @@ from src.janus_sleep_cycle import janus_sleep_cycle
 from interface_runtime_policy import install as install_interface_runtime_policy
 from interface_chat import install as install_interface_chat
 from deliberation_tasks import install as install_deliberation_tasks
+from continuity_api import install as install_continuity_api
 from curiosity_search import install as install_curiosity_search
 from epistemic_search_bridge import install as install_epistemic_search_bridge
 from saturation_regulation import install as install_saturation_regulation
@@ -69,53 +70,32 @@ def _message_rows(profile:str,limit:int=50,include_dismissed:bool=False):
             item=dict(row)
             if not include_dismissed and item['state']=='dismissed': continue
             mt,text,source=_decode_message(item['event_type'],item['detail']); item.update(message_type=mt,detail=text,source=source)
-            # Step 6: legacy autonomous telemetry/process chatter is not a user
-            # notification. Explicit/manual/chat Messages remain untouched.
-            if not filter_autonomous_items([item]):
-                continue
+            if not filter_autonomous_items([item]): continue
             items.append(item)
             if len(items)>=limit: break
         return items
     finally: c.close()
 
 def _ensure_runtime_started():
-    """Make the server society self-healing if an ASGI startup hook was skipped/reloaded."""
     try:
         thread=getattr(janus_sleep_cycle,'_thread',None)
-        if not thread or not thread.is_alive():
-            janus_sleep_cycle.start()
-    except Exception:
-        pass
+        if not thread or not thread.is_alive(): janus_sleep_cycle.start()
+    except Exception: pass
 
 def _presence(profile,latest):
-    _ensure_runtime_started()
-    runtime=janus_sleep_cycle.status()
-    if runtime.get('interface_awake'): return 'Active'
-    if runtime.get('interface_available'): return 'Active'
-    if runtime.get('phase')=='wake': return 'Active'
+    _ensure_runtime_started(); runtime=janus_sleep_cycle.status()
+    if runtime.get('interface_awake') or runtime.get('interface_available') or runtime.get('phase')=='wake': return 'Active'
     if not latest or not latest.get('created_at'): return 'Dormant'
     try:
         stamp=datetime.fromisoformat(str(latest['created_at']).replace('Z','+00:00')); age=(datetime.now(timezone.utc)-stamp.astimezone(timezone.utc)).total_seconds(); interval=max(1,int(os.environ.get('JANUS_INTERVAL_MINUTES','15')))*60
         return 'Active' if age<=interval*2 else 'Dormant'
-    except Exception: return 'Dormant'
+    except Exception:return 'Dormant'
 
 def _runtime_with_presence(username:str|None):
-    _ensure_runtime_started()
-    runtime=janus_sleep_cycle.status()
-    clients=presence_for_profile(username or '') if username else []
-    online=[x for x in clients if x.get('online')]
-    runtime['remote_clients']=len(online)
-    runtime['registered_clients']=len(clients)
-    runtime['clients']=clients[:50]
-    runtime['presence_state']='connected' if online else ('registered-offline' if clients else 'awaiting-authenticated-heartbeat')
-    runtime['server_runtime_thread_alive']=bool(getattr(janus_sleep_cycle,'_thread',None) and janus_sleep_cycle._thread.is_alive())
+    _ensure_runtime_started(); runtime=janus_sleep_cycle.status(); clients=presence_for_profile(username or '') if username else []; online=[x for x in clients if x.get('online')]
+    runtime['remote_clients']=len(online); runtime['registered_clients']=len(clients); runtime['clients']=clients[:50]; runtime['presence_state']='connected' if online else ('registered-offline' if clients else 'awaiting-authenticated-heartbeat'); runtime['server_runtime_thread_alive']=bool(getattr(janus_sleep_cycle,'_thread',None) and janus_sleep_cycle._thread.is_alive())
     if online:
-        latest=online[0]
-        runtime['latest_remote_phase']=latest.get('phase') or 'unknown'
-        runtime['latest_remote_cycles']=latest.get('cycles') or {}
-        runtime['latest_remote_device_id']=latest.get('device_id') or ''
-        runtime['latest_remote_client_version']=latest.get('client_version') or 'unknown'
-        runtime['latest_remote_last_seen_at']=latest.get('last_seen_at') or 0
+        latest=online[0]; runtime['latest_remote_phase']=latest.get('phase') or 'unknown'; runtime['latest_remote_cycles']=latest.get('cycles') or {}; runtime['latest_remote_device_id']=latest.get('device_id') or ''; runtime['latest_remote_client_version']=latest.get('client_version') or 'unknown'; runtime['latest_remote_last_seen_at']=latest.get('last_seen_at') or 0
     return runtime
 
 @app.on_event('startup')
@@ -141,7 +121,7 @@ def desktop_message_state(event_id:int,payload:dict[str,Any]):
     try:
         if not c.execute('SELECT 1 FROM desktop_events WHERE id=? AND profile_id=?',(event_id,profile)).fetchone(): raise HTTPException(404,'message not found')
         c.execute("INSERT INTO janus_message_state(profile_id,event_id,state) VALUES(?,?,?) ON CONFLICT(profile_id,event_id) DO UPDATE SET state=excluded.state",(profile,event_id,state)); c.commit()
-    finally: c.close()
+    finally:c.close()
     return {'ok':True,'event_id':event_id,'state':state}
 
 @app.get('/desktop/home',tags=['desktop'])
@@ -149,26 +129,18 @@ def desktop_home(username:str=Query(...)):
     messages=_message_rows(username,50); c=_connect()
     try:
         row=c.execute('SELECT event_type,detail,created_at FROM desktop_events WHERE profile_id=? ORDER BY id DESC LIMIT 1',(username,)).fetchone(); latest=dict(row) if row else None
-    finally: c.close()
+    finally:c.close()
     runtime=_runtime_with_presence(username); return {'profile':username,'status':_presence(username,latest),'architecture':'11-core','unread_messages':sum(1 for x in messages if x['state']=='unread'),'latest_activity':latest,'background_interval_minutes':1,'core_phase':runtime.get('phase'),'core_runtime':runtime,'external_api_budget_used_by_core_cycle':0,'messaging_action':True}
 
-app.router.routes = [route for route in app.router.routes if getattr(route, 'path', None) != '/auth/google']
-
-@app.post('/auth/google', tags=['auth'])
-def google_auth_android_compat(req: GoogleRequest):
-    result = current_google_auth(req)
-    account = result.get('account') or {}
-    username = str(account.get('username') or '').strip()
-    account_id = account.get('id')
-    result['username'] = username
-    result['profile_id'] = username
-    result['account_id'] = account_id
-    result['user_id'] = account_id
-    return result
+app.router.routes=[route for route in app.router.routes if getattr(route,'path',None)!='/auth/google']
+@app.post('/auth/google',tags=['auth'])
+def google_auth_android_compat(req:GoogleRequest):
+    result=current_google_auth(req); account=result.get('account') or {}; username=str(account.get('username') or '').strip(); account_id=account.get('id'); result['username']=username; result['profile_id']=username; result['account_id']=account_id; result['user_id']=account_id; return result
 
 app.include_router(auth_router); app.include_router(account_deletion_router); app.include_router(privacy_policy_router); app.include_router(terms_router); app.include_router(ai_reports_router); app.include_router(core_sync_router)
 install_interface_chat(app)
 install_deliberation_tasks(app)
+install_continuity_api(app)
 install_curiosity_search(app)
 install_epistemic_search_bridge(app)
 install_runtime_messaging(app)
