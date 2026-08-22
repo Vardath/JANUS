@@ -1,9 +1,9 @@
 """Selective federated memory synchronization for JANUS.
 
-Local/device state is never wholesale-replaced.  Devices exchange bounded, typed
-records with provenance and stable origin ids.  The server stores remote records as
+Local/device state is never wholesale-replaced. Devices exchange bounded, typed
+records with provenance and stable origin ids. The server stores remote records as
 remote evidence, detects conflicting current claims, and exposes bounded outbound
-records for specialist review.  Protected identity/core state is never accepted from
+records for specialist review. Protected identity/core state is never accepted from
 remote peers.
 """
 from __future__ import annotations
@@ -78,7 +78,7 @@ def _semantic_conflict(a:sqlite3.Row,b:dict[str,Any])->bool:
  return na!=nb and overlap>=0.6
 
 def ingest(profile_id:str,device_id:str,records:list[dict[str,Any]]|None)->dict[str,Any]:
- accepted=updated=ignored=conflicts=0
+ accepted=updated=ignored=conflicts=0; accepted_items=[]
  for raw in (records or [])[:MAX_IN]:
   if not isinstance(raw,dict): ignored+=1; continue
   r=_validate_record(raw,device_id)
@@ -93,15 +93,17 @@ def ingest(profile_id:str,device_id:str,records:list[dict[str,Any]]|None)->dict[
    else:
     cur=c.execute("INSERT INTO janus_federated_records(profile_id,origin_device,origin_id,kind,text,state,confidence,source_updated_at,content_hash,conflict_group,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
       (profile_id,device_id,r["origin_id"],r["kind"],r["text"],r["state"],r["confidence"],r["source_updated_at"],h,group,now,now)); record_id=int(cur.lastrowid); accepted+=1
+   record_conflicted=False
    peers=c.execute("SELECT * FROM janus_federated_records WHERE profile_id=? AND id<>? AND kind=? ORDER BY updated_at DESC LIMIT 80",(profile_id,record_id,r["kind"])).fetchall()
    for p in peers:
     if _semantic_conflict(p,r):
      left,right=sorted((int(p["id"]),record_id)); cg=group or _group(r["kind"],r["text"])
      c.execute("INSERT OR IGNORE INTO janus_federated_conflicts(profile_id,conflict_group,left_record,right_record,reason,created_at) VALUES(?,?,?,?,?,?)",
        (profile_id,cg,left,right,"similar federated records disagree in lifecycle/claim polarity",now))
-     c.execute("UPDATE janus_federated_records SET status='conflicted',conflict_group=? WHERE id IN (?,?)",(cg,left,right)); conflicts+=1
+     c.execute("UPDATE janus_federated_records SET status='conflicted',conflict_group=? WHERE id IN (?,?)",(cg,left,right)); conflicts+=1; record_conflicted=True
    c.commit()
- return {"accepted":accepted,"updated":updated,"ignored":ignored,"conflicts":conflicts}
+  accepted_items.append({**r,"record_id":record_id,"status":"conflicted" if record_conflicted else "accepted","merge_policy":"grounding_only_no_overwrite"})
+ return {"accepted":accepted,"updated":updated,"ignored":ignored,"conflicts":conflicts,"accepted_items":accepted_items[:MAX_IN]}
 
 def outbound(profile_id:str,exclude_device:str="",limit:int=MAX_OUT)->list[dict[str,Any]]:
  """Return bounded shared records. They are grounding candidates, never overwrite commands."""
