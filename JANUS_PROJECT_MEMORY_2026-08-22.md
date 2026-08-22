@@ -1,6 +1,6 @@
 # JANUS Project Continuity Checkpoint — 2026-08-22
 
-This file supplements `JANUS_PROJECT_MEMORY.md` and records the latest material changes from the Aug 22 Android/server telemetry and synchronization work. It should be read after the older continuity file when resuming development.
+This file supplements `JANUS_PROJECT_MEMORY.md` and records the latest material changes from the Aug 22 Android/server telemetry, synchronization, and maintenance-review work. It should be read after the older continuity file when resuming development.
 
 ## Current client/runtime line
 - Android working line: **v0.64**.
@@ -90,14 +90,36 @@ Forward routing remains the intended architecture:
 
 Do not reintroduce uncontrolled cyclic self-feeding solely to make counters move.
 
+## Quarterly maintenance / upgrade review
+A new server-side maintenance-review mechanism is now part of the active design.
+
+Intent:
+- approximately every 90 days JANUS records a bounded technical snapshot and requests a human review;
+- it **does not** automatically edit code, install dependencies, switch models, change APIs, alter configuration, or deploy anything;
+- it uses zero external model/API calls;
+- when SMTP + `JANUS_MAINTENANCE_OWNER_EMAIL` are configured it emails the owner a maintenance-review request asking that JANUS be reviewed with ChatGPT before any upgrades or patches are applied;
+- the report includes deployed commit, Python/platform state, runtime topology/phase, persistence, server core cycle range, client presence and a checklist covering Python/FastAPI, Android/Gradle, iOS/Xcode, Windows packaging, OpenAI model/API changes, Render/runtime changes, OAuth/security guidance and regression/device tests;
+- admin-only `/diagnostics/maintenance` reports current schedule/state and `/diagnostics/maintenance/run` can generate a review on demand;
+- the scheduler checks periodically but only creates a new scheduled review once the configured interval has elapsed;
+- default cadence is 90 days (`JANUS_MAINTENANCE_INTERVAL_DAYS=90`).
+
+This mechanism is advisory by design. New technology should trigger a request for owner + ChatGPT maintenance work, never autonomous self-modification.
+
 ## Current validation state
 As of this checkpoint:
 - server runtime health and independent server cycling have been verified by live Chat diagnostics;
 - Android local runtime health and independent local cycling have been verified on device;
 - authenticated device/server connection has been verified server-side;
-- the remaining target is the **Android Options → Cores rendering of the heartbeat-provided server snapshot in v0.64**.
-
-Treat the v0.64 Cores screen as requiring real-device verification before declaring the telemetry issue closed.
+- v0.64 correctly moved the server panel away from fake zero values to an explicit heartbeat waiting state when no full snapshot has arrived yet;
+- heartbeat snapshot population still requires continued real-device soak testing before the telemetry issue is declared fully closed;
+- quarterly maintenance review code is committed server-side and requires deployed-environment SMTP/owner-email configuration for actual email delivery.
 
 ## Development priority after telemetry verification
 Once v0.64 proves the correct local/server display, stop iterating on this surface and return to the broader JANUS roadmap. Preserve this bug as a regression test: a future build must not show zero/unknown server cores while an authenticated server diagnostic can see a live server runtime.
+
+Next roadmap items after maintenance review:
+1. finish heartbeat/local↔global synchronization soak testing;
+2. richer document/file grounding;
+3. image/screenshot understanding;
+4. autonomous Messages/curiosity/background-cognition soak testing;
+5. later, revenue-gated multi-core visual deliberation/image exchange.
