@@ -9,7 +9,7 @@ The original post-Step-7 implementation roadmap (Steps 1–11) is functionally c
 3. **Persistence and migration matrix** — record schema ownership/version for every durable table, test clean install + legacy upgrade + repeated restart paths, and detect incompatible old schemas before accepting writes. **IMPLEMENTED; CI validation pending.**
 4. **Background usefulness audit** — measure useful novel outputs versus repetition/self-reference; suppress low-information loops and keep curiosity/research budget focused on concrete questions and evidence. **IMPLEMENTED; CI validation pending.**
 5. **Memory quality audit** — test conversation-thread retention, corrections, contradictions, salience promotion, duplicate consolidation and whole-history retrieval on realistic multi-session conversations. **IMPLEMENTED; CI validation pending.**
-6. **Server/local synchronization soak** — long-running selective-sync tests covering reconnects, duplicate devices, stale clients, conflict provenance, no-overwrite guarantees and heartbeat loss/recovery.
+6. **Server/local synchronization soak** — long-running selective-sync tests covering reconnects, duplicate devices, stale clients, conflict provenance, no-overwrite guarantees and heartbeat loss/recovery. **IMPLEMENTED; CI validation pending.**
 7. **Cost/failure degradation audit** — exercise exhausted web/model/image budgets, provider timeouts, malformed responses and partial outages; ordinary chat and deterministic local/server cognition should degrade cleanly.
 8. **Operational observability** — expose human-readable owner/admin health summaries for reliability, budgets, migrations, synchronization and background usefulness without leaking private account content.
 9. **Release checkpoint** — freeze feature additions briefly, run the full suite/soak matrix, document known limitations, and create a stable server protocol checkpoint before returning to optional new features.
@@ -39,3 +39,13 @@ User corrections and clarifications are explicitly marked with precedence over e
 Exact repeated user turns are measured and near-identical retrieved memories are collapsed from the injected context so repetition cannot crowd out independent older history. Retrieval is profile-scoped, does not promote unrelated material merely because it was searched, and never exposes hidden chain-of-thought: only persisted conversation/memory records are eligible.
 
 `/memory-quality/status` exposes account-scoped audit counts, and `janus_memory_quality` records reinforcement events. `persistence_matrix.py` registers this table and advances the durable matrix version. `tests/test_memory_quality.py` covers old-history retrieval beyond the recent window, correction precedence, ponder/remember promotion, duplicate suppression, account isolation and non-promotion of irrelevant turns. The main cognition CI compiles and runs the new suite.
+
+## Phase 2 Step 6
+
+The synchronization soak now exercises the existing selective-federation contract under repeated reconnect and restart pressure instead of adding another synchronization path. The core invariant remains unchanged: remote state arrives as bounded typed grounding records with provenance; no client or server receives a whole-state overwrite instruction.
+
+`tests/test_sync_soak.py` covers repeated heartbeat/reconnect updates from the same stable device id without duplicate registration, explicit heartbeat expiry followed by recovery, two-device exchange without echoing a record back to its origin, conflict preservation when two devices disagree on the same current claim, and repeated module/server-style restarts against the same persistent database. Stable `origin_id` records are verified to update in place rather than cloning on reconnect.
+
+Conflict tests verify that both competing records remain present with their distinct lifecycle states and that at least one is marked `conflicted`; the soak never resolves disagreement by silently choosing a winner. Account-bound presence and existing federated profile-isolation regressions remain part of the matrix.
+
+`.github/workflows/test-sync-soak.yml` provides a dedicated synchronization workflow, while the main cognition CI now also executes the soak tests. The workflow uses writable temporary DB/file paths and a short test TTL so heartbeat loss/recovery can be tested deterministically without waiting in real time.
