@@ -8,7 +8,7 @@ Updated 2026-08-22. Windows/PC and Apple client parity are intentionally skipped
 2. **Continuity integration + contradiction/revision governance** — connect the ledger to Chat, Memory/Context, deliberation and background cognition; detect completion/correction/supersession candidates conservatively; never silently rewrite protected identity/core history. **COMPLETE.**
 3. **Federated selective memory synchronization** — formal local/global exchange objects, provenance, conflict detection, merge/supersession rules, bounded remote summaries and no whole-state overwrite. **COMPLETE.**
 4. **Unified cost/accounting governor** — per-profile/per-capability usage ledger and configurable daily/monthly budgets for chat escalation, curiosity, background review/synthesis, vision and image generation; graceful throttling before limits. **IMPLEMENTED; CI/live accounting validation pending.**
-5. **Maintenance/upgrade request system** — approximately quarterly stack/security/model/dependency review that creates a proposal/report for the user; no autonomous protected-code modification. Email/report delivery can be layered on available account notification infrastructure.
+5. **Maintenance/upgrade request system** — approximately quarterly stack/security/model/dependency review that creates a proposal/report for the user; no autonomous protected-code modification. Email/report delivery can be layered on available account notification infrastructure. **IMPLEMENTED; CI/live notification configuration validation pending.**
 6. **Richer proactive thread continuity** — Messages can refer back to the originating question/project/deliberation, distinguish notification from continuation, and avoid treating routine background activity as a new conversation.
 7. **Outbound working artifacts** — server-side JANUS-generated research notes/reports/exports as account-bound files, building on authenticated file storage; avoid client-specific parity work in this sequence.
 8. **Visual explanation decision layer** — decide when an explanatory image/diagram materially improves a user answer; use existing bounded Stage-1 image generation and caching rather than autonomous render loops.
@@ -43,3 +43,13 @@ The same origin record updates in place; distinct-device records remain distinct
 `image_response_compat.py` activates the governor in the live bootstrap stack, scopes each authenticated chat turn to its profile, exposes `/desktop/cost-status`, and returns a human-readable cost-governor snapshot with chat responses. The estimates are explicitly labeled planning values rather than provider invoices.
 
 `tests/test_cost_governor.py` covers accounting, per-profile isolation, hard daily limits, background-first throttling and nested capability scopes. The cognition CI compiles and runs the unified governor.
+
+## Step 5 implementation
+
+`maintenance_review.py` now turns the existing quarterly check into a durable, owner-gated maintenance proposal. Roughly every 90 days it captures a zero-model-call runtime snapshot, prepares a structured review across security, runtime/dependencies, model/API changes, clients, architecture and regression testing, and records the proposal as `awaiting_owner_review`.
+
+The proposal explicitly forbids automatic protected-code edits, dependency upgrades, model/API switches and deployment. It stores an email subject/body even when SMTP is not configured, so the request is still recoverable. If `JANUS_MAINTENANCE_OWNER_EMAIL` and SMTP are configured, the email is sent; if `JANUS_MAINTENANCE_OWNER_PROFILE` is configured, a persistent JANUS Messages follow-up is also created for that owner profile.
+
+Owner/admin disposition can be recorded as reviewed, approved-for-manual-work, deferred or rejected, but acknowledgement still performs no maintenance automatically. The intended workflow remains: JANUS requests review -> owner + ChatGPT inspect current technology/security/deprecations -> explicit changes are chosen -> ordinary tested commits/deployments are performed.
+
+`tests/test_maintenance_review.py` verifies advisory-only invariants, stored email drafts, owner-message creation and acknowledgement without self-upgrade. Cognition CI compiles and runs the maintenance tests.
