@@ -14,6 +14,7 @@ import visual_deliberation
 import research_workspace
 import reliability_audit
 import secure_desktop
+import persistence_matrix
 
 cost_governor_hooks.install()
 visual_explanation.install(image_generation)
@@ -123,4 +124,5 @@ def install(app) -> None:
     app.state.janus_reliability_audit_enabled = True
     app.state.janus_profile_boundary_hardening_enabled = True
     app.state.janus_background_multi_core_image_generation_enabled = False
+    app.state.janus_persistence_matrix = persistence_matrix.record_current_matrix()
     app.state.janus_image_response_compat = True
