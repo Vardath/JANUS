@@ -11,6 +11,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 import auth
+import federated_sync
 from src.janus_sleep_cycle import janus_sleep_cycle
 from core_observer import ingest_remote_events, record_remote_snapshot
 from core_activity_bridge import ingest_profile_core_activity
@@ -33,6 +34,8 @@ class CoreSummary(BaseModel):
     observe_events: list[dict] = Field(default_factory=list, max_length=100)
     memories: list[str] = Field(default_factory=list, max_length=24)
     conclusions: list[str] = Field(default_factory=list, max_length=24)
+    # New selective sync protocol. Older clients may omit this entirely.
+    sync_records: list[dict] = Field(default_factory=list, max_length=48)
 
 
 def _db():
@@ -153,7 +156,6 @@ def _presence(account_id: int):
 
 
 def presence_for_profile(profile_id: str):
-    """Return presence rows for the authenticated profile selected by secure desktop routes."""
     profile = str(profile_id or "").strip()
     if not profile:
         return []
@@ -165,20 +167,24 @@ def presence_for_profile(profile_id: str):
     return _decode_presence_rows(rows)
 
 
-def _shared_state(profile_id: str):
-    """Return bounded, tagged global material only; never local queue/cycle/device identity state."""
+def _shared_state(profile_id: str, device_id: str = ""):
+    """Bounded global grounding plus typed federated records; never overwrite instructions."""
     active = active_for_profile(profile_id)
     runtime = janus_sleep_cycle.compact_summary()
     items = []
     for label, value in (("global_consensus", runtime.get("consensus")), ("global_interface", runtime.get("interface"))):
         text = str(value or "").strip()
         if text:
-            items.append({"kind": label, "text": text[:1200], "provenance": "global_janus"})
+            items.append({"kind": label, "text": text[:1200], "provenance": "global_janus", "merge_policy": "grounding_only_no_overwrite"})
     if active:
         text = str(active.get("current_summary") or active.get("topic") or "").strip()
         if text:
-            items.append({"kind": "deliberation_progress", "text": text[:1200], "provenance": "global_janus"})
-    return {"items": items[:MAX_SHARED_ITEMS], "policy": "tagged_grounding_only"}
+            items.append({"kind": "deliberation_progress", "text": text[:1200], "provenance": "global_janus", "merge_policy": "grounding_only_no_overwrite"})
+    return {
+        "items": items[:MAX_SHARED_ITEMS],
+        "federated_records": federated_sync.outbound(profile_id, exclude_device=device_id),
+        "policy": "tagged_grounding_only_no_whole_state_overwrite",
+    }
 
 
 @router.post("/exchange")
@@ -198,26 +204,41 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
     snapshots = _safe_count(lambda: record_remote_snapshot(device_key, data, profile_id=profile_id), "snapshot-persistence", errors)
     profile_records = _safe_profile_records(lambda: ingest_profile_core_activity(profile_id, device_key, data), errors)
 
+    # Legacy string notes remain supported for older clients. New clients should use
+    # sync_records so provenance, lifecycle and conflicts can be represented explicitly.
     remote_notes = [str(x).strip()[:1200] for x in (summary.memories + summary.conclusions) if str(x).strip()][:MAX_SHARED_ITEMS]
     for text in remote_notes:
         for target in ("evidence", "context", "memory", "safety"):
             janus_sleep_cycle.send("interface", target, f"remote-grounding [{summary.device_id}]: {text}", "remote_grounding")
-    if remote_notes:
+
+    try:
+        fed = federated_sync.ingest(profile_id, summary.device_id, summary.sync_records)
+    except Exception as exc:
+        fed = {"accepted":0,"updated":0,"ignored":0,"conflicts":0,"accepted_items":[]}
+        errors.append(f"federated-sync: {type(exc).__name__}: {str(exc)[:240]}")
+
+    # Remote records can influence JANUS only after specialist review. Conflicted
+    # records are explicitly marked so Evidence/Counterpoint/Safety do not treat them
+    # as settled facts.
+    for rec in fed.get("accepted_items", [])[:MAX_SHARED_ITEMS]:
+        marker = "CONFLICTED REMOTE RECORD" if rec.get("status") == "conflicted" else "REMOTE RECORD"
+        text = f"{marker} [{summary.device_id}/{rec.get('kind')} state={rec.get('state') or 'unspecified'} confidence={rec.get('confidence',0.5):.2f}]: {rec.get('text','')}"
+        for target in ("evidence", "context", "memory", "counterpoint", "safety"):
+            janus_sleep_cycle.send("interface", target, text[:3600], "federated_grounding")
+
+    if remote_notes or fed.get("accepted_items"):
         janus_sleep_cycle.service_work_burst(include_interface=True, only_if_pending=True)
 
     _record_presence(account_id, profile_id, summary, errors)
     presence = _presence(account_id)
 
-    # Return the full authoritative server runtime on the heartbeat itself. Android
-    # already performs this authenticated exchange every 15 seconds, so the UI can
-    # display exactly the same server society without a second WebView HTTP path.
     server_summary = janus_sleep_cycle.status()
     server_summary["remote_clients"] = sum(1 for x in presence if x["online"])
     server_summary["registered_clients"] = len(presence)
     active_deliberation = active_for_profile(profile_id)
 
     return {
-        "ok": True, "server": server_summary, "shared_state": _shared_state(profile_id),
+        "ok": True, "server": server_summary, "shared_state": _shared_state(profile_id, summary.device_id),
         "active_deliberation": active_deliberation,
         "presence": {"online": sum(1 for x in presence if x["online"]), "registered": len(presence), "clients": presence[:20]},
         "account_id": account_id, "profile_id": profile_id,
@@ -226,6 +247,9 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
         "profile_memory_recorded": int(profile_records.get("memory", 0) or 0),
         "profile_messages_recorded": int(profile_records.get("messages", 0) or 0),
         "profile_snapshots_recorded": int(profile_records.get("snapshots", 0) or 0),
+        "federated_sync": {k:v for k,v in fed.items() if k != "accepted_items"},
+        "federated_open_conflicts": len([x for x in federated_sync.conflict_status(profile_id, 100) if x.get("status") == "open"]),
+        "sync_policy": "selective typed records; provenance preserved; conflicts flagged; no whole-state overwrite",
         "sync_degraded": bool(errors), "sync_errors": errors,
     }
 
@@ -240,4 +264,6 @@ def status(authorization: Optional[str] = Header(default=None)):
     runtime["registered_clients"] = len(presence)
     runtime["clients"] = presence[:50]
     runtime["profile_id"] = profile_id
+    runtime["federated_open_conflicts"] = len([x for x in federated_sync.conflict_status(profile_id, 100) if x.get("status") == "open"])
+    runtime["sync_policy"] = "selective typed records; no whole-state overwrite"
     return runtime
