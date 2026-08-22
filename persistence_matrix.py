@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 DB_PATH = Path(os.getenv("JANUS_DB_PATH", "/data/janus.sqlite3"))
-MATRIX_VERSION = 1
+MATRIX_VERSION = 2
 
 # Minimum columns that current code depends on. Extra columns are explicitly
 # tolerated so additive migrations remain restart-safe.
@@ -36,6 +36,7 @@ TABLES: dict[str, dict[str, Any]] = {
     "janus_deliberation_tasks": {"owner": "deliberation_tasks.py", "version": 1, "critical": False, "columns": {"id","profile_id","source_message","topic","status","pass_count","current_summary","created_at","updated_at"}},
     "janus_message_threads": {"owner": "proactive_threads.py", "version": 1, "critical": False, "columns": {"event_id","profile_id","thread_key","thread_type","title","source_event","confidence","created_at"}},
     "janus_reliability_audits": {"owner": "reliability_audit.py", "version": 1, "critical": False, "columns": {"id","profile_id","overall","summary_json","created_at"}},
+    "janus_background_usefulness": {"owner": "background_usefulness.py", "version": 1, "critical": False, "columns": {"id","profile_id","event_kind","source_id","core_name","mode","topic","score","novelty","process_ratio","max_similarity","decision","reasons_json","created_at"}},
     "janus_files": {"owner": "attachment_api.py", "version": 1, "critical": False, "columns": {"id","account_id","original_name","mime_type","size_bytes","sha256","storage_name","created_at"}},
     "janus_generated_images": {"owner": "image_generation.py", "version": 1, "critical": False, "columns": {"id","account_id","file_id","prompt_hash","prompt","model","quality","size","origin","created_at"}},
     "janus_schema_meta": {"owner": "persistence_matrix.py/reliability_audit.py", "version": 2, "critical": False, "columns": {"key","value","updated_at"}},
