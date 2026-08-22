@@ -47,6 +47,7 @@ try:
     from auth_lifecycle import router as auth_lifecycle_router
     from auth_rate_limit import install as install_auth_rate_limit
     from attachment_api import router as attachment_router
+    from outbound_artifacts import router as outbound_artifacts_router
     from attachment_retention import install_storage_auditor
     from attachment_chat import install as install_attachment_chat
     from image_generation import router as image_generation_router, install_chat_image_bridge
@@ -58,6 +59,7 @@ try:
     app = real_app
     app.include_router(auth_lifecycle_router)
     app.include_router(attachment_router)
+    app.include_router(outbound_artifacts_router)
     app.include_router(image_generation_router)
     app.include_router(image_inline_router)
     install_storage_auditor(app, janus_sleep_cycle)
@@ -132,6 +134,7 @@ try:
             "file_sharing_enabled": True,
             "file_chat_grounding_enabled": bool(getattr(app.state, "janus_attachment_chat_bridge", False)),
             "file_storage_auditor_enabled": True,
+            "outbound_working_artifacts_enabled": True,
             "lightweight_image_generation_enabled": True,
             "image_inline_transport_enabled": True,
             "background_multi_core_image_generation_enabled": False,
@@ -161,6 +164,8 @@ try:
             "file_storage_status_route_present": "/files/storage/status" in routes,
             "file_audit_route_present": "/files/audit/recent" in routes,
             "file_chat_grounding_enabled": bool(getattr(app.state, "janus_attachment_chat_bridge", False)),
+            "artifact_create_route_present": "/artifacts" in routes,
+            "artifact_info_route_present": "/artifacts/{artifact_id}" in routes,
             "image_generate_route_present": "/images/generate" in routes,
             "image_usage_route_present": "/images/usage" in routes,
             "image_inline_route_present": any(path.startswith("/images/{file_id}/inline") for path in routes),
@@ -257,6 +262,8 @@ except Exception as exc:
             "file_storage_status_route_present": False,
             "file_audit_route_present": False,
             "file_chat_grounding_enabled": False,
+            "artifact_create_route_present": False,
+            "artifact_info_route_present": False,
             "image_generate_route_present": False,
             "image_usage_route_present": False,
             "image_inline_route_present": False,
