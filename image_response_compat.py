@@ -1,4 +1,4 @@
-"""Normalize image artifacts, apply unified cost scope, preserve Message threads, and activate visual/research policy."""
+"""Normalize image artifacts, apply unified cost scope, preserve Message threads, and activate visual/research/reliability policy."""
 from __future__ import annotations
 
 import os
@@ -12,12 +12,9 @@ import image_generation
 import visual_explanation
 import visual_deliberation
 import research_workspace
+import reliability_audit
 
-# Bootstrap imports this module after the chat/vision/image modules are loaded, so it
-# is a stable point to install cross-cutting paid-call and thread-continuity policy.
 cost_governor_hooks.install()
-# Step 8: Interface nominations are screened locally before any unsolicited render.
-# Explicit user image requests still use the normal Stage-1 path and budgets.
 visual_explanation.install(image_generation)
 
 
@@ -36,25 +33,20 @@ def install(app) -> None:
     if getattr(app.state, "janus_image_response_compat", False):
         return
     proactive_threads.install(app)
-    # Step 9 scaffolding is safe to expose now because the module contains no
-    # renderer call and reports autonomous/background rendering as disabled.
     paths = {getattr(r, "path", "") for r in app.router.routes}
     if "/visual-deliberations" not in paths:
         app.include_router(visual_deliberation.router)
     if "/research/workspace" not in paths:
         app.include_router(research_workspace.router)
+    if "/reliability/status" not in paths:
+        app.include_router(reliability_audit.router)
 
-    # Seed only the explicitly configured owner profile. This avoids leaking the
-    # creator's private research programme into unrelated user accounts. Reuse the
-    # maintenance-owner setting when a separate research-owner setting is absent.
     owner_profile = (os.getenv("JANUS_RESEARCH_OWNER_PROFILE", "").strip()
                      or os.getenv("JANUS_MAINTENANCE_OWNER_PROFILE", "").strip())
     if owner_profile:
         try:
             research_workspace.seed_janus_program(owner_profile)
         except Exception:
-            # Research seeding must never prevent Chat/server startup; the authenticated
-            # /research/workspace/seed route remains available for explicit retry.
             pass
 
     route = next(
@@ -74,8 +66,6 @@ def install(app) -> None:
         profile = str(payload.get("profile_id") or payload.get("username") or "local-user")
         message = str(payload.get("message") or payload.get("text") or "").strip()
         thread_context, thread = proactive_threads.format_chat_context(profile, message, _reply_event_id(payload))
-        # Store bounded process-context records rather than changing the user's text.
-        # interface_chat's normal recent-context path will see them later in this turn.
         if thread_context:
             dashboard_api._store(profile, "thread_context", thread_context, "proactive_thread_context", "working")
         research_context = research_workspace.workspace_context(profile)
@@ -111,5 +101,6 @@ def install(app) -> None:
     app.state.janus_visual_explanation_enabled = True
     app.state.janus_visual_deliberation_scaffolding_enabled = True
     app.state.janus_research_workspace_enabled = True
+    app.state.janus_reliability_audit_enabled = True
     app.state.janus_background_multi_core_image_generation_enabled = False
     app.state.janus_image_response_compat = True
