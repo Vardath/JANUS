@@ -36,7 +36,10 @@ def test_continuity_report_is_account_bound_and_indexed(tmp_path, monkeypatch):
     out = artifacts.create_artifact(alice, req)
     assert out["file"]["filename"].endswith(".md")
     assert out["file"]["has_extracted_text"] is True
-    assert out["file"]["document_index"]["chunk_count"] >= 1
+    # document_grounding.index_text/ensure_file_index use the canonical `chunks`
+    # field. Keep the regression test aligned with the live file API rather than
+    # introducing a second, artifact-only schema name such as `chunk_count`.
+    assert out["file"]["document_index"]["chunks"] >= 1
     with sqlite3.connect(db) as c:
         row = c.execute("SELECT account_id,extracted_text FROM janus_files WHERE id=?", (out["file"]["id"],)).fetchone()
     assert row[0] == alice["id"]
@@ -66,7 +69,7 @@ def test_research_digest_exports_completed_research_and_sources(tmp_path, monkey
         c.execute("INSERT INTO janus_curiosity_searches VALUES(1,'alice','evidence','relevant','test query','A concrete retrieved result','[{\"title\":\"Example\",\"url\":\"https://example.test\"}]','complete','2026-08-22T00:00:00Z')")
     out = artifacts.create_artifact(alice, artifacts.ArtifactRequest(kind="research_digest", research_limit=5))
     with sqlite3.connect(db) as c:
-        text = c.execute("SELECT extracted_text FROM janus_files WHERE id=?", (out["file"]["id"],)).fetchone()[0]
+        text = c.execute("SELECT extracted_text FROM janus_files WHERE id=?", (out["file"]["id"])).fetchone()[0]
     assert "A concrete retrieved result" in text
     assert "https://example.test" in text
     assert out["provenance"]["research_ids"] == [1]
