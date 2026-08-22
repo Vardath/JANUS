@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.56: direct native bearer handoff for authenticated global heartbeat + honest connected/reachable UI.
+// v0.57: WebView-authenticated global heartbeat + balanced seven-specialist review.
 android {
     namespace 'com.vardath.janus'
     compileSdk 36
@@ -18,8 +18,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 56
-        versionName '0.56'
+        versionCode 57
+        versionName '0.57'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
