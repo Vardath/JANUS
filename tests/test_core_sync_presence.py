@@ -48,7 +48,13 @@ def test_presence_is_authenticated_account_bound_and_live():
         assert body["presence"]["online"] == 1
         assert body["presence"]["registered"] == 1
         assert body["presence"]["clients"][0]["platform"] == "android"
-        assert body["shared_state"]["policy"] == "tagged_grounding_only"
+        # Step 3 strengthened the original tagged-grounding policy. Preserve that
+        # invariant rather than pinning this regression test to the older exact text.
+        policy = body["shared_state"]["policy"]
+        assert "tagged_grounding_only" in policy
+        assert "no_whole_state_overwrite" in policy
+        assert isinstance(body["shared_state"].get("federated_records"), list)
+        assert body["sync_policy"].startswith("selective typed records")
 
         r = client.get("/core-sync/status", headers=headers)
         assert r.status_code == 200
@@ -57,6 +63,7 @@ def test_presence_is_authenticated_account_bound_and_live():
         assert status["registered_clients"] == 1
         assert status["clients"][0]["cycles"]["evidence"] == 12
         assert status["persistent_storage"] in (True, False)
+        assert "no whole-state overwrite" in status["sync_policy"]
 
         token2 = _register(client, "presence2", "presence2@example.com")
         r = client.get("/core-sync/status", headers={"Authorization": f"Bearer {token2}"})
