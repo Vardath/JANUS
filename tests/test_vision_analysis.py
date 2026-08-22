@@ -1,3 +1,4 @@
+# Regression coverage for bounded, account-scoped visual assessment caching.
 import asyncio
 import hashlib
 import importlib
