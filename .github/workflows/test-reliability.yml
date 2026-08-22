@@ -1,0 +1,77 @@
+name: Test JANUS Reliability Security and Soak
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'reliability_audit.py'
+      - 'image_response_compat.py'
+      - 'bootstrap.py'
+      - 'auth.py'
+      - 'continuity_ledger.py'
+      - 'federated_sync.py'
+      - 'cost_governor.py'
+      - 'research_workspace.py'
+      - 'visual_deliberation.py'
+      - 'outbound_artifacts.py'
+      - 'background_cognition.py'
+      - 'tests/test_reliability_audit.py'
+      - 'tests/test_continuity_ledger.py'
+      - 'tests/test_federated_sync.py'
+      - 'tests/test_cost_governor.py'
+      - 'tests/test_research_workspace.py'
+      - 'tests/test_visual_deliberation.py'
+      - 'tests/test_outbound_artifacts.py'
+      - '.github/workflows/test-reliability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reliability-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Reconstruct legacy base server
+        run: python tools/rebuild_server.py
+      - name: Compile reliability-critical server layers
+        run: python -m py_compile server.py bootstrap.py auth.py reliability_audit.py continuity_ledger.py federated_sync.py cost_governor.py research_workspace.py visual_deliberation.py outbound_artifacts.py image_response_compat.py
+      - name: Run reliability, persistence, isolation and budget regressions
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: >-
+          python -m pytest -q
+          tests/test_reliability_audit.py
+          tests/test_continuity_ledger.py
+          tests/test_federated_sync.py
+          tests/test_cost_governor.py
+          tests/test_research_workspace.py
+          tests/test_visual_deliberation.py
+          tests/test_outbound_artifacts.py
+      - name: Exercise repeated restart-style reliability audit
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          JANUS_DB_PATH: /tmp/janus-soak.sqlite3
+          JANUS_AUTH_DB: /tmp/janus-soak.sqlite3
+        run: |
+          python - <<'PY'
+          import importlib, sqlite3
+          import auth, continuity_ledger as ledger, reliability_audit as audit
+          with sqlite3.connect('/tmp/janus-soak.sqlite3') as c:
+              c.execute('CREATE TABLE IF NOT EXISTS desktop_memory(id INTEGER PRIMARY KEY AUTOINCREMENT,profile_id TEXT,role TEXT,content TEXT,level TEXT,created_at TEXT)')
+          ledger.create_item('soak','question','Can state survive repeated module restarts?',state='investigating')
+          for i in range(12):
+              result=audit.run('soak')
+              assert result['error_count']==0, result
+              ledger=importlib.reload(ledger)
+              audit=importlib.reload(audit)
+          assert ledger.list_items('soak',open_only=True)[0]['title']=='Can state survive repeated module restarts?'
+          assert len(audit.history('soak',limit=20))==12
+          print('12 restart/audit cycles passed')
+          PY
