@@ -11,19 +11,24 @@ Canonical cognitive topology: **11 cores arranged 7 → 2 → 1 → 1**.
 - 1 Consensus core reconciles the hemispheres.
 - 1 Interface core surfaces the result to Chat/Messages.
 
-Ordinary routing is forward-only: specialists → assigned hemisphere → Consensus → Interface. Consensus/Interface output is not automatically recycled as a new topic. Remote/client summaries are compressed, tagged as feedback-only, and re-enter through specialist review rather than directly through Consensus.
+Ordinary routing is forward-only: specialists → assigned hemisphere → Consensus → Interface. Consensus/Interface output is not automatically recycled as a new topic. Remote/client summaries are compressed, tagged as feedback/grounding, and re-enter through specialist review rather than directly through Consensus.
 
 Fano/JANUS state is operational rather than decorative: persistent d0–d7 orientations can influence attention, processing pressure and integration bias, while evidence remains grounded independently of Fano state.
 
-## Current client status
+## Current client/runtime status
 
-On the lightweight-image feature branch:
+**Android working line: v0.64.** The Aug 22 telemetry investigation verified two independent, functioning societies:
 
-- **Android v0.52** renders account-bound JANUS-generated images inline in Chat. The WebView receives image bytes through an authenticated JSON/base64 transport; no public or token-bearing image URL is exposed.
-- **Windows v0.23** renders generated PNGs inline in the Tk Chat transcript after a bearer-authenticated binary fetch. Session tokens remain DPAPI-protected at rest.
-- **iOS v0.2** renders generated images inline in native SwiftUI Chat after a Keychain-backed bearer-authenticated binary fetch. The unsigned simulator build workflow compiles successfully; Apple signing/TestFlight/device testing remain future release steps.
+- the Android local 11-core runtime advances its own persistent wake/sleep, memory, Fano, routing and deterministic zero-API cycles;
+- the Render/global 11-core runtime has a live background thread, persistent server state and independently advancing server cycle counters;
+- authenticated device presence is visible server-side and is kept separate from server-core counters;
+- local and global counters must never be substituted for one another.
 
-The prior published Android checkpoint remains v0.51 until the image branch is merged/published. Windows and iOS feature-branch packages are CI artifacts rather than signed production releases.
+Android v0.64 changes the Cores-screen server telemetry architecture: the native authenticated `/core-sync/exchange` heartbeat returns the authoritative server runtime snapshot, Android stores that successful heartbeat snapshot, and the WebView reads it through the native bridge. The Cores screen should display a waiting/error state when no authenticated snapshot exists rather than fabricating zero-cycle server cores.
+
+The v0.64 Cores display still requires real-device verification before the long-running telemetry issue is considered closed. See `JANUS_PROJECT_MEMORY_2026-08-22.md` for the detailed checkpoint and regression lessons.
+
+Windows and iOS remain development clients/CI artifacts where applicable; real Windows launch testing and Apple signing/TestFlight/device testing remain platform-specific validation steps.
 
 The Android Messages path has been real-device tested end-to-end with a JANUS-originated test message. Autonomous useful unsolicited messaging is intentionally thresholded and remains an ongoing soak-test target rather than routine telemetry spam.
 
@@ -80,5 +85,7 @@ GitHub Actions contains regression/build workflows for:
 - architecture/deployment contract checks;
 - Windows client packaging;
 - iOS simulator compilation.
+
+The Android telemetry regression target is now explicit: a build must not show zero/unknown Server JANUS cores when the same authenticated account has a live heartbeat/server diagnostic showing an advancing server runtime. Critical telemetry should have one authoritative data path rather than competing WebView/native readers.
 
 Before treating a build as released, verify the actual artifact/download branch rather than inferring success from a version bump or commit alone.
