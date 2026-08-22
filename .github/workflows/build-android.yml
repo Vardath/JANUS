@@ -38,11 +38,7 @@ jobs:
           python tools/patch_android_global_connectivity.py
           python tools/patch_android_webview_heartbeat.py
           python tools/patch_android_core_visibility.py
-          python tools/patch_android_runtime_cores_v061.py
-          python tools/patch_android_runtime_cores_v063.py
-          python tools/patch_android_runtime_cores_v064.py
-          python tools/patch_android_runtime_cores_v065.py
-          python tools/patch_android_runtime_cores_v066.py
+          python tools/patch_android_runtime_cores_v067.py
 
       - uses: actions/setup-java@v5
         with:
