@@ -7,9 +7,9 @@ Updated 2026-08-22. Windows/PC and Apple client parity are intentionally skipped
 1. **Project + Question Continuity Ledger** — durable lifecycle for projects, questions, tasks, promises, ideas and research; explicit open/completed/deferred/superseded/contradicted states so JANUS can distinguish unfinished work from history. **COMPLETE.**
 2. **Continuity integration + contradiction/revision governance** — connect the ledger to Chat, Memory/Context, deliberation and background cognition; detect completion/correction/supersession candidates conservatively; never silently rewrite protected identity/core history. **COMPLETE.**
 3. **Federated selective memory synchronization** — formal local/global exchange objects, provenance, conflict detection, merge/supersession rules, bounded remote summaries and no whole-state overwrite. **COMPLETE.**
-4. **Unified cost/accounting governor** — per-profile/per-capability usage ledger and configurable daily/monthly budgets for chat escalation, curiosity, background review/synthesis, vision and image generation; graceful throttling before limits. **IMPLEMENTED; CI/live accounting validation pending.**
-5. **Maintenance/upgrade request system** — approximately quarterly stack/security/model/dependency review that creates a proposal/report for the user; no autonomous protected-code modification. Email/report delivery can be layered on available account notification infrastructure. **IMPLEMENTED; CI/live notification configuration validation pending.**
-6. **Richer proactive thread continuity** — Messages can refer back to the originating question/project/deliberation, distinguish notification from continuation, and avoid treating routine background activity as a new conversation.
+4. **Unified cost/accounting governor** — per-profile/per-capability usage ledger and configurable daily/monthly budgets for chat escalation, curiosity, background review/synthesis, vision and image generation; graceful throttling before limits. **COMPLETE.**
+5. **Maintenance/upgrade request system** — approximately quarterly stack/security/model/dependency review that creates a proposal/report for the user; no autonomous protected-code modification. Email/report delivery can be layered on available account notification infrastructure. **IMPLEMENTED.**
+6. **Richer proactive thread continuity** — Messages can refer back to the originating question/project/deliberation, distinguish notification from continuation, and avoid treating routine background activity as a new conversation. **IMPLEMENTED; CI/live follow-up validation pending.**
 7. **Outbound working artifacts** — server-side JANUS-generated research notes/reports/exports as account-bound files, building on authenticated file storage; avoid client-specific parity work in this sequence.
 8. **Visual explanation decision layer** — decide when an explanatory image/diagram materially improves a user answer; use existing bounded Stage-1 image generation and caching rather than autonomous render loops.
 9. **Revenue-gated multi-core visual deliberation scaffolding** — concept/critique/selection records and hard budgets, with actual autonomous background rendering remaining disabled until explicitly enabled economically.
@@ -34,7 +34,7 @@ The same origin record updates in place; distinct-device records remain distinct
 
 `core_sync.py` remains backward-compatible with legacy `memories`/`conclusions` while accepting optional `sync_records`. Accepted typed records enter the server society only as external grounding routed through Evidence, Context, Memory, Counterpoint and Safety. The heartbeat response returns bounded records from other devices with `grounding_only_no_overwrite`; a device never receives its own record as an overwrite command.
 
-## Step 4 implementation
+## Step 4 complete
 
 `cost_governor.py` is the single account/profile budgeting ledger for external compute. It records estimated spend, model identity and provider token usage when available across chat, foreground multi-core consultations, background model/web work, vision and image generation. Limits are configurable by environment and include per-profile daily/monthly, optional-background daily and global daily ceilings.
 
@@ -46,10 +46,18 @@ The same origin record updates in place; distinct-device records remain distinct
 
 ## Step 5 implementation
 
-`maintenance_review.py` now turns the existing quarterly check into a durable, owner-gated maintenance proposal. Roughly every 90 days it captures a zero-model-call runtime snapshot, prepares a structured review across security, runtime/dependencies, model/API changes, clients, architecture and regression testing, and records the proposal as `awaiting_owner_review`.
+`maintenance_review.py` turns the quarterly check into a durable, owner-gated maintenance proposal. Roughly every 90 days it captures a zero-model-call runtime snapshot, prepares a structured review across security, runtime/dependencies, model/API changes, clients, architecture and regression testing, and records the proposal as awaiting owner review.
 
-The proposal explicitly forbids automatic protected-code edits, dependency upgrades, model/API switches and deployment. It stores an email subject/body even when SMTP is not configured, so the request is still recoverable. If `JANUS_MAINTENANCE_OWNER_EMAIL` and SMTP are configured, the email is sent; if `JANUS_MAINTENANCE_OWNER_PROFILE` is configured, a persistent JANUS Messages follow-up is also created for that owner profile.
+The proposal explicitly forbids automatic protected-code edits, dependency upgrades, model/API switches and deployment. It stores an email subject/body even when SMTP is not configured, so the request is still recoverable. If owner email and SMTP are configured, the email is sent; if an owner profile is configured, a persistent JANUS Messages follow-up is also created.
 
 Owner/admin disposition can be recorded as reviewed, approved-for-manual-work, deferred or rejected, but acknowledgement still performs no maintenance automatically. The intended workflow remains: JANUS requests review -> owner + ChatGPT inspect current technology/security/deprecations -> explicit changes are chosen -> ordinary tested commits/deployments are performed.
 
-`tests/test_maintenance_review.py` verifies advisory-only invariants, stored email drafts, owner-message creation and acknowledgement without self-upgrade. Cognition CI compiles and runs the maintenance tests.
+## Step 6 implementation
+
+`proactive_threads.py` gives each surfaced autonomous Message a durable thread identity. New background material is conservatively matched to an open continuity-ledger project/question/task/research item; unrelated material remains a separate background thread rather than being falsely attached to a project. Thread metadata stores the originating event, title, thread type, optional continuity item and confidence without changing lifecycle state.
+
+The proactive outbox is patched at the storage boundary so new autonomous Messages receive thread metadata while preserving the Step-6/7 quality gate. `/desktop/message-thread` and `/desktop/message-thread-status` expose account-scoped thread provenance and diagnostics.
+
+Chat supports explicit reply linkage through `reply_to_message_id`, `proactive_event_id` or `message_event_id`. For older clients that do not send a reply id, only clear follow-up language or strong topical overlap may select the latest proactive thread. A bounded process-context record is added to the normal recent context; the user's own message is never rewritten. This lets JANUS continue "tell me more about that" as the originating question/project instead of treating it as disconnected chat.
+
+`tests/test_proactive_threads.py` covers continuity linking, refusal to falsely link unrelated findings, natural follow-up continuity, explicit reply ids and profile isolation. The cognition CI compiles and runs the thread layer.
