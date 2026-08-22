@@ -18,6 +18,7 @@ on:
       - 'cost_governor.py'
       - 'cost_governor_hooks.py'
       - 'maintenance_review.py'
+      - 'proactive_threads.py'
       - 'image_response_compat.py'
       - 'image_generation.py'
       - 'vision_analysis.py'
@@ -32,6 +33,7 @@ on:
       - 'tests/test_federated_sync.py'
       - 'tests/test_cost_governor.py'
       - 'tests/test_maintenance_review.py'
+      - 'tests/test_proactive_threads.py'
       - 'tools/rebuild_server.py'
       - 'src/server.py.gz.b64.*'
       - 'render.yaml'
@@ -54,8 +56,8 @@ jobs:
         run: pip install -r requirements.txt pytest
       - name: Reconstruct legacy base server
         run: python tools/rebuild_server.py
-      - name: Compile cognition, continuity, federated sync, cost governance and maintenance review
-        run: python -m py_compile server.py curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py background_cognition.py autonomous_messages.py continuity_ledger.py continuity_governance.py continuity_api.py federated_sync.py core_sync.py cost_governor.py cost_governor_hooks.py maintenance_review.py image_response_compat.py image_generation.py vision_analysis.py interface_chat.py deliberation_tasks.py janus_dashboard.py
+      - name: Compile cognition, continuity, federated sync, cost, maintenance and Message threads
+        run: python -m py_compile server.py curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py background_cognition.py autonomous_messages.py proactive_threads.py continuity_ledger.py continuity_governance.py continuity_api.py federated_sync.py core_sync.py cost_governor.py cost_governor_hooks.py maintenance_review.py image_response_compat.py image_generation.py vision_analysis.py interface_chat.py deliberation_tasks.py janus_dashboard.py
       - name: Verify policy constants and modes
         env:
           JANUS_DB_PATH: /tmp/janus-curiosity-test.sqlite3
@@ -85,7 +87,7 @@ jobs:
           assert choice and choice[1]=='relevant', choice
           print('curiosity policy test passed:', choice[1])
           PY
-      - name: Verify epistemic, proactive, continuity, federated, cost and maintenance regulation
+      - name: Verify epistemic, proactive, continuity, federated, cost, maintenance and thread regulation
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: python -m pytest -q tests/test_epistemic_regulation.py tests/test_proactive_quality.py tests/test_background_cognition.py tests/test_continuity_ledger.py tests/test_continuity_governance.py tests/test_federated_sync.py tests/test_cost_governor.py tests/test_maintenance_review.py
+        run: python -m pytest -q tests/test_epistemic_regulation.py tests/test_proactive_quality.py tests/test_background_cognition.py tests/test_continuity_ledger.py tests/test_continuity_governance.py tests/test_federated_sync.py tests/test_cost_governor.py tests/test_maintenance_review.py tests/test_proactive_threads.py
