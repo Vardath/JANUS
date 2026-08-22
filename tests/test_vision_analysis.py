@@ -22,11 +22,11 @@ def _fresh(tmp: Path):
 
 
 def _make_account(auth, username: str, email: str) -> int:
-    auth._init_db()
+    auth.init_auth_db()
     with auth._db() as c:
         c.execute(
-            "INSERT INTO accounts(username,email,password_hash,created_at) VALUES(?,?,?,?)",
-            (username, email, "x", 1),
+            "INSERT INTO accounts(username,email,password_hash,created_at,updated_at,email_verified,disabled) VALUES(?,?,?,?,?,?,?)",
+            (username, email, "x", 1, 1, 1, 0),
         )
         return int(c.execute("SELECT id FROM accounts WHERE username=?", (username,)).fetchone()[0])
 
