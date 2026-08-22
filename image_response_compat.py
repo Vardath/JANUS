@@ -35,6 +35,15 @@ def _authenticated_profile(request: Request, payload: dict | None = None) -> str
     return secure_desktop._profile(request, payload)
 
 
+def _authenticated_payload(request: Request, payload: dict) -> tuple[str, dict]:
+    """Return a copy bound to the authenticated account, never client identity."""
+    profile = _authenticated_profile(request, payload)
+    safe = dict(payload)
+    safe["profile_id"] = profile
+    safe["username"] = profile
+    return profile, safe
+
+
 def install(app) -> None:
     if getattr(app.state, "janus_image_response_compat", False):
         return
@@ -72,10 +81,7 @@ def install(app) -> None:
         # This wrapper is installed after secure_desktop. Authenticate before any
         # thread, memory, research or cost-ledger access so a forged profile_id can
         # never create/read side effects in another account's partition.
-        profile = _authenticated_profile(request, payload)
-        safe = dict(payload)
-        safe["profile_id"] = profile
-        safe["username"] = profile
+        profile, safe = _authenticated_payload(request, payload)
         message = str(safe.get("message") or safe.get("text") or "").strip()
         thread_context, thread = proactive_threads.format_chat_context(profile, message, _reply_event_id(safe))
         if thread_context:
