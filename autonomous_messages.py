@@ -1,9 +1,10 @@
 """High-value autonomous JANUS Messages.
 
-Bridges the modern background systems (hive reflection + live curiosity research)
-into the persistent Messages outbox.  It deliberately suppresses plumbing,
-telemetry and repetitive self-reference.  The goal is a small number of messages
-that contain an actual discovery, connection, unresolved question or useful test.
+Bridges modern background systems into the persistent Messages outbox. Step 7 adds
+longitudinal quality: repeated source material is suppressed before paid review and
+completed research can occasionally be cross-synthesized into a genuinely new
+connection. Synthesis is still only a candidate; the normal interrupt-worthiness
+gate must approve it before the user sees anything.
 """
 from __future__ import annotations
 
@@ -18,9 +19,10 @@ from openai import AsyncOpenAI
 
 import dashboard_api as core
 from proactive_quality import assess, should_show_stored_message
+from background_cognition import maybe_synthesize, portfolio_status, similarity
 
 DB_PATH = os.environ.get("JANUS_DB_PATH", "/data/janus.sqlite3")
-SOURCE_EVENTS = ("curiosity_search_complete", "hive_language_reflection", "background_reflection")
+SOURCE_EVENTS = ("curiosity_search_complete", "hive_language_reflection", "background_reflection", "background_synthesis")
 DAILY_CAP = max(0, int(os.environ.get("JANUS_AUTONOMOUS_MESSAGES_DAILY_CAP", "3")))
 MIN_GAP_SECONDS = max(900, int(os.environ.get("JANUS_AUTONOMOUS_MESSAGES_MIN_GAP_SECONDS", "10800")))
 MODEL = os.environ.get("JANUS_BACKGROUND_MODEL", "gpt-5.6-luna")
@@ -75,6 +77,27 @@ def _recent_outbox(profile: str, limit: int = 20) -> list[str]:
         return [_extract(r["detail"]) for r in rows]
     except Exception:
         return []
+
+
+def _recent_background_material(profile: str, exclude_event_id: int, limit: int = 36) -> list[str]:
+    """Recent raw background notes, including ones that never became Messages."""
+    try:
+        marks = ",".join("?" for _ in SOURCE_EVENTS)
+        with _db() as c:
+            rows = c.execute(
+                f"SELECT id,detail FROM desktop_events WHERE profile_id=? AND event_type IN ({marks}) AND id<>? ORDER BY id DESC LIMIT ?",
+                (profile, *SOURCE_EVENTS, int(exclude_event_id), limit),
+            ).fetchall()
+        return [_extract(r["detail"]) for r in rows]
+    except Exception:
+        return []
+
+
+def _source_similarity(profile: str, event_id: int, material: str) -> float:
+    best = 0.0
+    for old in _recent_background_material(profile, event_id):
+        best = max(best, similarity(material, old))
+    return best
 
 
 def _daily_count(profile: str) -> int:
@@ -143,8 +166,12 @@ async def _evaluate(row: sqlite3.Row) -> None:
     material = _extract(row["detail"])
     recent = _recent_outbox(profile)
     pre = assess(material, recent)
-    # Raw source notes may be long, but telemetry-heavy/repetitive candidates are
-    # never worth a paid rewrite.
+    source_sim = _source_similarity(profile, event_id, material)
+    # Step 7: do not spend a model call repeatedly reconsidering the same underlying
+    # background idea just because earlier copies were correctly kept silent.
+    if source_sim >= 0.72:
+        _mark(event_id, profile, source_event, pre["score"], False, f"repeated-background-source:{source_sim:.2f}")
+        return
     if pre["telemetry_heavy"] or pre["max_similarity"] >= 0.72 or len(material) < 70:
         _mark(event_id, profile, source_event, pre["score"], False, ",".join(pre["reasons"]) or "prefilter")
         return
@@ -160,6 +187,7 @@ async def _evaluate(row: sqlite3.Row) -> None:
         "Most candidates should NOT surface. Surface only when there is concrete new subject matter: a useful discovery, non-obvious connection, serious unresolved question, contradiction, or test worth trying. "
         "Never surface cycle counts, Fano/control numbers, routing/integration descriptions, or generic statements that JANUS has been thinking. "
         "If surfacing, rewrite it as a natural standalone message that states WHAT was found/thought and WHY it matters. Keep it under 130 words. "
+        "For a background_synthesis source, require a real cross-topic payoff rather than a decorative analogy. "
         "Return ONLY JSON: {\"surface\":true|false,\"message_type\":\"Question|Observation|Memory|Follow-up\",\"message\":\"...\",\"reason\":\"...\"}.\n\n"
         f"Source kind: {source_event}\nMaterial:\n{material[:6000]}"
     )
@@ -188,15 +216,25 @@ async def _evaluate(row: sqlite3.Row) -> None:
 async def _scan_once() -> None:
     with _db() as c:
         marks = ",".join("?" for _ in SOURCE_EVENTS)
-        rows = c.execute(f"SELECT id,profile_id,event_type,detail,created_at FROM desktop_events WHERE event_type IN ({marks}) ORDER BY id ASC LIMIT 80", SOURCE_EVENTS).fetchall()
+        rows = c.execute(f"SELECT id,profile_id,event_type,detail,created_at FROM desktop_events WHERE event_type IN ({marks}) ORDER BY id ASC LIMIT 100", SOURCE_EVENTS).fetchall()
     processed = 0
+    profiles: set[str] = set()
     for row in rows:
+        profiles.add(str(row["profile_id"]))
         if _reviewed(int(row["id"])):
             continue
         await _evaluate(row); processed += 1
         if processed >= 12:
             break
         await asyncio.sleep(0.15)
+    # Step 7: after ordinary material has been reviewed, allow one rare bounded
+    # cross-research synthesis per profile. A useful synthesis becomes a source
+    # event and must survive this worker's normal gate on the next scan.
+    for profile in sorted(profiles)[:8]:
+        try:
+            await maybe_synthesize(profile)
+        except Exception:
+            pass
 
 
 async def _worker() -> None:
@@ -221,16 +259,19 @@ def filtered_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def status(profile: str) -> dict[str, Any]:
     with _db() as c:
         row = c.execute("SELECT COUNT(*) reviewed, COALESCE(SUM(surfaced),0) surfaced FROM janus_autonomous_message_review WHERE profile_id=?", (profile,)).fetchone()
+    reviewed=int(row["reviewed"] or 0); surfaced=int(row["surfaced"] or 0)
     return {
         "enabled": True,
         "daily_cap": DAILY_CAP,
         "min_gap_seconds": MIN_GAP_SECONDS,
         "today_autonomous_messages": _daily_count(profile),
         "seconds_since_last_autonomous": _seconds_since_auto(profile),
-        "reviewed": int(row["reviewed"] or 0),
-        "surfaced": int(row["surfaced"] or 0),
+        "reviewed": reviewed,
+        "surfaced": surfaced,
+        "surface_rate": round(surfaced/max(1,reviewed),3),
         "source_events": list(SOURCE_EVENTS),
-        "quality_policy": "concrete novelty/usefulness over activity volume; telemetry/self-reference suppressed",
+        "quality_policy": "longitudinal novelty/diversity and concrete usefulness over activity volume; repeated source loops and telemetry suppressed",
+        "background_portfolio": portfolio_status(profile),
     }
 
 
