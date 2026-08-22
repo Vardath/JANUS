@@ -1,4 +1,4 @@
-"""Normalize image artifacts, apply unified cost scope, and preserve Message threads."""
+"""Normalize image artifacts, apply unified cost scope, preserve Message threads, and activate visual-explanation policy."""
 from __future__ import annotations
 
 from fastapi import Request
@@ -7,10 +7,15 @@ import cost_governor as budget
 import cost_governor_hooks
 import dashboard_api
 import proactive_threads
+import image_generation
+import visual_explanation
 
 # Bootstrap imports this module after the chat/vision/image modules are loaded, so it
 # is a stable point to install cross-cutting paid-call and thread-continuity policy.
 cost_governor_hooks.install()
+# Step 8: Interface nominations are screened locally before any unsolicited render.
+# Explicit user image requests still use the normal Stage-1 path and budgets.
+visual_explanation.install(image_generation)
 
 
 def _reply_event_id(payload: dict):
@@ -75,4 +80,5 @@ def install(app) -> None:
 
     app.state.janus_cost_governor_enabled = True
     app.state.janus_proactive_thread_chat_enabled = True
+    app.state.janus_visual_explanation_enabled = True
     app.state.janus_image_response_compat = True
