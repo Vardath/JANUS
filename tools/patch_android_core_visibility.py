@@ -1,7 +1,13 @@
 from pathlib import Path
 
+runtime = Path('android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java')
+s = runtime.read_text(encoding='utf-8').replace('"client_version","0.59"', '"client_version","0.60"')
+runtime.write_text(s, encoding='utf-8')
+
 html = Path('android/app/src/main/assets/index.html')
 h = html.read_text(encoding='utf-8')
+h = h.replace('LIVE LOCAL JANUS · v0.59', 'LIVE LOCAL JANUS · v0.60')
+h = h.replace("client_version:'0.59'", "client_version:'0.60'")
 
 # v0.59 refreshed the local core panel every two seconds by replacing the entire
 # coreTopology host. That briefly erased the separately-fetched online/global
@@ -14,7 +20,7 @@ else:
     raise SystemExit('v0.59 core refresh block not found')
 
 # Do not hit the server every two seconds. The visible local card can still update
-# quickly on Options/Observe; the combined Cores page is refreshed on its normal
+# quickly on Options/Observe; the combined Cores page refreshes on its normal
 # cadence and when opened.
 h = h.replace("setInterval(janusRefreshVisibleLocal,2000);", "setInterval(function(){let c=document.getElementById('cores');if(!c||!c.classList.contains('active'))janusRefreshVisibleLocal();},2000);")
 
