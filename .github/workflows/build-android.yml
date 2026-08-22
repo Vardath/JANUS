@@ -36,6 +36,7 @@ jobs:
           python tools/patch_android_saturation_regulation.py
           python tools/patch_android_file_attachments.py
           python tools/patch_android_global_connectivity.py
+          python tools/patch_android_webview_heartbeat.py
 
       - uses: actions/setup-java@v5
         with:
