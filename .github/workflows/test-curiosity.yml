@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install minimal dependencies
-        run: pip install 'openai>=1.99,<2' pytest
+        run: pip install 'openai>=1.99,<2' pytest fastapi pydantic python-multipart
       - name: Compile curiosity and autonomous messaging integration
         run: python -m py_compile curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py autonomous_messages.py janus_dashboard.py
       - name: Verify policy constants and modes
@@ -50,16 +50,16 @@ jobs:
           assert c.RELEVANT_CAP == 2
           assert c.ADJACENT_CAP == 1
           assert c.WANDER_CAP == 1
-          assert set(c.status().keys()) >= {'enabled','daily_cap','relevant_cap','adjacent_cap','wander_cap'}
+          assert set(c.status().keys()) >= {'enabled','daily_web_cap','web_min_gap_seconds','model'}
           db=sqlite3.connect(os.environ['JANUS_DB_PATH'])
           db.execute('CREATE TABLE IF NOT EXISTS desktop_memory(id INTEGER PRIMARY KEY AUTOINCREMENT,profile_id TEXT,role TEXT,content TEXT,level TEXT,created_at TEXT)')
           db.execute('CREATE TABLE IF NOT EXISTS janus_deliberation_tasks(id INTEGER PRIMARY KEY AUTOINCREMENT,profile_id TEXT,topic TEXT,status TEXT,updated_at TEXT)')
           db.execute("INSERT INTO desktop_memory(profile_id,role,content,level,created_at) VALUES('tester','user','distributed memory and error correction','working','2026-08-21T00:00:00+00:00')")
           db.execute("INSERT INTO janus_deliberation_tasks(profile_id,topic,status,updated_at) VALUES('tester','compare two candidate naming schemes','active','2026-08-21T00:00:00+00:00')")
           db.commit(); db.close()
-          choice=c._choose('tester')
-          assert choice and choice[0]=='relevant', choice
-          print('curiosity policy test passed:', choice[0])
+          choice=c._choose_search('tester')
+          assert choice and choice[1]=='relevant', choice
+          print('curiosity policy test passed:', choice[1])
           PY
       - name: Verify epistemic and proactive-message regulation
         run: pytest -q tests/test_epistemic_regulation.py tests/test_proactive_quality.py
