@@ -1,14 +1,15 @@
 """Install Step-4 cost-governor scopes around JANUS paid/external calls.
 
 This keeps the policy centralized without duplicating budget logic through every
-feature.  It wraps the OpenAI client aliases already imported by JANUS modules and
+feature. It wraps the OpenAI client aliases already imported by JANUS modules and
 sets capability/profile context around chat, curiosity, vision and image paths.
 """
 from __future__ import annotations
 
 import functools
-import inspect
 from typing import Any
+
+from fastapi import Query
 
 import cost_governor as budget
 
@@ -18,7 +19,7 @@ class BudgetDenied(RuntimeError):
     pass
 
 class _CallableProxy:
-    def __init__(self, fn, model_getter=None): self._fn=fn; self._model_getter=model_getter
+    def __init__(self, fn): self._fn=fn
     def __call__(self,*args,**kwargs):
         decision=budget.authorize_current()
         if not decision.get("allowed"):
@@ -86,6 +87,34 @@ def _wrap_async(module,name,profile_fn,capability_fn):
             return await fn(*args,**kwargs)
     wrapped._janus_budget_scope=True; setattr(module,name,wrapped)
 
+def _wrap_chat_bridge(image_generation):
+    original=getattr(image_generation,"install_chat_image_bridge",None)
+    if not original or getattr(original,"_janus_cost_bridge",False):return
+    @functools.wraps(original)
+    def install_with_cost(app,interface_chat_module):
+        result=original(app,interface_chat_module)
+        route=next((r for r in app.router.routes if getattr(r,"path",None)=="/desktop/chat" and "POST" in getattr(r,"methods",set())),None)
+        if route and not getattr(route.endpoint,"_janus_cost_chat_scope",False):
+            base=route.endpoint
+            app.router.routes[:]=[r for r in app.router.routes if r is not route]
+            @app.post("/desktop/chat",tags=["desktop"])
+            @functools.wraps(base)
+            async def cost_scoped_chat(*args,**kwargs):
+                payload=kwargs.get("payload") or (args[-1] if args and isinstance(args[-1],dict) else {})
+                profile=str((payload or {}).get("profile_id") or (payload or {}).get("username") or "local-user")
+                with budget.scope(profile,"chat"):
+                    return await base(*args,**kwargs)
+            cost_scoped_chat._janus_cost_chat_scope=True
+        paths={getattr(r,"path","") for r in app.router.routes}
+        if "/desktop/cost-status" not in paths:
+            @app.get("/desktop/cost-status",tags=["desktop"])
+            def cost_status(username:str=Query(...)):
+                return {"ok":True,**budget.status(username)}
+        app.state.janus_cost_governor_enabled=True
+        return result
+    install_with_cost._janus_cost_bridge=True
+    image_generation.install_chat_image_bridge=install_with_cost
+
 def install()->None:
     global _installed
     if _installed:return
@@ -104,4 +133,5 @@ def install()->None:
         try:return str(account["username"] or account["email"] or f"acct-{account['id']}")
         except Exception:return "__unattributed__"
     _wrap_async(image_generation,"generate_for_account",img_profile,lambda *a,**k:"image")
+    _wrap_chat_bridge(image_generation)
     _installed=True
