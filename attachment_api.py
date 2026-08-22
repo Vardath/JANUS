@@ -1,14 +1,15 @@
 """Authenticated, account-bound file storage for JANUS.
 
-This is deliberately model/API independent: upload, validation, hashing, storage,
-listing, download and deletion are ordinary application operations. Semantic
-analysis can consume cached extracted text later without re-uploading the file.
+Upload, validation, hashing, storage, listing, download and deletion are ordinary
+application operations. Text/code files and text-bearing PDFs are extracted
+locally so most document grounding has no model/API cost.
 """
 from __future__ import annotations
 
 import base64
 import binascii
 import hashlib
+import io
 import os
 import re
 import sqlite3
@@ -20,6 +21,7 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from pypdf import PdfReader
 
 import auth
 
@@ -28,6 +30,8 @@ DB_PATH = Path(os.getenv("JANUS_DB_PATH", "/data/janus.sqlite3"))
 FILE_ROOT = Path(os.getenv("JANUS_FILE_DIR", "/data/janus_files"))
 MAX_FILE_BYTES = max(64 * 1024, int(os.getenv("JANUS_MAX_FILE_BYTES", str(8 * 1024 * 1024))))
 MAX_TEXT_CACHE_BYTES = max(16 * 1024, int(os.getenv("JANUS_MAX_TEXT_CACHE_BYTES", str(512 * 1024))))
+MAX_PDF_TEXT_CHARS = max(16000, int(os.getenv("JANUS_MAX_PDF_TEXT_CHARS", "250000")))
+MAX_PDF_PAGES = max(1, int(os.getenv("JANUS_MAX_PDF_PAGES", "80")))
 
 ALLOWED_EXTENSIONS = {
     ".txt", ".md", ".markdown", ".json", ".jsonl", ".csv", ".tsv", ".log",
@@ -107,7 +111,6 @@ def _decode_upload(encoded: str) -> bytes:
     raw = (encoded or "").strip()
     if raw.startswith("data:") and "," in raw:
         raw = raw.split(",", 1)[1]
-    # Reject obviously oversized payloads before decoding. Base64 is ~4/3 input size.
     if len(raw) > ((MAX_FILE_BYTES + 2) // 3) * 4 + 16:
         raise HTTPException(413, f"File exceeds the {MAX_FILE_BYTES} byte upload limit")
     try:
@@ -121,25 +124,59 @@ def _decode_upload(encoded: str) -> bytes:
     return data
 
 
+def _extract_pdf_text(data: bytes) -> tuple[Optional[str], str]:
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        chunks: list[str] = []
+        chars = 0
+        truncated = False
+        for idx, page in enumerate(reader.pages):
+            if idx >= MAX_PDF_PAGES:
+                truncated = True
+                break
+            try:
+                text = (page.extract_text() or "").strip()
+            except Exception:
+                text = ""
+            if not text:
+                continue
+            block = f"[PDF page {idx + 1}]\n{text}\n"
+            remaining = MAX_PDF_TEXT_CHARS - chars
+            if remaining <= 0:
+                truncated = True
+                break
+            if len(block) > remaining:
+                chunks.append(block[:remaining])
+                chars += remaining
+                truncated = True
+                break
+            chunks.append(block)
+            chars += len(block)
+        result = "\n".join(chunks).strip()
+        if not result:
+            return None, "pdf_no_text"
+        return result, "pdf_cached_truncated" if truncated else "pdf_cached"
+    except Exception:
+        return None, "pdf_failed"
+
+
 def _extract_text(filename: str, data: bytes) -> tuple[Optional[str], str]:
     ext = Path(filename).suffix.lower()
+    if ext == ".pdf":
+        return _extract_pdf_text(data)
     if ext not in TEXT_EXTENSIONS:
         return None, "not_applicable"
     sample = data[:MAX_TEXT_CACHE_BYTES]
     try:
         text = sample.decode("utf-8")
     except UnicodeDecodeError:
-        try:
-            text = sample.decode("utf-8", errors="replace")
-        except Exception:
-            return None, "failed"
+        text = sample.decode("utf-8", errors="replace")
     if "\x00" in text[:4096]:
         return None, "failed"
     return text, "cached" if len(data) <= MAX_TEXT_CACHE_BYTES else "cached_truncated"
 
 
 def cleanup_account_files(account_id: int) -> int:
-    """Delete attachment bytes for an account; metadata is removed separately/cascade."""
     _init_db()
     removed = 0
     with _db() as c:
