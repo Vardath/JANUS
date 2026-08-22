@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from core_sync import presence_for_profile
+
 
 def _find(app, path: str, method: str) -> Callable[..., Any]:
     for route in app.router.routes:
@@ -46,8 +48,9 @@ def _server_reply(runtime: dict[str, Any]) -> str:
         f"Server persistence: {'yes' if runtime.get('persistent_storage') else 'no'}\n"
         f"Authenticated device clients online: {int(runtime.get('remote_clients') or 0)}\n"
         f"Registered device clients: {int(runtime.get('registered_clients') or 0)}\n\n"
-        "Provenance: every value above is read from the server runtime/presence state. "
-        "No local Android cycle counters were used for this server diagnostic."
+        "Provenance: server core counters above come only from the server runtime. "
+        "Client counts come only from authenticated server presence records. "
+        "No Android/local core cycle counters were substituted for server counters."
     )
 
 
@@ -67,10 +70,10 @@ def install(app, runtime):
                 pass
             state = runtime.status()
             state["server_runtime_thread_alive"] = bool(getattr(runtime, "_thread", None) and runtime._thread.is_alive())
-            # Presence is added by the runtime endpoint, not by the bare runtime object.
-            # Keep client fields explicit when unavailable here rather than borrowing local telemetry.
-            state.setdefault("remote_clients", 0)
-            state.setdefault("registered_clients", 0)
+            profile = str(payload.get("profile_id") or payload.get("username") or "").strip()
+            clients = presence_for_profile(profile) if profile else []
+            state["remote_clients"] = sum(1 for x in clients if x.get("online"))
+            state["registered_clients"] = len(clients)
             return {
                 "reply": _server_reply(state),
                 "mode": "server_runtime_diagnostic",
