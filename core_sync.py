@@ -181,7 +181,6 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
     snapshots = _safe_count(lambda: record_remote_snapshot(device_key, data, profile_id=profile_id), "snapshot-persistence", errors)
     profile_records = _safe_profile_records(lambda: ingest_profile_core_activity(profile_id, device_key, data), errors)
 
-    # Selective local material is tagged and reviewed by specialists; it is never injected into Consensus/Interface directly.
     remote_notes = [str(x).strip()[:1200] for x in (summary.memories + summary.conclusions) if str(x).strip()][:MAX_SHARED_ITEMS]
     for text in remote_notes:
         for target in ("evidence", "context", "memory", "safety"):
@@ -195,9 +194,11 @@ def exchange(summary: CoreSummary, authorization: Optional[str] = Header(default
     server_summary["remote_clients"] = sum(1 for x in presence if x["online"])
     server_summary["registered_clients"] = len(presence)
     server_summary["persistent_storage"] = bool(server_summary.get("persistent"))
+    active_deliberation = active_for_profile(profile_id)
 
     return {
         "ok": True, "server": server_summary, "shared_state": _shared_state(profile_id),
+        "active_deliberation": active_deliberation,
         "presence": {"online": sum(1 for x in presence if x["online"]), "registered": len(presence), "clients": presence[:20]},
         "account_id": account_id, "profile_id": profile_id,
         "observed_events_received": observed, "runtime_snapshots_recorded": snapshots,
