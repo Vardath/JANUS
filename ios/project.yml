@@ -17,8 +17,8 @@ targets:
       path: JANUS/Info.plist
       properties:
         CFBundleDisplayName: JANUS
-        CFBundleShortVersionString: "0.3"
-        CFBundleVersion: "3"
+        CFBundleShortVersionString: "0.4"
+        CFBundleVersion: "4"
         UILaunchScreen:
           UIColorName: ""
         UIApplicationSceneManifest:
