@@ -6,7 +6,7 @@ The original post-Step-7 implementation roadmap (Steps 1–11) is functionally c
 
 1. **Authentication boundary hardening** — ensure every post-security wrapper resolves the authenticated account before any memory, thread, research, cost, file or diagnostic side effect. Client-supplied `username`/`profile_id` must never select another account's partition. **IMPLEMENTED; CI validation pending.**
 2. **Route/security inventory** — enumerate all profile/account-bearing routes and prove each is public-by-design, admin-token-bound or account-session-bound. Remove accidental query-parameter identity selectors from private endpoints. **IMPLEMENTED; CI validation pending.**
-3. **Persistence and migration matrix** — record schema ownership/version for every durable table, test clean install + legacy upgrade + repeated restart paths, and detect incompatible old schemas before accepting writes.
+3. **Persistence and migration matrix** — record schema ownership/version for every durable table, test clean install + legacy upgrade + repeated restart paths, and detect incompatible old schemas before accepting writes. **IMPLEMENTED; CI validation pending.**
 4. **Background usefulness audit** — measure useful novel outputs versus repetition/self-reference; suppress low-information loops and keep curiosity/research budget focused on concrete questions and evidence.
 5. **Memory quality audit** — test conversation-thread retention, corrections, contradictions, salience promotion, duplicate consolidation and whole-history retrieval on realistic multi-session conversations.
 6. **Server/local synchronization soak** — long-running selective-sync tests covering reconnects, duplicate devices, stale clients, conflict provenance, no-overwrite guarantees and heartbeat loss/recovery.
@@ -31,3 +31,13 @@ A route-by-route inventory found several older `/desktop/*` APIs whose implement
 A second issue existed in routes installed later by `bootstrap.py`: proactive Message thread diagnostics were created after the main secure-desktop pass and still accepted a `username` query selector. `proactive_threads.py` now authenticates those routes internally through `auth.require_account()` and derives the profile from that account. Old clients may still send an unused username query parameter, but it is no longer part of the route contract and cannot select a partition.
 
 `JANUS_ROUTE_SECURITY_INVENTORY.md` records the explicit boundary classes: public-by-design, administrator-token-bound, router-authenticated account APIs, secure-desktop compatibility wrappers and late-installed internally authenticated routes. `tests/test_profile_boundary_hardening.py` now protects these route contracts in CI.
+
+## Phase 2 Step 3
+
+`persistence_matrix.py` now provides a single minimum-compatibility registry for the main durable JANUS tables. It records each table's owning subsystem, a registry schema version and the columns current code requires. The registry deliberately tolerates extra additive columns rather than demanding byte-for-byte SQL identity.
+
+Startup ordering is now explicit. The existing auth normalizer first preserves the oldest incompatible account layouts; `auth_schema_guard.py` performs safe additive auth fixes and preserves incompatible legacy session/token tables; then `persistence_matrix.preflight_existing()` runs before `janus_dashboard` is imported. A missing table is valid on a clean installation, but an already-existing registered table missing required columns causes a fail-closed degraded startup before ordinary application modules can write through the incompatible shape.
+
+After the normal subsystems have initialized, `image_response_compat.install()` records the observed matrix version and table compatibility snapshot into `janus_schema_meta`. This gives repeated restarts a durable schema checkpoint without rewriting user tables. Outside the pre-existing auth compatibility migrations, the new guard is intentionally non-destructive: it does not guess at unknown legacy conversions, delete rows or silently rebuild tables.
+
+`JANUS_PHASE2_PERSISTENCE_MATRIX.md` documents table ownership and startup policy. `tests/test_persistence_matrix.py` covers clean installation, incompatible legacy shape rejection, additive-column compatibility and repeated restart/idempotence. The cognition CI now compiles and runs the persistence registry tests.
