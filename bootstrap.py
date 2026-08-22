@@ -53,6 +53,7 @@ try:
     from image_inline import router as image_inline_router
     from image_response_compat import install as install_image_response_compat
     from chat_receipt_security import install as install_chat_receipt_security
+    from maintenance_review import install as install_maintenance_review, status as maintenance_status, run_review as run_maintenance_review
     from src.janus_sleep_cycle import janus_sleep_cycle
     app = real_app
     app.include_router(auth_lifecycle_router)
@@ -65,6 +66,7 @@ try:
     install_image_response_compat(app)
     install_chat_receipt_security(interface_chat_module)
     install_auth_rate_limit(app)
+    install_maintenance_review(app, janus_sleep_cycle)
 
     @app.middleware("http")
     async def preserve_google_auth_error(request, call_next):
@@ -133,6 +135,7 @@ try:
             "lightweight_image_generation_enabled": True,
             "image_inline_transport_enabled": True,
             "background_multi_core_image_generation_enabled": False,
+            "quarterly_maintenance_review_enabled": bool(getattr(app.state, "janus_maintenance_review_installed", False)),
         }
 
     @app.get("/diagnostics/runtime-health")
@@ -163,7 +166,24 @@ try:
             "image_inline_route_present": any(path.startswith("/images/{file_id}/inline") for path in routes),
             "background_multi_core_image_generation_enabled": False,
             "auth_rate_limit_enabled": True,
+            "quarterly_maintenance_review_enabled": bool(getattr(app.state, "janus_maintenance_review_installed", False)),
         }
+
+    @app.get("/diagnostics/maintenance")
+    def maintenance_detail(
+        authorization: Optional[str] = Header(default=None),
+        x_janus_admin_token: Optional[str] = Header(default=None),
+    ):
+        _require_admin(authorization, x_janus_admin_token)
+        return maintenance_status()
+
+    @app.post("/diagnostics/maintenance/run")
+    def maintenance_run(
+        authorization: Optional[str] = Header(default=None),
+        x_janus_admin_token: Optional[str] = Header(default=None),
+    ):
+        _require_admin(authorization, x_janus_admin_token)
+        return run_maintenance_review(janus_sleep_cycle, "manual-admin-request")
 
     @app.get("/diagnostics/auth-detail")
     def auth_detail(
