@@ -90,6 +90,22 @@ def _delete_attachment_audit(account_id: int) -> int:
         c.close()
 
 
+def _delete_client_presence(account_id: int) -> int:
+    """Remove account-owned device registration/heartbeat history."""
+    c = _app_db()
+    try:
+        exists = c.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='janus_client_presence'"
+        ).fetchone()
+        if not exists:
+            return 0
+        cur = c.execute("DELETE FROM janus_client_presence WHERE account_id=?", (int(account_id),))
+        c.commit()
+        return max(0, cur.rowcount)
+    finally:
+        c.close()
+
+
 def _ensure_public_request_table():
     with auth._db() as c:
         c.execute(
@@ -133,6 +149,7 @@ def delete_account(req: DeleteAccountRequest, authorization: Optional[str] = Hea
     except Exception:
         attachment_files_deleted = 0
     attachment_audit_rows_deleted = _delete_attachment_audit(account_id)
+    client_presence_rows_deleted = _delete_client_presence(account_id)
 
     with auth._db() as c:
         c.execute("DELETE FROM account_deletion_requests WHERE email=? COLLATE NOCASE", (account["email"],))
@@ -145,6 +162,7 @@ def delete_account(req: DeleteAccountRequest, authorization: Optional[str] = Hea
         "profile_rows_deleted": removed,
         "attachment_files_deleted": attachment_files_deleted,
         "attachment_audit_rows_deleted": attachment_audit_rows_deleted,
+        "client_presence_rows_deleted": client_presence_rows_deleted,
     }
 
 
@@ -154,7 +172,7 @@ def delete_account_page():
         """<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
         <title>Delete JANUS account</title><style>body{font-family:Arial,sans-serif;max-width:720px;margin:40px auto;padding:0 18px;line-height:1.5}input,button{font:inherit;padding:10px;margin:6px 0;width:100%;box-sizing:border-box}button{background:#111;color:#fff;border:0;border-radius:8px}small{color:#666}</style></head><body>
         <h1>Delete your JANUS account</h1>
-        <p>You can permanently delete your JANUS account from inside the JANUS Android app. This removes the account, active sessions, authentication tokens, known JANUS conversation, memory, activity, message data, uploaded files and file-retention audit history associated with the account.</p>
+        <p>You can permanently delete your JANUS account from inside the JANUS Android app. This removes the account, active sessions, authentication tokens, known JANUS conversation, memory, activity, message data, uploaded files, file-retention audit history and registered device-presence history associated with the account.</p>
         <p>If you cannot access the app, submit the email address used for your JANUS account below. This creates an account-deletion request for identity verification and processing.</p>
         <form id='f'><input id='email' type='email' required placeholder='JANUS account email'><button>Request account deletion</button></form>
         <p id='result'></p><small>For security, a public request does not immediately delete an account merely because someone knows its email address.</small>
