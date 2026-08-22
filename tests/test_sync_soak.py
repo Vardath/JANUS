@@ -28,7 +28,7 @@ def _client(tmp: Path):
     return TestClient(app), auth, federated_sync, core_sync
 
 
-def _register(client, username="syncuser", email="sync@example.test"):
+def _register(client, username="syncuser", email="syncuser@example.com"):
     r = client.post("/auth/register", json={"username": username, "email": email, "password": "password12345"})
     assert r.status_code == 200, r.text
     return r.json()["access_token"]
