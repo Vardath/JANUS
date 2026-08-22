@@ -4,48 +4,63 @@ The original post-Step-7 implementation roadmap (Steps 1–11) is functionally c
 
 ## Ordered stabilization plan
 
-1. **Authentication boundary hardening** — ensure every post-security wrapper resolves the authenticated account before any memory, thread, research, cost, file or diagnostic side effect. Client-supplied `username`/`profile_id` must never select another account's partition. **IMPLEMENTED; CI validation pending.**
-2. **Route/security inventory** — enumerate all profile/account-bearing routes and prove each is public-by-design, admin-token-bound or account-session-bound. Remove accidental query-parameter identity selectors from private endpoints. **IMPLEMENTED; CI validation pending.**
-3. **Persistence and migration matrix** — record schema ownership/version for every durable table, test clean install + legacy upgrade + repeated restart paths, and detect incompatible old schemas before accepting writes. **IMPLEMENTED; CI validation pending.**
-4. **Background usefulness audit** — measure useful novel outputs versus repetition/self-reference; suppress low-information loops and keep curiosity/research budget focused on concrete questions and evidence. **IMPLEMENTED; CI validation pending.**
-5. **Memory quality audit** — test conversation-thread retention, corrections, contradictions, salience promotion, duplicate consolidation and whole-history retrieval on realistic multi-session conversations. **IMPLEMENTED; CI validation pending.**
-6. **Server/local synchronization soak** — long-running selective-sync tests covering reconnects, duplicate devices, stale clients, conflict provenance, no-overwrite guarantees and heartbeat loss/recovery. **IMPLEMENTED; CI validation pending.**
-7. **Cost/failure degradation audit** — exercise exhausted web/model/image budgets, provider timeouts, malformed responses and partial outages; ordinary chat and deterministic local/server cognition should degrade cleanly.
-8. **Operational observability** — expose human-readable owner/admin health summaries for reliability, budgets, migrations, synchronization and background usefulness without leaking private account content.
-9. **Release checkpoint** — freeze feature additions briefly, run the full suite/soak matrix, document known limitations, and create a stable server protocol checkpoint before returning to optional new features.
+1. **Authentication boundary hardening** — authenticated identity owns every private profile side effect. **IMPLEMENTED.**
+2. **Route/security inventory** — classify public/admin/account routes and remove client-selected private identity selectors. **IMPLEMENTED.**
+3. **Persistence and migration matrix** — register durable schemas and fail closed on incompatible existing shapes before ordinary writes. **IMPLEMENTED.**
+4. **Background usefulness audit** — suppress repetitive/process-heavy autonomous research before external spend. **IMPLEMENTED.**
+5. **Memory quality audit** — whole-history retrieval, correction precedence, continuity-marker promotion and duplicate suppression. **IMPLEMENTED.**
+6. **Server/local synchronization soak** — reconnect, stale heartbeat, multi-device conflicts, restart persistence and no-overwrite guarantees. **IMPLEMENTED.**
+7. **Cost/failure degradation audit** — optional work throttles before foreground Chat; provider failures are classified and do not consume successful-call budget estimates. **IMPLEMENTED.**
+8. **Operational observability** — human-readable server/local, memory, cost and provider-health summaries; Android v0.69 surfaces this under Options → System status. **IMPLEMENTED.**
+9. **Release checkpoint** — integrated server stability + Android v0.69 clean-build gate, known limitations and protocol invariants. **IMPLEMENTED; CI VALIDATION PENDING.**
 
-## Phase 2 Step 1
+## Phase 2 Step 1 — Authentication boundary
 
-`image_response_compat.py` authenticates before any profile-scoped thread, research, memory or cost work. The authenticated username replaces client-selected identity fields before side effects, and `/desktop/cost-status` is session-bound.
+`image_response_compat.py`, `secure_desktop.py` and late-installed account routes resolve authenticated identity before profile-scoped memory, thread, research, cost, file or diagnostic side effects. Client-supplied `username`/`profile_id` cannot select another private partition.
 
-## Phase 2 Step 2
+## Phase 2 Step 2 — Route/security inventory
 
-`secure_desktop.py` and late-installed thread routes now bind private profile/account APIs to authenticated sessions. `JANUS_ROUTE_SECURITY_INVENTORY.md` records the public/admin/account boundary classes.
+`JANUS_ROUTE_SECURITY_INVENTORY.md` records public-by-design, administrator-token-bound, router-authenticated and compatibility-wrapper surfaces. Older private desktop diagnostics and continuity routes are session-bound.
 
-## Phase 2 Step 3
+## Phase 2 Step 3 — Persistence and migrations
 
-`persistence_matrix.py` registers minimum compatible durable schemas, tolerates additive columns, rejects incompatible existing shapes before ordinary writes, and records the observed matrix after initialization.
+`persistence_matrix.py` registers minimum compatible durable schemas, tolerates additive columns, rejects incompatible existing shapes before ordinary writes, and records the observed matrix after initialization. The auth normalizer remains the only targeted compatibility migration for the oldest account/session layouts.
 
-## Phase 2 Step 4
+## Phase 2 Step 4 — Background usefulness
 
-`background_usefulness.py` adds a deterministic zero-API gate before autonomous research spending, suppressing repetitive/process-heavy self-reference while leaving explicit foreground research untouched. It records account-scoped usefulness metrics for inspection.
+`background_usefulness.py` adds a deterministic zero-API gate before autonomous research spending. Repetitive or JANUS-process-heavy candidates are suppressed before web/model calls; explicit foreground user research remains unaffected. Decisions and completed-result usefulness are retained for account-scoped inspection.
 
-## Phase 2 Step 5
+## Phase 2 Step 5 — Memory quality
 
-`memory_quality.py` adds deterministic whole-history retrieval over retained user-visible conversation records rather than relying only on the latest fixed-size Chat window. Relevant older material can re-enter the live Chat prompt through a concise persisted `memory_context` record, while ordinary recent conversation remains intact.
+`memory_quality.py` adds deterministic whole-history retrieval over retained user-visible conversation records rather than relying only on the latest fixed-size Chat window. Relevant older material can re-enter the live Chat prompt through concise persisted memory context while ordinary recent conversation remains intact.
 
-User corrections and clarifications are explicitly marked with precedence over earlier conflicting material. Phrases such as “think about this”, “ponder”, “mull it over”, “remember this” and “come back to this” are treated as continuity markers and receive gentle trace→working→episodic reinforcement instead of being discarded as ordinary transient turns. Long substantive user turns also receive a conservative trace→working promotion.
+Corrections and clarifications receive precedence over earlier conflicting material. Phrases such as “think about this”, “ponder”, “mull it over”, “remember this” and “come back to this” are continuity markers and receive conservative memory reinforcement. Repeated retrieved memories are collapsed so repetition cannot crowd out independent history. Hidden chain-of-thought is never exported as memory.
 
-Exact repeated user turns are measured and near-identical retrieved memories are collapsed from the injected context so repetition cannot crowd out independent older history. Retrieval is profile-scoped, does not promote unrelated material merely because it was searched, and never exposes hidden chain-of-thought: only persisted conversation/memory records are eligible.
+## Phase 2 Step 6 — Server/local synchronization soak
 
-`/memory-quality/status` exposes account-scoped audit counts, and `janus_memory_quality` records reinforcement events. `persistence_matrix.py` registers this table and advances the durable matrix version. `tests/test_memory_quality.py` covers old-history retrieval beyond the recent window, correction precedence, ponder/remember promotion, duplicate suppression, account isolation and non-promotion of irrelevant turns. The main cognition CI compiles and runs the new suite.
+The synchronization soak exercises the existing selective-federation contract under repeated reconnect and restart pressure. Remote state arrives as bounded typed grounding records with provenance; neither local nor global state receives a whole-state overwrite instruction.
 
-## Phase 2 Step 6
+`tests/test_sync_soak.py` covers stable-device reconnect without duplicate registration, heartbeat expiry and recovery, two-device exchange without origin echo, conflicting claims remaining simultaneously present and marked conflicted, repeated persistence-module reloads, and stable `origin_id` updates in place.
 
-The synchronization soak now exercises the existing selective-federation contract under repeated reconnect and restart pressure instead of adding another synchronization path. The core invariant remains unchanged: remote state arrives as bounded typed grounding records with provenance; no client or server receives a whole-state overwrite instruction.
+`.github/workflows/test-sync-soak.yml` provides the dedicated synchronization workflow and the main cognition suite also executes these regressions.
 
-`tests/test_sync_soak.py` covers repeated heartbeat/reconnect updates from the same stable device id without duplicate registration, explicit heartbeat expiry followed by recovery, two-device exchange without echoing a record back to its origin, conflict preservation when two devices disagree on the same current claim, and repeated module/server-style restarts against the same persistent database. Stable `origin_id` records are verified to update in place rather than cloning on reconnect.
+## Phase 2 Step 7 — Cost/failure degradation
 
-Conflict tests verify that both competing records remain present with their distinct lifecycle states and that at least one is marked `conflicted`; the soak never resolves disagreement by silently choosing a winner. Account-bound presence and existing federated profile-isolation regressions remain part of the matrix.
+The external-compute governor distinguishes successful completions from provider timeouts, malformed responses and other upstream failures. Failed provider calls are retained as diagnostics at zero estimated successful-call cost, preventing an outage from manufacturing a budget lockout.
 
-`.github/workflows/test-sync-soak.yml` provides a dedicated synchronization workflow, while the main cognition CI now also executes the soak tests. The workflow uses writable temporary DB/file paths and a short test TTL so heartbeat loss/recovery can be tested deterministically without waiting in real time.
+Optional background web/model/maintenance work remains the first class to be throttled. Foreground Chat stays eligible while its own profile/global allowance remains available. Regression tests deliberately simulate exhausted background allowances and repeated provider failures.
+
+## Phase 2 Step 8 — Operational observability
+
+`owner_observability.py` translates raw telemetry into `healthy`, `degraded` or `attention` status with human-readable explanations. It reports server background-cycle health, authenticated local-device presence, retained continuity counts, cost protection and recent provider failures while keeping server and local runtime state distinct.
+
+Android v0.69 adds **Options → System status**, consuming the owner diagnostic and falling back to local JANUS status if the server is unavailable. Windows and Apple client parity remain deferred by design.
+
+## Phase 2 Step 9 — Release checkpoint
+
+`JANUS_PHASE2_RELEASE_CHECKPOINT.md` records the stable protocol invariants and known deferred work. `.github/workflows/phase2-release-checkpoint.yml` is the integrated gate with two independent jobs:
+
+- **server-stability** reconstructs the deployed server, compiles critical modules, runs auth/authorization regressions, then runs the complete Phase 2 cognition/security/persistence/memory/sync/cost/failure/observability/artifact/visual-policy matrix.
+- **android-v069** applies the authoritative consolidated Android patch, verifies version 0.69 and performs a clean Gradle debug assembly.
+
+A red checkpoint is evidence that Phase 2 is not yet a stable baseline. Fixes should be narrow and additive; unrelated completed functionality should not be rolled back merely to make the checkpoint green.
