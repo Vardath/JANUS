@@ -1,7 +1,7 @@
 """Thread continuity for proactive JANUS Messages.
 
 Links autonomous findings back to an explicit continuity item or durable background
-thread, stores provenance, and supplies compact follow-up grounding to Chat.  This
+thread, stores provenance, and supplies compact follow-up grounding to Chat. This
 layer never creates or mutates project/question lifecycle state by itself.
 """
 from __future__ import annotations
@@ -176,3 +176,59 @@ def status(profile: str) -> dict[str, Any]:
         "continuity_linked": int(row["linked"] or 0),
         "recent_threads": [dict(r) for r in recent],
     }
+
+
+def _latest_proactive_event(profile: str) -> tuple[int, dict[str, Any]] | None:
+    with _db() as c:
+        row = c.execute("SELECT id,detail FROM desktop_events WHERE profile_id=? AND event_type='proactive_message' ORDER BY id DESC LIMIT 1", (profile,)).fetchone()
+    if not row:
+        return None
+    try:
+        detail = json.loads(str(row["detail"] or "{}"))
+    except Exception:
+        detail = {"text": str(row["detail"] or "")}
+    return int(row["id"]), detail if isinstance(detail, dict) else {"text": str(detail)}
+
+
+def install(app) -> None:
+    """Patch autonomous outbox storage and expose thread diagnostics/API."""
+    if getattr(app.state, "janus_proactive_threads_installed", False):
+        return
+    import autonomous_messages
+
+    original_store = autonomous_messages._store
+    if not getattr(original_store, "_janus_threaded", False):
+        def threaded_store(profile: str, message_type: str, text: str, source_event: str):
+            before = _latest_proactive_event(profile)
+            before_id = before[0] if before else 0
+            stored = original_store(profile, message_type, text, source_event)
+            if not stored:
+                return stored
+            latest = _latest_proactive_event(profile)
+            if not latest or latest[0] <= before_id:
+                return stored
+            event_id, detail = latest
+            resolved = resolve_thread(profile, text)
+            thread = bind_message(event_id, profile, source_event, None, text, resolved)
+            detail["thread"] = {
+                "key": thread["thread_key"],
+                "type": thread["thread_type"],
+                "title": thread["title"],
+                "continuity_item_id": thread.get("continuity_item_id"),
+                "confidence": thread.get("confidence", 0),
+            }
+            with _db() as c:
+                c.execute("UPDATE desktop_events SET detail=? WHERE id=? AND profile_id=?", (json.dumps(detail, ensure_ascii=False), event_id, profile))
+            return stored
+        threaded_store._janus_threaded = True
+        autonomous_messages._store = threaded_store
+
+    @app.get("/desktop/message-thread", tags=["desktop"])
+    def message_thread(username: str, event_id: int):
+        return {"profile": username, "thread": get_thread(username, event_id)}
+
+    @app.get("/desktop/message-thread-status", tags=["desktop"])
+    def message_thread_status(username: str):
+        return {"profile": username, **status(username)}
+
+    app.state.janus_proactive_threads_installed = True
