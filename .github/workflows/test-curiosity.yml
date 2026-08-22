@@ -10,8 +10,10 @@ on:
       - 'janus_dashboard.py'
       - 'autonomous_messages.py'
       - 'proactive_quality.py'
+      - 'background_cognition.py'
       - 'tests/test_epistemic_regulation.py'
       - 'tests/test_proactive_quality.py'
+      - 'tests/test_background_cognition.py'
       - 'tools/rebuild_server.py'
       - 'src/server.py.gz.b64.*'
       - 'render.yaml'
@@ -35,7 +37,7 @@ jobs:
       - name: Reconstruct legacy base server
         run: python tools/rebuild_server.py
       - name: Compile curiosity and autonomous messaging integration
-        run: python -m py_compile server.py curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py autonomous_messages.py janus_dashboard.py
+        run: python -m py_compile server.py curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py background_cognition.py autonomous_messages.py janus_dashboard.py
       - name: Verify policy constants and modes
         env:
           JANUS_DB_PATH: /tmp/janus-curiosity-test.sqlite3
@@ -65,7 +67,7 @@ jobs:
           assert choice and choice[1]=='relevant', choice
           print('curiosity policy test passed:', choice[1])
           PY
-      - name: Verify epistemic and proactive-message regulation
+      - name: Verify epistemic, proactive-message and longitudinal cognition regulation
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: python -m pytest -q tests/test_epistemic_regulation.py tests/test_proactive_quality.py
+        run: python -m pytest -q tests/test_epistemic_regulation.py tests/test_proactive_quality.py tests/test_background_cognition.py
