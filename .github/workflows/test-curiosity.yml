@@ -12,6 +12,8 @@ on:
       - 'proactive_quality.py'
       - 'tests/test_epistemic_regulation.py'
       - 'tests/test_proactive_quality.py'
+      - 'tools/rebuild_server.py'
+      - 'src/server.py.gz.b64.*'
       - 'render.yaml'
       - '.env.example'
       - '.github/workflows/test-curiosity.yml'
@@ -28,10 +30,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install minimal dependencies
-        run: pip install 'openai>=1.99,<2' pytest fastapi pydantic python-multipart
+      - name: Install application and test dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Reconstruct legacy base server
+        run: python tools/rebuild_server.py
       - name: Compile curiosity and autonomous messaging integration
-        run: python -m py_compile curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py autonomous_messages.py janus_dashboard.py
+        run: python -m py_compile server.py curiosity_search.py epistemic_search_bridge.py self_assessment.py proactive_quality.py autonomous_messages.py janus_dashboard.py
       - name: Verify policy constants and modes
         env:
           JANUS_DB_PATH: /tmp/janus-curiosity-test.sqlite3
