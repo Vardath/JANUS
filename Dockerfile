@@ -7,6 +7,7 @@ RUN python tools/rebuild_server.py
 RUN python tools/patch_url_media_ingestion.py
 RUN python tools/patch_maintenance_owner_api.py
 RUN python tools/patch_research_provenance_api.py
+RUN python tools/patch_protocol_capabilities.py
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 CMD ["sh", "-c", "uvicorn bootstrap:app --host 0.0.0.0 --port ${PORT:-8000}"]
