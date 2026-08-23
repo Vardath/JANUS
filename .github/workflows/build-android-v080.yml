@@ -41,7 +41,7 @@ jobs:
           test -s "$HOME"
           grep -q 'HomeActivity' "$MAN"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
-          grep -q 'Chat · Messages · Observe · System' "$HOME"
+          grep -q 'Chat · Account · Messages · Observe · System' "$HOME"
           grep -q 'Research workspace' "$HOME"
           grep -q 'Artifacts · Open · Share · Export' "$HOME"
           grep -q 'Maintenance review' "$HOME"
@@ -51,6 +51,22 @@ jobs:
           grep -q 'android:name=".ArtifactActivity".*android:exported="false"' "$MAN"
           grep -q 'android:name=".MaintenanceActivity".*android:exported="false"' "$MAN"
           grep -q 'android:name=".SettingsActivity".*android:exported="false"' "$MAN"
+          grep -q 'android:name=".GoogleAuthActivity".*android:exported="false"' "$MAN"
+      - name: Verify native Google sign-in contract
+        run: |
+          set -euo pipefail
+          GOOGLE=android_v080/app/src/main/java/com/vardath/janus/v080/GoogleAuthActivity.java
+          HOME=android_v080/app/src/main/java/com/vardath/janus/v080/HomeActivity.java
+          GRADLE=android_v080/app/build.gradle
+          test -s "$GOOGLE"
+          grep -q 'play-services-auth' "$GRADLE"
+          grep -q 'GOOGLE_WEB_CLIENT_ID' "$GRADLE"
+          grep -q 'requestIdToken(BuildConfig.GOOGLE_WEB_CLIENT_ID)' "$GOOGLE"
+          grep -q 'GoogleSignIn.getClient' "$GOOGLE"
+          grep -q '/auth/google' "$GOOGLE"
+          grep -q '"id_token"' "$GOOGLE"
+          grep -q 'putString(TOKEN,token)' "$GOOGLE"
+          grep -q 'Continue with Google' "$HOME"
       - name: Verify core native feature contract
         run: |
           set -euo pipefail
@@ -129,7 +145,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
-          grep -q 'Google sign-in parity remains to be reintroduced' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
+          grep -q 'Native Google sign-in bridge' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
+          grep -q 'Google sign-in on device' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
           grep -q 'Legacy retirement gate' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
       - name: Build native v0.80 debug APK
         working-directory: android_v080
