@@ -11,7 +11,9 @@ android {
         versionCode 80
         versionName '0.80-dev1'
         def serverBaseUrl = project.findProperty('JANUS_SERVER_BASE_URL') ?: 'https://janus-global-core.onrender.com'
+        def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'SERVER_BASE_URL', '"' + serverBaseUrl + '"'
+        buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
 
     buildFeatures { buildConfig true }
@@ -42,4 +44,5 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'androidx.core:core:1.16.0'
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+    implementation 'com.google.android.gms:play-services-auth:21.4.0'
 }
