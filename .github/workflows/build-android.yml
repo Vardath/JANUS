@@ -28,10 +28,12 @@ jobs:
         run: |
           set -euxo pipefail
           # Product features are applied to the clean Android base first.
+          # Native artifact export depends on attachments + artifact UI.
           # UI hardening is last in the product layer, then the consolidated
           # local/global runtime patch adds current core/sync/status work.
           python tools/patch_android_file_attachments.py
           python tools/patch_android_artifacts.py
+          python tools/patch_android_artifact_export.py
           python tools/patch_android_research_workspace.py
           python tools/patch_android_maintenance_review.py
           python tools/patch_android_research_provenance.py
