@@ -30,8 +30,15 @@ def test_native_artifact_export_patch_uses_account_authenticated_downloads():
     assert 'file_paths.xml' in text
 
 
-def test_authoritative_build_orders_product_ui_before_runtime():
-    text = Path('.github/workflows/build-android.yml').read_text(encoding='utf-8')
+def test_authoritative_build_uses_single_phase3_composer():
+    workflow = Path('.github/workflows/build-android.yml').read_text(encoding='utf-8')
+    assert 'python tools/compose_android_phase3.py' in workflow
+    assert 'python tools/patch_android_file_attachments.py' not in workflow
+    assert 'python tools/patch_android_runtime_cores_v068.py' not in workflow
+
+
+def test_phase3_composer_preserves_required_patch_order_and_postconditions():
+    text = Path('tools/compose_android_phase3.py').read_text(encoding='utf-8')
     names = [
         'patch_android_file_attachments.py',
         'patch_android_artifacts.py',
@@ -45,6 +52,8 @@ def test_authoritative_build_orders_product_ui_before_runtime():
     ]
     positions = [text.index(name) for name in names]
     assert positions == sorted(positions)
+    for marker in ['Android Phase 3 composition verified', 'Download / Export', 'Compatibility', 'themeMode']:
+        assert marker in text
 
 
 def test_android_phase3_version_is_not_stale_v069():
