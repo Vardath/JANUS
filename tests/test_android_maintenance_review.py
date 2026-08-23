@@ -28,8 +28,6 @@ def test_android_maintenance_ui_has_explicit_manual_only_decisions():
     assert '/maintenance/status' in text
     assert '/maintenance/reviews/' in text
     assert 'Approve for manual work' in text
-    # The patch embeds these values inside a raw Python string, so quote escaping is
-    # an implementation detail. Assert the decision states themselves instead.
     assert 'approved_for_manual_work' in text
     assert 'deferred' in text
     assert 'rejected' in text
@@ -37,11 +35,13 @@ def test_android_maintenance_ui_has_explicit_manual_only_decisions():
     assert 'cannot change code, dependencies, models, configuration or deployments by itself' in text
 
 
-def test_android_patch_order_preserves_existing_product_features():
-    text = Path('.github/workflows/build-android.yml').read_text(encoding='utf-8')
-    attach = text.index('python tools/patch_android_file_attachments.py')
-    artifacts = text.index('python tools/patch_android_artifacts.py')
-    research = text.index('python tools/patch_android_research_workspace.py')
-    maintenance = text.index('python tools/patch_android_maintenance_review.py')
-    runtime = text.index('python tools/patch_android_runtime_cores_v068.py')
+def test_phase3_composer_patch_order_preserves_existing_product_features():
+    workflow = Path('.github/workflows/build-android.yml').read_text(encoding='utf-8')
+    assert 'python tools/compose_android_phase3.py' in workflow
+    text = Path('tools/compose_android_phase3.py').read_text(encoding='utf-8')
+    attach = text.index('tools/patch_android_file_attachments.py')
+    artifacts = text.index('tools/patch_android_artifacts.py')
+    research = text.index('tools/patch_android_research_workspace.py')
+    maintenance = text.index('tools/patch_android_maintenance_review.py')
+    runtime = text.index('tools/patch_android_runtime_cores_v068.py')
     assert attach < artifacts < research < maintenance < runtime
