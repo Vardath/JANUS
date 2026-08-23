@@ -28,8 +28,11 @@ def test_android_maintenance_ui_has_explicit_manual_only_decisions():
     assert '/maintenance/status' in text
     assert '/maintenance/reviews/' in text
     assert 'Approve for manual work' in text
-    assert "'deferred'" in text
-    assert "'rejected'" in text
+    # The patch embeds these values inside a raw Python string, so quote escaping is
+    # an implementation detail. Assert the decision states themselves instead.
+    assert 'approved_for_manual_work' in text
+    assert 'deferred' in text
+    assert 'rejected' in text
     assert 'will not make or deploy any changes automatically' in text
     assert 'cannot change code, dependencies, models, configuration or deployments by itself' in text
 
