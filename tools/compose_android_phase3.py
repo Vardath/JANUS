@@ -38,6 +38,9 @@ JAVA_MARKERS = [
     'ACTION_SEND',
 ]
 
+EXPECTED_VERSION_CODE = 71
+EXPECTED_VERSION_NAME = "0.71"
+
 
 def run_patch(path: str) -> None:
     print(f"[compose] {path}")
@@ -60,11 +63,11 @@ def verify() -> None:
     html, java, gradle = current_text()
     missing = [marker for marker in HTML_MARKERS if marker not in html]
     missing += [marker for marker in JAVA_MARKERS if marker not in java]
-    if "versionCode 70" not in gradle or "versionName '0.70'" not in gradle:
-        missing.append("Android v0.70 version identity")
+    if f"versionCode {EXPECTED_VERSION_CODE}" not in gradle or f"versionName '{EXPECTED_VERSION_NAME}'" not in gradle:
+        missing.append(f"Android v{EXPECTED_VERSION_NAME} version identity")
     if missing:
         raise SystemExit("Phase 3 composition verification failed; missing: " + ", ".join(missing))
-    print("[compose] Android Phase 3 composition verified")
+    print(f"[compose] Android Phase 3 composition verified for v{EXPECTED_VERSION_NAME}")
 
 
 def main() -> int:
