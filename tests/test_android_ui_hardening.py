@@ -18,11 +18,24 @@ def test_theme_patch_keeps_settings_device_local():
     assert "api('PUT'" not in text
 
 
+def test_native_artifact_export_patch_uses_account_authenticated_downloads():
+    text = Path('tools/patch_android_artifact_export.py').read_text(encoding='utf-8')
+    for marker in [
+        'ACTION_CREATE_DOCUMENT', 'ACTION_SEND', 'FLAG_GRANT_READ_URI_PERMISSION',
+        'FileProvider.getUriForFile', '/files/', '/download', 'Authorization',
+        'exportArtifactNative', 'shareArtifactNative', 'Download / Export', 'Share',
+    ]:
+        assert marker in text
+    assert 'shared_artifacts' in text
+    assert 'file_paths.xml' in text
+
+
 def test_authoritative_build_orders_product_ui_before_runtime():
     text = Path('.github/workflows/build-android.yml').read_text(encoding='utf-8')
     names = [
         'patch_android_file_attachments.py',
         'patch_android_artifacts.py',
+        'patch_android_artifact_export.py',
         'patch_android_research_workspace.py',
         'patch_android_maintenance_review.py',
         'patch_android_research_provenance.py',
