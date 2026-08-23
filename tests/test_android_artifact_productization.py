@@ -16,11 +16,13 @@ def test_artifact_patch_exposes_android_artifact_workflow():
     assert "Use in Chat" in text
 
 
-def test_android_build_applies_artifact_patch_after_attachments_before_runtime():
-    text = Path('.github/workflows/build-android.yml').read_text(encoding='utf-8')
-    attach = text.index('python tools/patch_android_file_attachments.py')
-    artifact = text.index('python tools/patch_android_artifacts.py')
-    runtime = text.index('python tools/patch_android_runtime_cores_v068.py')
+def test_phase3_composer_applies_artifact_patch_after_attachments_before_runtime():
+    workflow = Path('.github/workflows/build-android.yml').read_text(encoding='utf-8')
+    assert 'python tools/compose_android_phase3.py' in workflow
+    text = Path('tools/compose_android_phase3.py').read_text(encoding='utf-8')
+    attach = text.index('tools/patch_android_file_attachments.py')
+    artifact = text.index('tools/patch_android_artifacts.py')
+    runtime = text.index('tools/patch_android_runtime_cores_v068.py')
     assert attach < artifact < runtime
 
 
