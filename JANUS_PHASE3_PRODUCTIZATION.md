@@ -26,7 +26,3 @@ Phase 2 established the stabilization baseline. Phase 3 turns the capabilities a
 ## URL/media implementation boundary
 
 Foreground pasted URLs are fetched directly where public text is available. YouTube video URLs attempt captions/transcripts and retain an explicit unavailable state rather than fabricating text. Retrieved material is injected into the existing multi-core research fabric, not answered from as a separate unexamined subsystem. Cache keys are profile + canonical URL. Channel-wide autonomous crawling remains disabled; bounded channel discovery can continue through the existing web-search fabric.
-
-## Already implemented and therefore not deferred anymore
-
-The server already has authenticated file storage, document grounding, selective vision escalation, one-shot foreground image generation, bounded visual-explanation decisions, multi-core visual-deliberation scaffolding, outbound working artifacts, owner observability, research workspace, maintenance-review proposals, cost governance, memory-quality retrieval and selective federated synchronization.
