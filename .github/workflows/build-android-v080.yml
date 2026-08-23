@@ -24,21 +24,48 @@ jobs:
           gradle-version: '8.11.1'
       - name: Verify clean-client boundary
         run: |
+          set -euo pipefail
+          SRC=android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
           test -d android_v080
           ! grep -R "compose_android_phase3\|patch_android_" android_v080 .github/workflows/build-android-v080.yml
           grep -q "applicationId 'com.vardath.janus.v080'" android_v080/app/build.gradle
           grep -q "versionName '0.80-dev1'" android_v080/app/build.gradle
           grep -q 'uses-permission android:name="android.permission.INTERNET"' android_v080/app/src/main/AndroidManifest.xml
-          grep -q '7→2→1→1' android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
+          grep -q '7→2→1→1' "$SRC"
+      - name: Verify Stage 3 native feature contract
+        run: |
+          set -euo pipefail
+          SRC=android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
+          grep -q '"Chat","Messages","Observe","Options"' "$SRC"
+          grep -q '/desktop/chat' "$SRC"
+          grep -q '/desktop/messages?username=' "$SRC"
+          grep -q '/desktop/runtime-cores' "$SRC"
+          grep -q '/diagnostics/runtime-health' "$SRC"
+          grep -q 'chat_queue' "$SRC"
+          grep -q 'client_message_id' "$SRC"
+          grep -q 'duplicate suppressed' "$SRC"
+          grep -q 'Stable snapshot only' "$SRC"
+          grep -q 'Healthy' "$SRC"
+          grep -q 'Reduced capability' "$SRC"
+          grep -q 'Needs attention' "$SRC"
       - name: Build native v0.80 debug APK
         working-directory: android_v080
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify built APK
+        run: |
+          set -euo pipefail
+          test -s android_v080/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh android_v080/app/build/outputs/apk/debug/app-debug.apk
       - name: Prepare APK
         run: |
+          set -euo pipefail
           mkdir -p dist
           cp android_v080/app/build/outputs/apk/debug/app-debug.apk dist/JANUS-Android-v0.80-dev1.apk
+          sha256sum dist/JANUS-Android-v0.80-dev1.apk | tee dist/JANUS-Android-v0.80-dev1.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v0.80-dev1
-          path: dist/JANUS-Android-v0.80-dev1.apk
+          path: |
+            dist/JANUS-Android-v0.80-dev1.apk
+            dist/JANUS-Android-v0.80-dev1.sha256
           if-no-files-found: error
