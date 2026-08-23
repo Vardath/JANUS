@@ -3,6 +3,9 @@ package com.vardath.janus;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -13,6 +16,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /** Persistent on-device outbound chat queue with retry-safe idempotency. */
 public final class JanusOfflineQueue {
@@ -41,6 +45,16 @@ public final class JanusOfflineQueue {
     private static String normalizedMessage(JSONObject body) {
         String m = body.optString("message", body.optString("text", ""));
         return m == null ? "" : m.trim().replaceAll("\\s+", " ");
+    }
+
+    private static void scheduleFastRetries(Context context) {
+        long[] delays = new long[]{8L, 25L, 60L};
+        for (long delay : delays) {
+            OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(JanusQueueRetryWorker.class)
+                    .setInitialDelay(delay, TimeUnit.SECONDS)
+                    .build();
+            WorkManager.getInstance(context.getApplicationContext()).enqueue(request);
+        }
     }
 
     public static synchronized int enqueue(Context context, String preparedJson) {
@@ -73,6 +87,7 @@ public final class JanusOfflineQueue {
                 next.put(item);
             }
             prefs.edit().putString(OUTBOX, next.toString()).apply();
+            scheduleFastRetries(context);
             return next.length();
         } catch (Exception e) { return pendingCount(context); }
     }
