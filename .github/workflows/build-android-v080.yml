@@ -54,6 +54,22 @@ jobs:
           grep -q 'attachment_ids' "$SRC"
           grep -q 'Grounded attachments' "$SRC"
           grep -q 'data_base64' "$SRC"
+      - name: Verify native artifact export contract
+        run: |
+          set -euo pipefail
+          ART=android_v080/app/src/main/java/com/vardath/janus/v080/ArtifactActivity.java
+          MAN=android_v080/app/src/main/AndroidManifest.xml
+          test -s "$ART"
+          grep -q '/artifacts' "$ART"
+          grep -q 'continuity_report' "$ART"
+          grep -q 'research_digest' "$ART"
+          grep -q 'working_note' "$ART"
+          grep -q 'ACTION_VIEW' "$ART"
+          grep -q 'ACTION_SEND' "$ART"
+          grep -q 'FileProvider.getUriForFile' "$ART"
+          grep -q 'ArtifactActivity' "$MAN"
+          grep -q 'androidx.core.content.FileProvider' "$MAN"
+          test -s android_v080/app/src/main/res/xml/file_paths.xml
       - name: Build native v0.80 debug APK
         working-directory: android_v080
         run: gradle --no-daemon --stacktrace :app:assembleDebug
