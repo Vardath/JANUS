@@ -83,6 +83,7 @@ jobs:
           set -euxo pipefail
           python tools/patch_android_file_attachments.py
           python tools/patch_android_artifacts.py
+          python tools/patch_android_artifact_export.py
           python tools/patch_android_research_workspace.py
           python tools/patch_android_maintenance_review.py
           python tools/patch_android_research_provenance.py
