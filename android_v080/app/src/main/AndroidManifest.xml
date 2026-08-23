@@ -6,6 +6,7 @@
         android:label="JANUS v0.80"
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
+        <activity android:name=".GoogleAuthActivity" android:label="JANUS Google Sign-In" android:exported="false" />
         <activity android:name=".SettingsActivity" android:label="JANUS Options" android:exported="false" />
         <activity android:name=".MaintenanceActivity" android:label="JANUS Maintenance" android:exported="false" />
         <activity android:name=".ResearchActivity" android:label="JANUS Research" android:exported="false" />
