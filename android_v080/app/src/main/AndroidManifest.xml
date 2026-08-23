@@ -6,20 +6,16 @@
         android:label="JANUS v0.80"
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
-        <activity android:name=".SettingsActivity" android:label="JANUS Options" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
-        </activity>
-        <activity android:name=".MaintenanceActivity" android:label="JANUS Maintenance" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
-        </activity>
-        <activity android:name=".ResearchActivity" android:label="JANUS Research" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
-        </activity>
-        <activity android:name=".ArtifactActivity" android:label="JANUS Artifacts" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
-        </activity>
-        <activity android:name=".MainActivity" android:label="JANUS v0.80" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+        <activity android:name=".SettingsActivity" android:label="JANUS Options" android:exported="false" />
+        <activity android:name=".MaintenanceActivity" android:label="JANUS Maintenance" android:exported="false" />
+        <activity android:name=".ResearchActivity" android:label="JANUS Research" android:exported="false" />
+        <activity android:name=".ArtifactActivity" android:label="JANUS Artifacts" android:exported="false" />
+        <activity android:name=".MainActivity" android:label="JANUS Chat" android:exported="false" />
+        <activity android:name=".HomeActivity" android:label="JANUS v0.80" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
         <provider
             android:name="androidx.core.content.FileProvider"
