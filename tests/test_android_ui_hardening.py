@@ -30,14 +30,15 @@ def test_native_artifact_export_patch_uses_account_authenticated_downloads():
     assert 'file_paths.xml' in text
 
 
-def test_authoritative_build_uses_single_phase3_composer():
+def test_authoritative_build_uses_hard_coded_android_product():
     workflow = Path('.github/workflows/build-android.yml').read_text(encoding='utf-8')
-    assert 'python tools/compose_android_phase3.py' in workflow
-    assert 'python tools/patch_android_file_attachments.py' not in workflow
-    assert 'python tools/patch_android_runtime_cores_v068.py' not in workflow
+    assert 'python tools/compose_android_phase3.py' not in workflow
+    assert 'Persist composed Android product into source' not in workflow
+    assert 'Validate hard-coded Android UI JavaScript' in workflow
+    assert 'Verify hard-coded Android product markers' in workflow
 
 
-def test_phase3_composer_preserves_required_patch_order_and_postconditions():
+def test_phase3_composer_is_retained_as_legacy_migration_tool_only():
     text = Path('tools/compose_android_phase3.py').read_text(encoding='utf-8')
     names = [
         'patch_android_file_attachments.py',
@@ -56,11 +57,11 @@ def test_phase3_composer_preserves_required_patch_order_and_postconditions():
         assert marker in text
 
 
-def test_android_phase3_version_is_not_stale_v069():
+def test_android_phase3_version_is_v071_hard_coded_product():
     text = Path('android/app/build.gradle').read_text(encoding='utf-8')
-    assert "versionCode 70" in text
-    assert "versionName '0.70'" in text
-    assert 'v0.70: Phase 3 productization baseline' in text
+    assert "versionCode 71" in text
+    assert "versionName '0.71'" in text
+    assert 'v0.71: hard-coded Phase 3 product build' in text
 
 
 def test_fast_offline_chat_retry_is_complete_and_not_half_committed():
