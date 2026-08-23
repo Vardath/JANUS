@@ -31,14 +31,18 @@ public final class HomeActivity extends AppCompatActivity {
         String profile=prefs().getString(PROFILE,"");
         boolean signedIn=!prefs().getString(TOKEN,"").isBlank();
         root.addView(label("11-core architecture · 7 specialists → 2 hemispheres → Consensus → Interface",15,false));
-        root.addView(label(signedIn?("Signed in · "+(profile.isBlank()?"JANUS account":profile)):"Not signed in · open Chat to sign in or create an account",14,false));
+        root.addView(label(signedIn?("Signed in · "+(profile.isBlank()?"JANUS account":profile)):"Not signed in · use password/account sign-in or Google",14,false));
 
-        root.addView(nav("Chat · Messages · Observe · System",MainActivity.class));
+        if(!signedIn){
+            root.addView(nav("Continue with Google",GoogleAuthActivity.class));
+        }
+        root.addView(nav("Chat · Account · Messages · Observe · System",MainActivity.class));
         root.addView(nav("Research workspace",ResearchActivity.class));
         root.addView(nav("Artifacts · Open · Share · Export",ArtifactActivity.class));
         root.addView(nav("Maintenance review",MaintenanceActivity.class));
         root.addView(nav("Themes · Background · Options",SettingsActivity.class));
 
+        root.addView(label("Google identity is verified by the JANUS server through /auth/google; the resulting session is the same account-bound JANUS session used by password login.",13,false));
         root.addView(label("This is the clean native v0.80 client. The server-side JANUS cognition, continuity, memory, research and 7→2→1→1 routing remain the shared JANUS core.",14,false));
         root.addView(label("Maintenance is advisory and owner-gated. Device theme/background settings remain local and do not overwrite protected JANUS cognition state.",13,false));
         setContentView(root);
