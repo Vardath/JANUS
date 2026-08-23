@@ -85,6 +85,29 @@ jobs:
           grep -q 'BACKGROUND RESEARCH / PROVENANCE' "$RES"
           grep -q 'research_digest' "$RES"
           grep -q 'ResearchActivity' "$MAN"
+      - name: Verify maintenance themes and background controls
+        run: |
+          set -euo pipefail
+          SET=android_v080/app/src/main/java/com/vardath/janus/v080/SettingsActivity.java
+          THEME=android_v080/app/src/main/java/com/vardath/janus/v080/ThemePrefs.java
+          MAINT=android_v080/app/src/main/java/com/vardath/janus/v080/MaintenanceActivity.java
+          APP=android_v080/app/src/main/java/com/vardath/janus/v080/JanusApplication.java
+          MAN=android_v080/app/src/main/AndroidManifest.xml
+          test -s "$SET" && test -s "$THEME" && test -s "$MAINT" && test -s "$APP"
+          grep -q 'system","light","dark' "$SET"
+          grep -q 'indigo","teal","amber","violet","slate' "$SET"
+          grep -q 'Background cycles:' "$SET"
+          grep -q 'Observe telemetry:' "$SET"
+          grep -q 'Local background interval' "$SET"
+          grep -q '/maintenance/status' "$MAINT"
+          grep -q 'approved_for_manual_work' "$MAINT"
+          grep -q 'deferred' "$MAINT"
+          grep -q 'rejected' "$MAINT"
+          grep -q 'no automatic changes' "$MAINT"
+          grep -q 'AppCompatDelegate.setDefaultNightMode' "$THEME"
+          grep -q 'JanusApplication' "$MAN"
+          grep -q 'SettingsActivity' "$MAN"
+          grep -q 'MaintenanceActivity' "$MAN"
       - name: Build native v0.80 debug APK
         working-directory: android_v080
         run: gradle --no-daemon --stacktrace :app:assembleDebug
