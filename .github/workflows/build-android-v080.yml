@@ -32,7 +32,7 @@ jobs:
           grep -q "versionName '0.80-dev1'" android_v080/app/build.gradle
           grep -q 'uses-permission android:name="android.permission.INTERNET"' android_v080/app/src/main/AndroidManifest.xml
           grep -q '7→2→1→1' "$SRC"
-      - name: Verify Stage 3 native feature contract
+      - name: Verify Stage 4 native feature contract
         run: |
           set -euo pipefail
           SRC=android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
@@ -48,6 +48,12 @@ jobs:
           grep -q 'Healthy' "$SRC"
           grep -q 'Reduced capability' "$SRC"
           grep -q 'Needs attention' "$SRC"
+          grep -q 'ACTION_OPEN_DOCUMENT' "$SRC"
+          grep -q '/files/upload' "$SRC"
+          grep -q 'MAX_ATTACHMENTS=4' "$SRC"
+          grep -q 'attachment_ids' "$SRC"
+          grep -q 'Grounded attachments' "$SRC"
+          grep -q 'data_base64' "$SRC"
       - name: Build native v0.80 debug APK
         working-directory: android_v080
         run: gradle --no-daemon --stacktrace :app:assembleDebug
