@@ -7,7 +7,7 @@ on:
       - '**/*.py'
       - 'tests/**'
       - 'android/**'
-      - 'tools/patch_android_runtime_cores_v068.py'
+      - 'tools/patch_android_*.py'
       - 'requirements.txt'
       - 'JANUS_PHASE2_RELEASE_CHECKPOINT.md'
       - '.github/workflows/phase2-release-checkpoint.yml'
@@ -73,17 +73,27 @@ jobs:
           tests/test_visual_explanation.py
           tests/test_visual_deliberation.py
 
-  android-v069:
+  android-current:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Apply consolidated Android v0.69 patch
-        run: python tools/patch_android_runtime_cores_v068.py
+      - name: Apply current Android product patches
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python tools/patch_android_file_attachments.py
+          python tools/patch_android_artifacts.py
+          python tools/patch_android_research_workspace.py
+          python tools/patch_android_maintenance_review.py
+          python tools/patch_android_research_provenance.py
+          python tools/patch_android_protocol_capabilities.py
+          python tools/patch_android_ui_hardening.py
+          python tools/patch_android_runtime_cores_v068.py
       - name: Verify Android version checkpoint
         shell: bash
         run: |
-          grep -q "versionName '0.69'" android/app/build.gradle
-          grep -q "versionCode 69" android/app/build.gradle
+          grep -q "versionName '0.70'" android/app/build.gradle
+          grep -q "versionCode 70" android/app/build.gradle
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -98,6 +108,6 @@ jobs:
           if [ ! -f "$HOME/.android/debug.keystore" ]; then
             keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
-      - name: Assemble Android v0.69
+      - name: Assemble current Android build
         working-directory: android
         run: gradle :app:assembleDebug --stacktrace
