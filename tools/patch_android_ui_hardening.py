@@ -48,5 +48,33 @@ try{if(window.matchMedia){window.matchMedia('(prefers-color-scheme: dark)').addE
 '''
 replace_once('</script>', js + '\n</script>')
 
+# Independent script: it still runs if the main application script throws during startup.
+# It deliberately uses explicit element lookups rather than legacy id-as-global behaviour.
+recovery = r'''
+<script id="janusUiRecovery">
+(function(){
+  var lastError='';
+  window.addEventListener('error',function(e){lastError=String((e&&e.message)||'interface error');var s=document.getElementById('status');if(s)s.textContent='Interface recovery active';});
+  function el(id){return document.getElementById(id)}
+  function ensureNav(){
+    var n=el('nav');if(!n)return;
+    if(!n.children.length){['chat','messages','observe','options'].forEach(function(p){var b=document.createElement('button');b.textContent=p.charAt(0).toUpperCase()+p.slice(1);b.dataset.janusPage=p;n.appendChild(b);});}
+    Array.prototype.forEach.call(n.querySelectorAll('button'),function(b){if(b.dataset.janusBound)return;b.dataset.janusBound='1';b.addEventListener('click',function(){var p=b.dataset.janusPage||String((b.id||'').replace(/^n-/,''));if(window.show){try{window.show(p);return}catch(e){lastError=String(e)}}Array.prototype.forEach.call(document.querySelectorAll('.view'),function(v){v.classList.toggle('active',v.id===p)});});});
+  }
+  function ensureSend(){
+    var send=el('chat')&&el('chat').querySelector('.sendbar button:last-child'),box=el('composer');if(!send||!box)return;
+    if(send.dataset.janusBound)return;send.dataset.janusBound='1';send.addEventListener('click',function(){if(typeof window.sendChat==='function'){try{window.sendChat();return}catch(e){lastError=String(e)}}var s=el('status');if(s)s.textContent='Interface script unavailable · restart app';});
+  }
+  function recover(){
+    ensureNav();ensureSend();
+    var login=el('login');if(login&&localStorage.janusToken&&localStorage.janusProfile)login.classList.add('hidden');
+    var s=el('status');if(s&&lastError)s.textContent='Interface recovery active';
+  }
+  recover();setTimeout(recover,250);setTimeout(recover,1200);setInterval(recover,5000);
+})();
+</script>
+'''
+replace_once('</body></html>', recovery + '</body></html>')
+
 html.write_text(h, encoding='utf-8')
-print('Applied Android Phase 3 theme/UI hardening patch')
+print('Applied Android Phase 3 theme/UI hardening + recovery watchdog')
