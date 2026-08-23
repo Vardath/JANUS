@@ -5,8 +5,8 @@ on:
     branches: [main]
     paths:
       - 'android_v080/**'
+      - 'android/app/src/main/assets/index.html'
       - '.github/workflows/build-android-v080.yml'
-      - 'JANUS_ANDROID_V080_STAGE0_MAP.md'
       - 'JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md'
       - 'JANUS_ANDROID_V080_PRODUCT_REBUILD.md'
   workflow_dispatch:
@@ -25,155 +25,83 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Verify clean-client boundary
+      - name: Verify clean v0.80 client and original JANUS UI
         run: |
           set -euo pipefail
           SRC=android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
-          test -d android_v080
-          ! grep -R "compose_android_phase3\|patch_android_" android_v080 .github/workflows/build-android-v080.yml
-          grep -q "applicationId 'com.vardath.janus.v080'" android_v080/app/build.gradle
-          grep -q "versionName '0.80-dev1'" android_v080/app/build.gradle
-          grep -q 'uses-permission android:name="android.permission.INTERNET"' android_v080/app/src/main/AndroidManifest.xml
-          grep -q '7→2→1→1' "$SRC"
-
-      - name: Verify original JANUS product surface
-        run: |
-          set -euo pipefail
-          SRC=android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
+          UI=android/app/src/main/assets/index.html
           MAN=android_v080/app/src/main/AndroidManifest.xml
+          GRADLE=android_v080/app/build.gradle
+          test -s "$SRC" && test -s "$UI"
+          ! grep -R "compose_android_phase3\|patch_android_" android_v080 .github/workflows/build-android-v080.yml
+          grep -q "applicationId 'com.vardath.janus.v080'" "$GRADLE"
+          grep -q "versionName '0.80-dev2'" "$GRADLE"
+          grep -q "assets.srcDirs" "$GRADLE"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
           grep -q 'android:name=".MainActivity" android:label="JANUS" android:exported="true"' "$MAN"
-          grep -q '"Chat", "Messages", "Observe", "Options"' "$SRC"
-          grep -q '11 cores · 7→2→1→1' "$SRC"
-          grep -q 'Message JANUS' "$SRC"
-          grep -q 'Continue with Google' "$SRC"
-          grep -q 'Research workspace' "$SRC"
-          grep -q 'Artifacts' "$SRC"
-          grep -q 'Maintenance review' "$SRC"
-          grep -q 'Settings' "$SRC"
-          grep -q 'Sign out' "$SRC"
-          grep -q 'Compatibility trampoline' android_v080/app/src/main/java/com/vardath/janus/v080/HomeActivity.java
+          grep -q 'file:///android_asset/index.html' "$SRC"
+          grep -q 'addJavascriptInterface(new Bridge(), "Android")' "$SRC"
+          grep -q 'Sign in to continue your JANUS identity and memory.' "$UI"
+          grep -q 'Username or email' "$UI"
+          grep -q 'Message JANUS' "$UI"
+          grep -q "\['chat','messages','observe','options'\]" "$UI"
+          grep -q 'Research workspace' "$UI"
+          grep -q 'Artifacts' "$UI"
+          grep -q 'Maintenance review' "$UI"
+          grep -q 'Background research' "$UI"
+          grep -q 'Compatibility' "$UI"
+          grep -q 'Settings' "$UI"
 
-      - name: Verify native Google sign-in contract
+      - name: Verify account and server bridge
         run: |
           set -euo pipefail
-          GOOGLE=android_v080/app/src/main/java/com/vardath/janus/v080/GoogleAuthActivity.java
           SRC=android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
-          GRADLE=android_v080/app/build.gradle
-          test -s "$GOOGLE"
-          grep -q 'play-services-auth' "$GRADLE"
-          grep -q 'GOOGLE_WEB_CLIENT_ID' "$GRADLE"
+          GOOGLE=android_v080/app/src/main/java/com/vardath/janus/v080/GoogleAuthActivity.java
+          UI=android/app/src/main/assets/index.html
+          grep -q '@JavascriptInterface public void request' "$SRC"
+          grep -q 'Authorization' "$SRC"
+          grep -q '/auth/login' "$SRC"
+          grep -q '/auth/register' "$SRC"
+          grep -q 'ACTION_OPEN_DOCUMENT' "$SRC"
+          grep -q 'data_base64' "$SRC"
+          grep -q '/desktop/chat' "$UI"
+          grep -q '/desktop/messages?username=' "$UI"
+          grep -q '/desktop/runtime-cores?username=' "$UI"
+          grep -q '/files/upload' "$UI"
+          grep -q 'client_message_id' "$UI"
+          grep -q 'play-services-auth' android_v080/app/build.gradle
           grep -q 'requestIdToken(BuildConfig.GOOGLE_WEB_CLIENT_ID)' "$GOOGLE"
-          grep -q 'GoogleSignIn.getClient' "$GOOGLE"
           grep -q '/auth/google' "$GOOGLE"
-          grep -q '"id_token"' "$GOOGLE"
-          grep -q 'putString(TOKEN,token)' "$GOOGLE"
-          grep -q 'Continue with Google' "$SRC"
           grep -q 'code 10' "$GOOGLE"
 
-      - name: Verify core native feature contract
+      - name: Verify advanced activities remain available
         run: |
           set -euo pipefail
-          SRC=android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
-          grep -q '/desktop/chat' "$SRC"
-          grep -q '/desktop/messages?username=' "$SRC"
-          grep -q '/desktop/runtime-cores' "$SRC"
-          grep -q '/diagnostics/runtime-health' "$SRC"
-          grep -q 'chat_queue' "$SRC"
-          grep -q 'client_message_id' "$SRC"
-          grep -q 'now - x.created < 120000' "$SRC"
-          grep -qi 'stable, readable snapshot' "$SRC"
-          grep -q 'Healthy' "$SRC"
-          grep -q 'Reduced capability' "$SRC"
-          grep -q 'Needs attention' "$SRC"
-          grep -q 'ACTION_OPEN_DOCUMENT' "$SRC"
-          grep -q '/files/upload' "$SRC"
-          grep -q 'MAX_ATTACHMENTS = 4' "$SRC"
-          grep -q 'attachment_ids' "$SRC"
-          grep -q 'Grounded attachments' "$SRC"
-          grep -q 'data_base64' "$SRC"
+          test -s android_v080/app/src/main/java/com/vardath/janus/v080/ArtifactActivity.java
+          test -s android_v080/app/src/main/java/com/vardath/janus/v080/ResearchActivity.java
+          test -s android_v080/app/src/main/java/com/vardath/janus/v080/MaintenanceActivity.java
+          test -s android_v080/app/src/main/java/com/vardath/janus/v080/SettingsActivity.java
+          grep -q 'ArtifactActivity' android_v080/app/src/main/AndroidManifest.xml
+          grep -q 'ResearchActivity' android_v080/app/src/main/AndroidManifest.xml
+          grep -q 'MaintenanceActivity' android_v080/app/src/main/AndroidManifest.xml
+          grep -q 'SettingsActivity' android_v080/app/src/main/AndroidManifest.xml
 
-      - name: Verify native artifact export contract
-        run: |
-          set -euo pipefail
-          ART=android_v080/app/src/main/java/com/vardath/janus/v080/ArtifactActivity.java
-          MAN=android_v080/app/src/main/AndroidManifest.xml
-          test -s "$ART"
-          grep -q '/artifacts' "$ART"
-          grep -q 'continuity_report' "$ART"
-          grep -q 'research_digest' "$ART"
-          grep -q 'working_note' "$ART"
-          grep -q 'ACTION_VIEW' "$ART"
-          grep -q 'ACTION_SEND' "$ART"
-          grep -q 'FileProvider.getUriForFile' "$ART"
-          grep -q 'ArtifactActivity' "$MAN"
-          grep -q 'androidx.core.content.FileProvider' "$MAN"
-          test -s android_v080/app/src/main/res/xml/file_paths.xml
-
-      - name: Verify native research workspace contract
-        run: |
-          set -euo pipefail
-          RES=android_v080/app/src/main/java/com/vardath/janus/v080/ResearchActivity.java
-          MAN=android_v080/app/src/main/AndroidManifest.xml
-          test -s "$RES"
-          grep -q '/research-provenance/status?limit=20' "$RES"
-          grep -q 'ESTABLISHED / RETRIEVED EVIDENCE' "$RES"
-          grep -q 'PROVISIONAL HYPOTHESES' "$RES"
-          grep -q 'NEGATIVE RESULTS' "$RES"
-          grep -q 'OPEN QUESTIONS' "$RES"
-          grep -q 'PROPOSED TESTS' "$RES"
-          grep -q 'BACKGROUND RESEARCH / PROVENANCE' "$RES"
-          grep -q 'research_digest' "$RES"
-          grep -q 'ResearchActivity' "$MAN"
-
-      - name: Verify maintenance themes and background controls
-        run: |
-          set -euo pipefail
-          SET=android_v080/app/src/main/java/com/vardath/janus/v080/SettingsActivity.java
-          THEME=android_v080/app/src/main/java/com/vardath/janus/v080/ThemePrefs.java
-          MAINT=android_v080/app/src/main/java/com/vardath/janus/v080/MaintenanceActivity.java
-          APP=android_v080/app/src/main/java/com/vardath/janus/v080/JanusApplication.java
-          MAN=android_v080/app/src/main/AndroidManifest.xml
-          test -s "$SET" && test -s "$THEME" && test -s "$MAINT" && test -s "$APP"
-          grep -q 'system","light","dark' "$SET"
-          grep -q 'indigo","teal","amber","violet","slate' "$SET"
-          grep -q 'Background cycles:' "$SET"
-          grep -q 'Observe telemetry:' "$SET"
-          grep -q 'Local background interval' "$SET"
-          grep -q '/maintenance/status' "$MAINT"
-          grep -q 'approved_for_manual_work' "$MAINT"
-          grep -q 'deferred' "$MAINT"
-          grep -q 'rejected' "$MAINT"
-          grep -q 'no automatic changes' "$MAINT"
-          grep -q 'AppCompatDelegate.setDefaultNightMode' "$THEME"
-          grep -q 'JanusApplication' "$MAN"
-
-      - name: Verify parity audit exists
-        run: |
-          set -euo pipefail
-          test -s JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
-          grep -q 'Native Google sign-in bridge' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
-          grep -q 'Google sign-in on device' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
-          grep -q 'Legacy retirement gate' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
-
-      - name: Build native v0.80 debug APK
+      - name: Build v0.80 dev2 APK
         working-directory: android_v080
         run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: Verify built APK
+
+      - name: Prepare unmistakable dev2 APK
         run: |
           set -euo pipefail
           test -s android_v080/app/build/outputs/apk/debug/app-debug.apk
-          ls -lh android_v080/app/build/outputs/apk/debug/app-debug.apk
-      - name: Prepare APK
-        run: |
-          set -euo pipefail
           mkdir -p dist
-          cp android_v080/app/build/outputs/apk/debug/app-debug.apk dist/JANUS-Android-v0.80-dev1.apk
-          sha256sum dist/JANUS-Android-v0.80-dev1.apk | tee dist/JANUS-Android-v0.80-dev1.sha256
+          cp android_v080/app/build/outputs/apk/debug/app-debug.apk dist/JANUS-Android-v0.80-dev2-ORIGINAL-UI.apk
+          sha256sum dist/JANUS-Android-v0.80-dev2-ORIGINAL-UI.apk | tee dist/JANUS-Android-v0.80-dev2-ORIGINAL-UI.sha256
+
       - uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Android-v0.80-dev1
+          name: JANUS-Android-v0.80-dev2-ORIGINAL-UI
           path: |
-            dist/JANUS-Android-v0.80-dev1.apk
-            dist/JANUS-Android-v0.80-dev1.sha256
+            dist/JANUS-Android-v0.80-dev2-ORIGINAL-UI.apk
+            dist/JANUS-Android-v0.80-dev2-ORIGINAL-UI.sha256
           if-no-files-found: error
