@@ -33,6 +33,7 @@ jobs:
           python tools/patch_android_file_attachments.py
           python tools/patch_android_artifacts.py
           python tools/patch_android_research_workspace.py
+          python tools/patch_android_maintenance_review.py
           python tools/patch_android_runtime_cores_v068.py
 
       - uses: actions/setup-java@v5
