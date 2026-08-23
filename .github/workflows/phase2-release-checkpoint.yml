@@ -8,6 +8,7 @@ on:
       - 'tests/**'
       - 'android/**'
       - 'tools/patch_android_*.py'
+      - 'tools/compose_android_phase3.py'
       - 'requirements.txt'
       - 'JANUS_PHASE2_RELEASE_CHECKPOINT.md'
       - '.github/workflows/phase2-release-checkpoint.yml'
@@ -77,19 +78,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Apply current Android product patches
+      - name: Compose current Android product
         shell: bash
         run: |
           set -euxo pipefail
-          python tools/patch_android_file_attachments.py
-          python tools/patch_android_artifacts.py
-          python tools/patch_android_artifact_export.py
-          python tools/patch_android_research_workspace.py
-          python tools/patch_android_maintenance_review.py
-          python tools/patch_android_research_provenance.py
-          python tools/patch_android_protocol_capabilities.py
-          python tools/patch_android_ui_hardening.py
-          python tools/patch_android_runtime_cores_v068.py
+          python tools/compose_android_phase3.py
       - name: Verify Android version checkpoint
         shell: bash
         run: |
