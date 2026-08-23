@@ -6,11 +6,13 @@ on:
     paths:
       - 'android/**'
       - 'tools/patch_android_*.py'
+      - 'tools/compose_android_phase3.py'
       - '.github/workflows/build-android.yml'
   pull_request:
     paths:
       - 'android/**'
       - 'tools/patch_android_*.py'
+      - 'tools/compose_android_phase3.py'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
@@ -23,23 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Prepare Android Phase 3 runtime
+      - name: Compose Android Phase 3 runtime
         shell: bash
         run: |
           set -euxo pipefail
-          # Product features are applied to the clean Android base first.
-          # Native artifact export depends on attachments + artifact UI.
-          # UI hardening is last in the product layer, then the consolidated
-          # local/global runtime patch adds current core/sync/status work.
-          python tools/patch_android_file_attachments.py
-          python tools/patch_android_artifacts.py
-          python tools/patch_android_artifact_export.py
-          python tools/patch_android_research_workspace.py
-          python tools/patch_android_maintenance_review.py
-          python tools/patch_android_research_provenance.py
-          python tools/patch_android_protocol_capabilities.py
-          python tools/patch_android_ui_hardening.py
-          python tools/patch_android_runtime_cores_v068.py
+          python tools/compose_android_phase3.py
 
       - uses: actions/setup-java@v5
         with:
