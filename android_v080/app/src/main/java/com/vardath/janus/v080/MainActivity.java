@@ -1,7 +1,6 @@
 package com.vardath.janus.v080;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
@@ -16,18 +15,16 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.URLEncoder;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -39,439 +36,53 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends AppCompatActivity {
-    private static final String PREFS = "janus_v080";
-    private static final String TOKEN = "access_token";
-    private static final String QUEUE = "chat_queue";
-    private static final long[] RETRY_DELAYS_MS = {8_000L, 25_000L, 60_000L};
+    private static final String PREFS="janus_v080", TOKEN="access_token", PROFILE="profile", QUEUE="chat_queue";
+    private static final long[] RETRY={8000L,25000L,60000L};
+    private final ExecutorService io=Executors.newSingleThreadExecutor();
+    private final Handler ui=new Handler(Looper.getMainLooper());
+    private final Set<String> rendered=new HashSet<>(), inFlight=new HashSet<>();
+    private LinearLayout root,content; private TextView status,chat; private ScrollView chatScroll;
+    private String accessToken="", profile="", activeTab="Chat";
 
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final Handler ui = new Handler(Looper.getMainLooper());
-    private final Set<String> renderedMessageIds = new HashSet<>();
-    private final Set<String> inFlightMessageIds = new HashSet<>();
+    @Override protected void onCreate(@Nullable Bundle state){super.onCreate(state); accessToken=prefs().getString(TOKEN,""); profile=prefs().getString(PROFILE,""); buildRoot(); if(accessToken.isBlank())showAuth();else validateSession();}
+    @Override protected void onDestroy(){io.shutdownNow();super.onDestroy();}
+    private android.content.SharedPreferences prefs(){return getSharedPreferences(PREFS,Context.MODE_PRIVATE);}
+    private void buildRoot(){root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(16),dp(18),dp(16),dp(14));root.addView(text("JANUS · v0.80 dev · 11 cores · 7→2→1→1",18,true),mw());status=text("Starting…",13,false);status.setPadding(0,dp(6),0,dp(10));root.addView(status,mw());content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);root.addView(content,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);}
 
-    private LinearLayout root;
-    private LinearLayout content;
-    private TextView status;
-    private TextView chatTranscript;
-    private ScrollView chatScroller;
-    private String accessToken = "";
-    private String activeTab = "Chat";
+    private void showAuth(){content.removeAllViews();activeTab="Auth";status.setText("Not signed in · checking server…");checkHealth();content.addView(text("Sign in to JANUS",30,true),mw());EditText id=input("Username or email"),email=input("Email (for registration)"),pw=input("Password");pw.setInputType(0x81);content.addView(id,mw());content.addView(email,mw());content.addView(pw,mw());Button login=button("Sign in"),register=button("Create account");content.addView(login,mw());content.addView(register,mw());content.addView(text("Clean native v0.80 rebuild · installed alongside legacy JANUS during validation.",14,false),mw());login.setOnClickListener(v->{if(id.getText().toString().trim().isEmpty()||pw.getText().toString().isEmpty()){toast("Enter username/email and password.");return;}JSONObject b=new JSONObject();try{b.put("identifier",id.getText().toString().trim());b.put("password",pw.getText().toString());}catch(Exception ignored){}authenticate("/auth/login",b);});register.setOnClickListener(v->{if(id.getText().toString().trim().isEmpty()||email.getText().toString().trim().isEmpty()||pw.getText().toString().isEmpty()){toast("Registration needs username, email and password.");return;}JSONObject b=new JSONObject();try{b.put("username",id.getText().toString().trim());b.put("email",email.getText().toString().trim());b.put("password",pw.getText().toString());}catch(Exception ignored){}authenticate("/auth/register",b);});}
+    private void authenticate(String path,JSONObject body){status.setText("Connecting to JANUS…");io.execute(()->{HttpResult r=request("POST",path,body.toString(),false);if(r.ok()){try{JSONObject j=new JSONObject(r.body);String t=j.optString("access_token","");String p=j.optJSONObject("account")!=null?j.optJSONObject("account").optString("username",""):"";if(!t.isBlank()){saveSession(t,p);ui.post(this::showApp);return;}}catch(Exception ignored){}}ui.post(()->status.setText("Sign-in failed · "+friendly(r)));});}
+    private void validateSession(){status.setText("Restoring JANUS session…");io.execute(()->{HttpResult r=request("GET","/auth/me",null,true);ui.post(()->{if(r.ok()){try{JSONObject a=new JSONObject(r.body).optJSONObject("account");if(a!=null){profile=a.optString("username",profile);prefs().edit().putString(PROFILE,profile).apply();}}catch(Exception ignored){}showApp();}else{clearSession();showAuth();status.setText("Session expired or unavailable · sign in again");}});});}
+    private void saveSession(String token,String p){accessToken=token;profile=p;prefs().edit().putString(TOKEN,token).putString(PROFILE,p).apply();}
+    private void clearSession(){accessToken="";profile="";prefs().edit().remove(TOKEN).remove(PROFILE).apply();}
 
-    @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        accessToken = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TOKEN, "");
-        buildRoot();
-        if (accessToken == null || accessToken.isBlank()) showAuth();
-        else validateSession();
-    }
+    private void showApp(){content.removeAllViews();LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(LinearLayout.HORIZONTAL);for(String n:new String[]{"Chat","Messages","Observe","Options"}){Button b=button(n);b.setOnClickListener(v->showTab(n));tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));}content.addView(tabs,mw());LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setTag("page");content.addView(page,new LinearLayout.LayoutParams(-1,0,1));status.setText("Connected · checking compatibility…");checkCapabilities();showTab("Chat");flushSoon(500);}
+    private LinearLayout page(){for(int i=0;i<content.getChildCount();i++){View v=content.getChildAt(i);if(v instanceof LinearLayout&&"page".equals(v.getTag()))return(LinearLayout)v;}throw new IllegalStateException("page missing");}
+    private void showTab(String tab){activeTab=tab;LinearLayout p=page();p.removeAllViews();if(tab.equals("Messages"))showMessages(p);else if(tab.equals("Observe"))showObserve(p);else if(tab.equals("Options"))showOptions(p);else showChat(p);}
 
-    @Override
-    protected void onDestroy() {
-        io.shutdownNow();
-        super.onDestroy();
-    }
+    private void showChat(LinearLayout p){p.addView(text("Chat",30,true),mw());chat=text("JANUS v0.80 Stage 3 · resilient native Chat.\n",16,false);chat.setMovementMethod(new ScrollingMovementMethod());chatScroll=new ScrollView(this);chatScroll.addView(chat,mw());p.addView(chatScroll,new LinearLayout.LayoutParams(-1,0,1));renderQueued();LinearLayout composer=new LinearLayout(this);composer.setOrientation(LinearLayout.HORIZONTAL);composer.setGravity(Gravity.CENTER_VERTICAL);EditText msg=input("Message JANUS");Button send=button("Send");composer.addView(msg,new LinearLayout.LayoutParams(0,-2,1));composer.addView(send,ww());p.addView(composer,mw());send.setOnClickListener(v->{String body=msg.getText().toString().trim();if(body.isEmpty())return;msg.setText("");enqueue(body);});}
+    private void enqueue(String message){List<Q> q=loadQueue();long now=System.currentTimeMillis();for(Q x:q)if(x.message.equals(message)&&now-x.created<120000){status.setText("Already queued · duplicate suppressed");return;}Q x=new Q(UUID.randomUUID().toString(),message,0,now);q.add(x);saveQueue(q);renderOnce(x);status.setText("Sending to JANUS…");sendQueued(x.id);}
+    private void sendQueued(String id){if(inFlight.contains(id))return;Q x=find(id);if(x==null)return;inFlight.add(id);io.execute(()->{JSONObject b=new JSONObject();try{b.put("message",x.message);b.put("client_message_id",x.id);}catch(Exception ignored){}HttpResult r=request("POST","/desktop/chat",b.toString(),true);inFlight.remove(id);if(r.ok()){String reply;try{reply=new JSONObject(r.body).optString("reply",r.body);}catch(Exception e){reply=r.body;}remove(id);String f=reply;ui.post(()->{if(chat!=null&&activeTab.equals("Chat")){chat.append("\nJANUS\n"+f+"\n");chatScroll.post(()->chatScroll.fullScroll(View.FOCUS_DOWN));}status.setText("Interface active");});return;}int a=increment(id);ui.post(()->status.setText("Queued locally · retry "+Math.min(a,RETRY.length)+"/"+RETRY.length+" · "+friendly(r)));if(a<=RETRY.length)flushSoon(RETRY[a-1]);});}
+    private void flushSoon(long ms){ui.postDelayed(()->{if(accessToken.isBlank())return;for(Q x:loadQueue())if(x.attempts<=RETRY.length)sendQueued(x.id);},ms);}
+    private void renderQueued(){for(Q x:loadQueue())renderOnce(x);} private void renderOnce(Q x){if(chat==null||!activeTab.equals("Chat")||rendered.contains(x.id))return;rendered.add(x.id);chat.append("\nYou\n"+x.message+"\nQueued locally\n");}
+    private List<Q> loadQueue(){List<Q> out=new ArrayList<>();try{JSONArray a=new JSONArray(prefs().getString(QUEUE,"[]"));for(int i=0;i<a.length();i++){JSONObject o=a.getJSONObject(i);out.add(new Q(o.optString("id"),o.optString("message"),o.optInt("attempts"),o.optLong("created_at")));}}catch(Exception ignored){}return out;}
+    private void saveQueue(List<Q> q){JSONArray a=new JSONArray();try{for(Q x:q){JSONObject o=new JSONObject();o.put("id",x.id);o.put("message",x.message);o.put("attempts",x.attempts);o.put("created_at",x.created);a.put(o);}}catch(Exception ignored){}prefs().edit().putString(QUEUE,a.toString()).apply();}
+    private Q find(String id){for(Q x:loadQueue())if(x.id.equals(id))return x;return null;} private int increment(String id){List<Q> q=loadQueue();int n=0;for(int i=0;i<q.size();i++){Q x=q.get(i);if(x.id.equals(id)){n=x.attempts+1;q.set(i,new Q(x.id,x.message,n,x.created));break;}}saveQueue(q);return n;} private void remove(String id){List<Q>q=loadQueue();q.removeIf(x->x.id.equals(id));saveQueue(q);}
 
-    private void buildRoot() {
-        root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(18), dp(16), dp(14));
-        root.addView(text("JANUS · v0.80 dev · 11 cores · 7→2→1→1", 18, true), matchWrap());
-        status = text("Starting…", 13, false);
-        status.setPadding(0, dp(6), 0, dp(10));
-        root.addView(status, matchWrap());
-        content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        root.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        setContentView(root);
-    }
+    private void showMessages(LinearLayout p){p.addView(text("Messages",30,true),mw());TextView remote=text("Loading JANUS outbox…",15,false);p.addView(remote,new LinearLayout.LayoutParams(-1,0,1));Button refresh=button("Refresh messages");p.addView(refresh,mw());refresh.setOnClickListener(v->loadMessages(remote));loadMessages(remote);}
+    private void loadMessages(TextView view){if(profile.isBlank()){view.setText("Profile unavailable · restore your session first.");return;}io.execute(()->{String path="/desktop/messages?username="+enc(profile)+"&limit=50";HttpResult r=request("GET",path,null,true);String display;if(r.ok()){StringBuilder b=new StringBuilder();try{JSONObject j=new JSONObject(r.body);JSONArray items=j.optJSONArray("items");int unread=j.optInt("unread",0);b.append(unread).append(" unread\n\n");if(items!=null)for(int i=0;i<items.length();i++){JSONObject x=items.getJSONObject(i);b.append(x.optString("message_type","Message")).append(" · ").append(x.optString("state","unread")).append("\n").append(x.optString("detail","")).append("\n\n");}if(items==null||items.length()==0)b.append("No JANUS messages yet.");}catch(Exception e){b.append(r.body);}display=b.toString();}else display="Messages unavailable · "+friendly(r);String f=display;ui.post(()->view.setText(f));});}
 
-    private void showAuth() {
-        content.removeAllViews();
-        activeTab = "Auth";
-        status.setText("Not signed in · checking server…");
-        checkHealth();
-        TextView heading = text("Sign in to JANUS", 30, true);
-        heading.setPadding(0, dp(18), 0, dp(16));
-        content.addView(heading, matchWrap());
-        EditText identifier = input("Username or email");
-        EditText email = input("Email (for registration)");
-        EditText password = input("Password");
-        password.setInputType(0x00000081);
-        content.addView(identifier, matchWrap());
-        content.addView(email, matchWrap());
-        content.addView(password, matchWrap());
-        Button login = button("Sign in");
-        Button register = button("Create account");
-        content.addView(login, matchWrap());
-        content.addView(register, matchWrap());
-        TextView note = text("v0.80 is the clean native rebuild. It is installed alongside the legacy JANUS app during development.", 14, false);
-        note.setPadding(0, dp(16), 0, 0);
-        content.addView(note, matchWrap());
-        login.setOnClickListener(v -> {
-            String id = identifier.getText().toString().trim();
-            String pw = password.getText().toString();
-            if (id.isEmpty() || pw.isEmpty()) { toast("Enter your username/email and password."); return; }
-            JSONObject body = new JSONObject();
-            try { body.put("identifier", id); body.put("password", pw); } catch (Exception ignored) {}
-            authenticate("/auth/login", body);
-        });
-        register.setOnClickListener(v -> {
-            String username = identifier.getText().toString().trim();
-            String mail = email.getText().toString().trim();
-            String pw = password.getText().toString();
-            if (username.isEmpty() || mail.isEmpty() || pw.isEmpty()) { toast("Registration needs username, email and password."); return; }
-            JSONObject body = new JSONObject();
-            try { body.put("username", username); body.put("email", mail); body.put("password", pw); } catch (Exception ignored) {}
-            authenticate("/auth/register", body);
-        });
-    }
+    private void showObserve(LinearLayout p){p.addView(text("Observe",30,true),mw());p.addView(text("11-core topology · 7 specialists → 2 hemispheres → Consensus → Interface\nStable snapshot only: this screen does not rapid-refresh or reset your scroll.",15,false),mw());TextView snapshot=text("Loading core snapshot…",14,false);ScrollView s=new ScrollView(this);s.addView(snapshot,mw());p.addView(s,new LinearLayout.LayoutParams(-1,0,1));Button refresh=button("Refresh core snapshot");p.addView(refresh,mw());refresh.setOnClickListener(v->loadObserve(snapshot));loadObserve(snapshot);}
+    private void loadObserve(TextView view){io.execute(()->{String path="/desktop/runtime-cores"+(profile.isBlank()?"":"?username="+enc(profile));HttpResult r=request("GET",path,null,true);String display;if(r.ok()){try{JSONObject j=new JSONObject(r.body),rt=j.optJSONObject("runtime");StringBuilder b=new StringBuilder();b.append(j.optString("architecture","11-core")).append("\n\n");if(rt!=null){b.append("Phase: ").append(rt.optString("phase","unknown")).append("\nCore count: ").append(rt.opt("core_count")).append("\nServer runtime: ").append(rt.optBoolean("server_runtime_thread_alive",false)?"active":"dormant").append("\nRemote clients: ").append(rt.optInt("remote_clients",0)).append("\nPresence: ").append(rt.optString("presence_state","unknown")).append("\nBackground API budget used: ").append(rt.opt("external_api_budget_used"));}b.append("\n\nCore cycles are deterministic/zero-API unless an explicitly governed external task is used. This is telemetry, not private chain-of-thought.");display=b.toString();}catch(Exception e){display=r.body;}}else display="Observe unavailable · "+friendly(r);String f=display;ui.post(()->view.setText(f));});}
 
-    private void authenticate(String path, JSONObject body) {
-        status.setText("Connecting to JANUS…");
-        io.execute(() -> {
-            HttpResult result = request("POST", path, body.toString(), false);
-            if (result.ok()) {
-                try {
-                    String token = new JSONObject(result.body).optString("access_token", "");
-                    if (!token.isBlank()) { saveToken(token); ui.post(this::showApp); return; }
-                } catch (Exception ignored) {}
-            }
-            ui.post(() -> status.setText("Sign-in failed · " + friendlyError(result)));
-        });
-    }
+    private void showOptions(LinearLayout p){p.addView(text("Options & System Status",30,true),mw());p.addView(text("Account: "+(profile.isBlank()?"unknown":profile)+"\nServer: "+BuildConfig.SERVER_BASE_URL,14,false),mw());TextView system=text("System status not checked yet.",15,false);p.addView(system,mw());Button check=button("Check system status"),cap=button("Check compatibility"),retry=button("Retry queued messages now"),logout=button("Sign out");p.addView(check,mw());p.addView(cap,mw());p.addView(retry,mw());p.addView(logout,mw());check.setOnClickListener(v->loadSystemStatus(system));cap.setOnClickListener(v->checkCapabilities());retry.setOnClickListener(v->flushSoon(0));logout.setOnClickListener(v->{clearSession();showAuth();});loadSystemStatus(system);}
+    private void loadSystemStatus(TextView view){io.execute(()->{HttpResult r=request("GET","/diagnostics/runtime-health",null,false);String display;if(r.ok()){try{JSONObject j=new JSONObject(r.body);boolean main=j.optBoolean("main_app_loaded",false),db=j.optBoolean("database_ok",false),schema=j.optBoolean("auth_schema_ok",false),persist=j.optBoolean("core_persistence_ok",false);String level=main&&db&&schema&&persist?"Healthy":main?"Reduced capability":"Needs attention";display=level+"\n\nServer: "+(main?"online":"degraded bootstrap")+"\nDatabase: "+(db?"healthy":"needs attention")+"\nAuthentication schema: "+(schema?"healthy":"needs attention")+"\nCore persistence: "+(persist?"healthy":"needs attention")+"\nCore phase: "+j.optString("core_phase","unknown")+"\nCore count: "+j.opt("core_count")+"\nFile grounding: "+(j.optBoolean("file_chat_grounding_enabled",false)?"available":"reduced")+"\nImage generation: "+(j.optBoolean("lightweight_image_generation_enabled",false)?"available":"unavailable")+"\nMaintenance review: "+(j.optBoolean("quarterly_maintenance_review_enabled",false)?"available":"unavailable");}catch(Exception e){display="Reduced capability · health response unreadable";}}else display="Needs attention · "+friendly(r);String f=display;ui.post(()->view.setText(f));});}
 
-    private void validateSession() {
-        status.setText("Restoring JANUS session…");
-        io.execute(() -> {
-            HttpResult result = request("GET", "/auth/me", null, true);
-            ui.post(() -> {
-                if (result.ok()) showApp();
-                else { clearToken(); showAuth(); status.setText("Session expired or unavailable · sign in again"); }
-            });
-        });
-    }
-
-    private void showApp() {
-        content.removeAllViews();
-        status.setText("Connected session · checking capabilities…");
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setOrientation(LinearLayout.HORIZONTAL);
-        for (String name : new String[]{"Chat", "Messages", "Observe", "Options"}) {
-            Button b = button(name);
-            b.setOnClickListener(v -> showTab(name));
-            tabs.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        }
-        content.addView(tabs, matchWrap());
-        LinearLayout page = new LinearLayout(this);
-        page.setId(View.generateViewId());
-        page.setOrientation(LinearLayout.VERTICAL);
-        page.setTag("page");
-        content.addView(page, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        checkCapabilities();
-        showTab("Chat");
-        flushQueueSoon(500L);
-    }
-
-    private LinearLayout page() {
-        for (int i = 0; i < content.getChildCount(); i++) {
-            View v = content.getChildAt(i);
-            if (v instanceof LinearLayout && "page".equals(v.getTag())) return (LinearLayout) v;
-        }
-        throw new IllegalStateException("v0.80 page container missing");
-    }
-
-    private void showTab(String tab) {
-        activeTab = tab;
-        LinearLayout page = page();
-        page.removeAllViews();
-        if ("Messages".equals(tab)) showMessages(page);
-        else if ("Observe".equals(tab)) showPlaceholder(page, "Observe", "Stable readable 11-core telemetry lands here in Stage 3. This native screen will not use the legacy rapid-refresh WebView.");
-        else if ("Options".equals(tab)) showOptions(page);
-        else showChat(page);
-    }
-
-    private void showChat(LinearLayout page) {
-        TextView heading = text("Chat", 30, true);
-        heading.setPadding(0, dp(12), 0, dp(10));
-        page.addView(heading, matchWrap());
-        chatTranscript = text("JANUS v0.80 Stage 2 ready. Chat uses a durable local queue with bounded retry.\n", 16, false);
-        chatTranscript.setMovementMethod(new ScrollingMovementMethod());
-        chatTranscript.setPadding(dp(10), dp(10), dp(10), dp(10));
-        chatScroller = new ScrollView(this);
-        chatScroller.addView(chatTranscript, matchWrap());
-        page.addView(chatScroller, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        renderQueuedMessages();
-        LinearLayout composer = new LinearLayout(this);
-        composer.setOrientation(LinearLayout.HORIZONTAL);
-        composer.setGravity(Gravity.CENTER_VERTICAL);
-        EditText message = input("Message JANUS");
-        Button send = button("Send");
-        composer.addView(message, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        composer.addView(send, wrapWrap());
-        page.addView(composer, matchWrap());
-        send.setOnClickListener(v -> {
-            String body = message.getText().toString().trim();
-            if (body.isEmpty()) return;
-            message.setText("");
-            enqueueChat(body);
-        });
-    }
-
-    private void showMessages(LinearLayout page) {
-        TextView heading = text("Messages", 30, true);
-        heading.setPadding(0, dp(12), 0, dp(10));
-        page.addView(heading, matchWrap());
-        List<QueuedMessage> queue = loadQueue();
-        if (queue.isEmpty()) page.addView(text("No queued messages.", 16, false), matchWrap());
-        else {
-            for (QueuedMessage item : queue) {
-                page.addView(text(item.message + "\nState: queued · attempts " + item.attempts, 15, false), matchWrap());
-            }
-        }
-    }
-
-    private void enqueueChat(String message) {
-        List<QueuedMessage> queue = loadQueue();
-        long now = System.currentTimeMillis();
-        for (QueuedMessage q : queue) {
-            if (q.message.equals(message) && now - q.createdAt < 120_000L) {
-                status.setText("Already queued · duplicate suppressed");
-                return;
-            }
-        }
-        QueuedMessage item = new QueuedMessage(UUID.randomUUID().toString(), message, 0, now);
-        queue.add(item);
-        saveQueue(queue);
-        renderUserOnce(item);
-        status.setText("Sending to JANUS…");
-        sendQueued(item.id);
-    }
-
-    private void sendQueued(String id) {
-        if (inFlightMessageIds.contains(id)) return;
-        QueuedMessage item = findQueued(id);
-        if (item == null) return;
-        inFlightMessageIds.add(id);
-        io.execute(() -> {
-            JSONObject payload = new JSONObject();
-            try { payload.put("message", item.message); payload.put("client_message_id", item.id); } catch (Exception ignored) {}
-            HttpResult result = request("POST", "/desktop/chat", payload.toString(), true);
-            inFlightMessageIds.remove(id);
-            if (result.ok()) {
-                String reply;
-                try { reply = new JSONObject(result.body).optString("reply", result.body); }
-                catch (Exception e) { reply = result.body; }
-                removeQueued(id);
-                String finalReply = reply;
-                ui.post(() -> {
-                    if (chatTranscript != null && "Chat".equals(activeTab)) {
-                        chatTranscript.append("\nJANUS\n" + finalReply + "\n");
-                        if (chatScroller != null) chatScroller.post(() -> chatScroller.fullScroll(View.FOCUS_DOWN));
-                    }
-                    status.setText("Interface active");
-                });
-                return;
-            }
-            int attempt = incrementAttempt(id);
-            ui.post(() -> status.setText("Queued locally · retry " + Math.min(attempt, RETRY_DELAYS_MS.length) + "/" + RETRY_DELAYS_MS.length + " · " + friendlyError(result)));
-            if (attempt <= RETRY_DELAYS_MS.length) flushQueueSoon(RETRY_DELAYS_MS[attempt - 1]);
-        });
-    }
-
-    private void flushQueueSoon(long delayMs) {
-        ui.postDelayed(() -> {
-            if (accessToken == null || accessToken.isBlank()) return;
-            for (QueuedMessage q : loadQueue()) {
-                if (q.attempts <= RETRY_DELAYS_MS.length) sendQueued(q.id);
-            }
-        }, delayMs);
-    }
-
-    private void renderQueuedMessages() {
-        for (QueuedMessage q : loadQueue()) renderUserOnce(q);
-    }
-
-    private void renderUserOnce(QueuedMessage item) {
-        if (chatTranscript == null || !"Chat".equals(activeTab) || renderedMessageIds.contains(item.id)) return;
-        renderedMessageIds.add(item.id);
-        chatTranscript.append("\nYou\n" + item.message + "\nQueued locally\n");
-    }
-
-    private List<QueuedMessage> loadQueue() {
-        List<QueuedMessage> out = new ArrayList<>();
-        String raw = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(QUEUE, "[]");
-        try {
-            JSONArray array = new JSONArray(raw);
-            for (int i = 0; i < array.length(); i++) {
-                JSONObject o = array.getJSONObject(i);
-                out.add(new QueuedMessage(o.optString("id"), o.optString("message"), o.optInt("attempts", 0), o.optLong("created_at", 0L)));
-            }
-        } catch (Exception ignored) {}
-        return out;
-    }
-
-    private void saveQueue(List<QueuedMessage> queue) {
-        JSONArray array = new JSONArray();
-        try {
-            for (QueuedMessage q : queue) {
-                JSONObject o = new JSONObject();
-                o.put("id", q.id); o.put("message", q.message); o.put("attempts", q.attempts); o.put("created_at", q.createdAt);
-                array.put(o);
-            }
-        } catch (Exception ignored) {}
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(QUEUE, array.toString()).apply();
-    }
-
-    private QueuedMessage findQueued(String id) {
-        for (QueuedMessage q : loadQueue()) if (q.id.equals(id)) return q;
-        return null;
-    }
-
-    private int incrementAttempt(String id) {
-        List<QueuedMessage> queue = loadQueue();
-        int result = 0;
-        for (int i = 0; i < queue.size(); i++) {
-            QueuedMessage q = queue.get(i);
-            if (q.id.equals(id)) {
-                result = q.attempts + 1;
-                queue.set(i, new QueuedMessage(q.id, q.message, result, q.createdAt));
-                break;
-            }
-        }
-        saveQueue(queue);
-        return result;
-    }
-
-    private void removeQueued(String id) {
-        List<QueuedMessage> queue = loadQueue();
-        queue.removeIf(q -> q.id.equals(id));
-        saveQueue(queue);
-    }
-
-    private void showOptions(LinearLayout page) {
-        TextView heading = text("Options", 30, true);
-        heading.setPadding(0, dp(12), 0, dp(12));
-        page.addView(heading, matchWrap());
-        page.addView(text("Server: " + BuildConfig.SERVER_BASE_URL, 14, false), matchWrap());
-        Button health = button("Check system status");
-        Button capabilities = button("Check compatibility");
-        Button retry = button("Retry queued messages now");
-        Button logout = button("Sign out");
-        page.addView(health, matchWrap());
-        page.addView(capabilities, matchWrap());
-        page.addView(retry, matchWrap());
-        page.addView(logout, matchWrap());
-        health.setOnClickListener(v -> checkHealth());
-        capabilities.setOnClickListener(v -> checkCapabilities());
-        retry.setOnClickListener(v -> flushQueueSoon(0));
-        logout.setOnClickListener(v -> { clearToken(); showAuth(); });
-    }
-
-    private void showPlaceholder(LinearLayout page, String headingText, String body) {
-        TextView heading = text(headingText, 30, true);
-        heading.setPadding(0, dp(12), 0, dp(14));
-        page.addView(heading, matchWrap());
-        page.addView(text(body, 16, false), matchWrap());
-    }
-
-    private void checkHealth() {
-        io.execute(() -> {
-            HttpResult result = request("GET", "/health", null, false);
-            ui.post(() -> status.setText(result.ok() ? "JANUS server reachable" : "JANUS server unavailable · " + friendlyError(result)));
-        });
-    }
-
-    private void checkCapabilities() {
-        io.execute(() -> {
-            HttpResult result = request("GET", "/protocol/capabilities", null, false);
-            ui.post(() -> { if (result.ok()) status.setText("Interface active · compatibility received"); else checkHealth(); });
-        });
-    }
-
-    private HttpResult request(String method, String path, @Nullable String body, boolean authenticated) {
-        HttpURLConnection connection = null;
-        try {
-            URL url = new URL(BuildConfig.SERVER_BASE_URL + path);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(12_000);
-            connection.setReadTimeout(45_000);
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("Connection", "close");
-            if (authenticated && accessToken != null && !accessToken.isBlank()) connection.setRequestProperty("Authorization", "Bearer " + accessToken);
-            if (body != null) {
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                try (OutputStream out = connection.getOutputStream()) { out.write(body.getBytes(StandardCharsets.UTF_8)); }
-            }
-            int code = connection.getResponseCode();
-            InputStream stream = code >= 200 && code < 400 ? connection.getInputStream() : connection.getErrorStream();
-            return new HttpResult(code, read(stream), null);
-        } catch (Exception e) {
-            return new HttpResult(0, "", e.getClass().getSimpleName() + ": " + e.getMessage());
-        } finally {
-            if (connection != null) connection.disconnect();
-        }
-    }
-
-    private static String read(@Nullable InputStream stream) throws Exception {
-        if (stream == null) return "";
-        StringBuilder out = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) out.append(line).append('\n');
-        }
-        return out.toString().trim();
-    }
-
-    private String friendlyError(HttpResult result) {
-        if (result.error != null && !result.error.isBlank()) return result.error;
-        if (result.code == 401) return "Authentication required or session expired.";
-        if (result.code == 429) return "JANUS is rate-limited. Try again shortly.";
-        if (result.code == 502 || result.code == 503 || result.code == 504) return "JANUS server is temporarily unavailable (HTTP " + result.code + ").";
-        if (result.code > 0) return "HTTP " + result.code + (result.body.isBlank() ? "" : " · " + result.body);
-        return "Network request failed.";
-    }
-
-    private void saveToken(String token) {
-        accessToken = token;
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(TOKEN, token).apply();
-    }
-
-    private void clearToken() {
-        accessToken = "";
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(TOKEN).apply();
-    }
-
-    private TextView text(String value, int sp, boolean bold) {
-        TextView view = new TextView(this);
-        view.setText(value);
-        view.setTextSize(sp);
-        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        return view;
-    }
-
-    private EditText input(String hint) {
-        EditText view = new EditText(this);
-        view.setHint(hint);
-        view.setSingleLine(true);
-        view.setPadding(dp(12), dp(10), dp(12), dp(10));
-        return view;
-    }
-
-    private Button button(String label) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setAllCaps(false);
-        return button;
-    }
-
-    private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_SHORT).show(); }
-    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
-    private LinearLayout.LayoutParams matchWrap() { return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); }
-    private LinearLayout.LayoutParams wrapWrap() { return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); }
-
-    private record HttpResult(int code, String body, String error) { boolean ok() { return code >= 200 && code < 300; } }
-    private record QueuedMessage(String id, String message, int attempts, long createdAt) {}
+    private void checkHealth(){io.execute(()->{HttpResult r=request("GET","/health",null,false);ui.post(()->status.setText(r.ok()?"JANUS server reachable":"JANUS server unavailable · "+friendly(r)));});}
+    private void checkCapabilities(){io.execute(()->{HttpResult r=request("GET","/protocol/capabilities",null,false);ui.post(()->{if(r.ok())status.setText("Interface active · compatibility received");else{status.setText("Interface active · optional capability negotiation unavailable");checkHealth();}});});}
+    private HttpResult request(String method,String path,@Nullable String body,boolean auth){HttpURLConnection c=null;try{c=(HttpURLConnection)new URL(BuildConfig.SERVER_BASE_URL+path).openConnection();c.setRequestMethod(method);c.setConnectTimeout(12000);c.setReadTimeout(45000);c.setRequestProperty("Accept","application/json");c.setRequestProperty("Connection","close");if(auth&&!accessToken.isBlank())c.setRequestProperty("Authorization","Bearer "+accessToken);if(body!=null){c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json; charset=utf-8");try(OutputStream o=c.getOutputStream()){o.write(body.getBytes(StandardCharsets.UTF_8));}}int code=c.getResponseCode();InputStream s=code>=200&&code<400?c.getInputStream():c.getErrorStream();return new HttpResult(code,read(s),null);}catch(Exception e){return new HttpResult(0,"",e.getClass().getSimpleName()+": "+e.getMessage());}finally{if(c!=null)c.disconnect();}}
+    private static String read(@Nullable InputStream s)throws Exception{if(s==null)return"";StringBuilder b=new StringBuilder();try(BufferedReader r=new BufferedReader(new InputStreamReader(s,StandardCharsets.UTF_8))){String line;while((line=r.readLine())!=null)b.append(line).append('\n');}return b.toString().trim();}
+    private String friendly(HttpResult r){if(r.error!=null&&!r.error.isBlank())return r.error;if(r.code==401)return"Authentication required or session expired.";if(r.code==429)return"JANUS is rate-limited. Try again shortly.";if(r.code==502||r.code==503||r.code==504)return"JANUS server temporarily unavailable (HTTP "+r.code+").";if(r.code>0)return"HTTP "+r.code+(r.body.isBlank()?"":" · "+r.body);return"Network request failed.";}
+    private String enc(String s){return URLEncoder.encode(s,StandardCharsets.UTF_8);}
+    private TextView text(String v,int sp,boolean bold){TextView t=new TextView(this);t.setText(v);t.setTextSize(sp);t.setPadding(dp(4),dp(8),dp(4),dp(8));if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;} private EditText input(String h){EditText e=new EditText(this);e.setHint(h);e.setSingleLine(true);e.setPadding(dp(12),dp(10),dp(12),dp(10));return e;} private Button button(String l){Button b=new Button(this);b.setText(l);b.setAllCaps(false);return b;} private void toast(String m){Toast.makeText(this,m,Toast.LENGTH_SHORT).show();} private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);} private LinearLayout.LayoutParams mw(){return new LinearLayout.LayoutParams(-1,-2);} private LinearLayout.LayoutParams ww(){return new LinearLayout.LayoutParams(-2,-2);}
+    private record HttpResult(int code,String body,String error){boolean ok(){return code>=200&&code<300;}} private record Q(String id,String message,int attempts,long created){}
 }
