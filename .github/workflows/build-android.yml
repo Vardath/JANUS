@@ -27,10 +27,11 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          # Apply the retained file-attachment feature to the clean Android base first.
-          # The consolidated runtime patch then adds the current core/sync/status work
+          # Product features are applied to the clean Android base first.
+          # The consolidated runtime patch then adds current core/sync/status work
           # without replaying obsolete pre-consolidation telemetry patches.
           python tools/patch_android_file_attachments.py
+          python tools/patch_android_artifacts.py
           python tools/patch_android_runtime_cores_v068.py
 
       - uses: actions/setup-java@v5
