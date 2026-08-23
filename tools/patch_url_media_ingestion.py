@@ -8,4 +8,10 @@ b='    install_maintenance_review(app, janus_sleep_cycle)\n'
 if 'install_url_media_ingest(app, curiosity_search_module)' not in s:
     if b not in s: raise SystemExit('bootstrap install anchor missing')
     s=s.replace(b,b+'    install_url_media_ingest(app, curiosity_search_module)\n',1)
-p.write_text(s,encoding='utf-8'); print('URL/media ingestion bootstrap installed')
+# Make deployment verification truthful and visible in the existing public diagnostics page.
+diag='            "quarterly_maintenance_review_enabled": bool(getattr(app.state, "janus_maintenance_review_installed", False)),\n'
+if '"url_media_ingestion_enabled"' not in s:
+    if diag not in s: raise SystemExit('diagnostic anchor missing')
+    s=s.replace(diag,diag+'            "url_media_ingestion_enabled": bool(getattr(app.state, "janus_url_media_ingest", False)),\n            "research_capabilities_route_present": "/capabilities/research" in routes,\n            "youtube_transcript_attempt_enabled": bool(getattr(app.state, "janus_url_media_ingest", False)),\n',1)
+p.write_text(s,encoding='utf-8')
+print('URL/media ingestion bootstrap installed with diagnostics')
