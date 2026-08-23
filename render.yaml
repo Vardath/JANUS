@@ -22,6 +22,14 @@ services:
         generateValue: true
       - key: JANUS_MODEL
         value: gpt-5.6
+      - key: JANUS_CORE_MODEL_CONSULT
+        value: "1"
+      - key: JANUS_FOREGROUND_WEB
+        value: "1"
+      - key: JANUS_CORE_FOREGROUND_MODEL
+        value: gpt-5.6
+      - key: JANUS_BACKGROUND_MODEL
+        value: gpt-5.6
       - key: JANUS_DB_PATH
         value: /data/janus.sqlite3
       - key: JANUS_CORE_CHECKPOINT_SECONDS
