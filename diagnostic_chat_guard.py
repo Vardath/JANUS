@@ -22,6 +22,11 @@ def _remove(app, path: str, method: str) -> None:
 
 def _looks_like_server_diagnostic(message: str) -> bool:
     m = str(message or "").strip().lower()
+    # Research/connectivity questions must reach the real foreground research
+    # path. They are not server-runtime telemetry diagnostics.
+    research_words = ("internet", "web", "youtube", "search", "browse", "browser", "transcript", "caption", "url", "website")
+    if any(x in m for x in research_words):
+        return False
     server_words = ("server janus", "server diagnostic", "online janus diagnostic", "online diagnostic", "global janus diagnostic")
     diagnostic_words = ("diagnostic", "status", "health", "check")
     return any(x in m for x in server_words) or ("server" in m and any(x in m for x in diagnostic_words))
