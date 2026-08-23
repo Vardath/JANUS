@@ -70,6 +70,21 @@ jobs:
           grep -q 'ArtifactActivity' "$MAN"
           grep -q 'androidx.core.content.FileProvider' "$MAN"
           test -s android_v080/app/src/main/res/xml/file_paths.xml
+      - name: Verify native research workspace contract
+        run: |
+          set -euo pipefail
+          RES=android_v080/app/src/main/java/com/vardath/janus/v080/ResearchActivity.java
+          MAN=android_v080/app/src/main/AndroidManifest.xml
+          test -s "$RES"
+          grep -q '/research-provenance/status?limit=20' "$RES"
+          grep -q 'ESTABLISHED / RETRIEVED EVIDENCE' "$RES"
+          grep -q 'PROVISIONAL HYPOTHESES' "$RES"
+          grep -q 'NEGATIVE RESULTS' "$RES"
+          grep -q 'OPEN QUESTIONS' "$RES"
+          grep -q 'PROPOSED TESTS' "$RES"
+          grep -q 'BACKGROUND RESEARCH / PROVENANCE' "$RES"
+          grep -q 'research_digest' "$RES"
+          grep -q 'ResearchActivity' "$MAN"
       - name: Build native v0.80 debug APK
         working-directory: android_v080
         run: gradle --no-daemon --stacktrace :app:assembleDebug
