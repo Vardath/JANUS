@@ -97,8 +97,12 @@ def test_android_attachment_patch_keeps_complete_product_path():
     assert not missing, f"Android attachment workflow regressed; missing: {missing}"
 
 
-def test_android_build_applies_attachment_patch_before_consolidated_runtime():
+def test_android_build_uses_authoritative_composer_with_attachment_before_runtime():
     workflow = Path(".github/workflows/build-android.yml").read_text(encoding="utf-8")
-    attachment = workflow.index("python tools/patch_android_file_attachments.py")
-    consolidated = workflow.index("python tools/patch_android_runtime_cores_v068.py")
+    assert "python tools/compose_android_phase3.py" in workflow
+    # Individual patch commands intentionally live in the composer now, not in
+    # build-android.yml. Verify their required ordering at the authoritative source.
+    composer = Path("tools/compose_android_phase3.py").read_text(encoding="utf-8")
+    attachment = composer.index("tools/patch_android_file_attachments.py")
+    consolidated = composer.index("tools/patch_android_runtime_cores_v068.py")
     assert attachment < consolidated
