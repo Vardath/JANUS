@@ -12,7 +12,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -21,6 +20,7 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -30,6 +30,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,12 +41,19 @@ import java.util.concurrent.Executors;
 public final class MainActivity extends AppCompatActivity {
     private static final String PREFS = "janus_v080";
     private static final String TOKEN = "access_token";
+    private static final String QUEUE = "chat_queue";
+    private static final long[] RETRY_DELAYS_MS = {8_000L, 25_000L, 60_000L};
+
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
+    private final Set<String> renderedMessageIds = new HashSet<>();
+    private final Set<String> inFlightMessageIds = new HashSet<>();
 
     private LinearLayout root;
     private LinearLayout content;
     private TextView status;
+    private TextView chatTranscript;
+    private ScrollView chatScroller;
     private String accessToken = "";
     private String activeTab = "Chat";
 
@@ -51,11 +62,8 @@ public final class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         accessToken = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TOKEN, "");
         buildRoot();
-        if (accessToken == null || accessToken.isBlank()) {
-            showAuth();
-        } else {
-            validateSession();
-        }
+        if (accessToken == null || accessToken.isBlank()) showAuth();
+        else validateSession();
     }
 
     @Override
@@ -68,14 +76,10 @@ public final class MainActivity extends AppCompatActivity {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(16), dp(18), dp(16), dp(14));
-
-        TextView title = text("JANUS · v0.80 dev · 11 cores · 7→2→1→1", 18, true);
-        root.addView(title, matchWrap());
-
+        root.addView(text("JANUS · v0.80 dev · 11 cores · 7→2→1→1", 18, true), matchWrap());
         status = text("Starting…", 13, false);
         status.setPadding(0, dp(6), 0, dp(10));
         root.addView(status, matchWrap());
-
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         root.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -87,11 +91,9 @@ public final class MainActivity extends AppCompatActivity {
         activeTab = "Auth";
         status.setText("Not signed in · checking server…");
         checkHealth();
-
         TextView heading = text("Sign in to JANUS", 30, true);
         heading.setPadding(0, dp(18), 0, dp(16));
         content.addView(heading, matchWrap());
-
         EditText identifier = input("Username or email");
         EditText email = input("Email (for registration)");
         EditText password = input("Password");
@@ -99,45 +101,28 @@ public final class MainActivity extends AppCompatActivity {
         content.addView(identifier, matchWrap());
         content.addView(email, matchWrap());
         content.addView(password, matchWrap());
-
         Button login = button("Sign in");
         Button register = button("Create account");
         content.addView(login, matchWrap());
         content.addView(register, matchWrap());
-
         TextView note = text("v0.80 is the clean native rebuild. It is installed alongside the legacy JANUS app during development.", 14, false);
         note.setPadding(0, dp(16), 0, 0);
         content.addView(note, matchWrap());
-
         login.setOnClickListener(v -> {
             String id = identifier.getText().toString().trim();
             String pw = password.getText().toString();
-            if (id.isEmpty() || pw.isEmpty()) {
-                toast("Enter your username/email and password.");
-                return;
-            }
+            if (id.isEmpty() || pw.isEmpty()) { toast("Enter your username/email and password."); return; }
             JSONObject body = new JSONObject();
-            try {
-                body.put("identifier", id);
-                body.put("password", pw);
-            } catch (Exception ignored) {}
+            try { body.put("identifier", id); body.put("password", pw); } catch (Exception ignored) {}
             authenticate("/auth/login", body);
         });
-
         register.setOnClickListener(v -> {
             String username = identifier.getText().toString().trim();
             String mail = email.getText().toString().trim();
             String pw = password.getText().toString();
-            if (username.isEmpty() || mail.isEmpty() || pw.isEmpty()) {
-                toast("Registration needs username, email and password.");
-                return;
-            }
+            if (username.isEmpty() || mail.isEmpty() || pw.isEmpty()) { toast("Registration needs username, email and password."); return; }
             JSONObject body = new JSONObject();
-            try {
-                body.put("username", username);
-                body.put("email", mail);
-                body.put("password", pw);
-            } catch (Exception ignored) {}
+            try { body.put("username", username); body.put("email", mail); body.put("password", pw); } catch (Exception ignored) {}
             authenticate("/auth/register", body);
         });
     }
@@ -148,13 +133,8 @@ public final class MainActivity extends AppCompatActivity {
             HttpResult result = request("POST", path, body.toString(), false);
             if (result.ok()) {
                 try {
-                    JSONObject json = new JSONObject(result.body);
-                    String token = json.optString("access_token", "");
-                    if (!token.isBlank()) {
-                        saveToken(token);
-                        ui.post(this::showApp);
-                        return;
-                    }
+                    String token = new JSONObject(result.body).optString("access_token", "");
+                    if (!token.isBlank()) { saveToken(token); ui.post(this::showApp); return; }
                 } catch (Exception ignored) {}
             }
             ui.post(() -> status.setText("Sign-in failed · " + friendlyError(result)));
@@ -167,11 +147,7 @@ public final class MainActivity extends AppCompatActivity {
             HttpResult result = request("GET", "/auth/me", null, true);
             ui.post(() -> {
                 if (result.ok()) showApp();
-                else {
-                    clearToken();
-                    showAuth();
-                    status.setText("Session expired or unavailable · sign in again");
-                }
+                else { clearToken(); showAuth(); status.setText("Session expired or unavailable · sign in again"); }
             });
         });
     }
@@ -179,26 +155,22 @@ public final class MainActivity extends AppCompatActivity {
     private void showApp() {
         content.removeAllViews();
         status.setText("Connected session · checking capabilities…");
-
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
-        String[] names = {"Chat", "Messages", "Observe", "Options"};
-        for (String name : names) {
+        for (String name : new String[]{"Chat", "Messages", "Observe", "Options"}) {
             Button b = button(name);
-            b.setAllCaps(false);
             b.setOnClickListener(v -> showTab(name));
             tabs.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         }
         content.addView(tabs, matchWrap());
-
         LinearLayout page = new LinearLayout(this);
         page.setId(View.generateViewId());
         page.setOrientation(LinearLayout.VERTICAL);
-        content.addView(page, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         page.setTag("page");
-
+        content.addView(page, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         checkCapabilities();
         showTab("Chat");
+        flushQueueSoon(500L);
     }
 
     private LinearLayout page() {
@@ -213,27 +185,23 @@ public final class MainActivity extends AppCompatActivity {
         activeTab = tab;
         LinearLayout page = page();
         page.removeAllViews();
-        switch (tab) {
-            case "Messages" -> showPlaceholder(page, "Messages", "Queued JANUS prompts and delivered messages will live here in Stage 3.");
-            case "Observe" -> showPlaceholder(page, "Observe", "Stable readable 11-core telemetry lands here in Stage 3. This native screen will not use the legacy rapid-refresh WebView.");
-            case "Options" -> showOptions(page);
-            default -> showChat(page);
-        }
+        if ("Messages".equals(tab)) showMessages(page);
+        else if ("Observe".equals(tab)) showPlaceholder(page, "Observe", "Stable readable 11-core telemetry lands here in Stage 3. This native screen will not use the legacy rapid-refresh WebView.");
+        else if ("Options".equals(tab)) showOptions(page);
+        else showChat(page);
     }
 
     private void showChat(LinearLayout page) {
         TextView heading = text("Chat", 30, true);
         heading.setPadding(0, dp(12), 0, dp(10));
         page.addView(heading, matchWrap());
-
-        TextView transcript = text("JANUS v0.80 Stage 1 ready. Send a message to test the native client/server round trip.\n", 16, false);
-        transcript.setMovementMethod(new ScrollingMovementMethod());
-        transcript.setPadding(dp(10), dp(10), dp(10), dp(10));
-
-        ScrollView scroller = new ScrollView(this);
-        scroller.addView(transcript, matchWrap());
-        page.addView(scroller, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-
+        chatTranscript = text("JANUS v0.80 Stage 2 ready. Chat uses a durable local queue with bounded retry.\n", 16, false);
+        chatTranscript.setMovementMethod(new ScrollingMovementMethod());
+        chatTranscript.setPadding(dp(10), dp(10), dp(10), dp(10));
+        chatScroller = new ScrollView(this);
+        chatScroller.addView(chatTranscript, matchWrap());
+        page.addView(chatScroller, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        renderQueuedMessages();
         LinearLayout composer = new LinearLayout(this);
         composer.setOrientation(LinearLayout.HORIZONTAL);
         composer.setGravity(Gravity.CENTER_VERTICAL);
@@ -242,64 +210,162 @@ public final class MainActivity extends AppCompatActivity {
         composer.addView(message, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         composer.addView(send, wrapWrap());
         page.addView(composer, matchWrap());
-
         send.setOnClickListener(v -> {
-            String text = message.getText().toString().trim();
-            if (text.isEmpty()) return;
-            String clientId = UUID.randomUUID().toString();
+            String body = message.getText().toString().trim();
+            if (body.isEmpty()) return;
             message.setText("");
-            transcript.append("\nYou\n" + text + "\n");
-            send.setEnabled(false);
-            status.setText("Sending to JANUS…");
+            enqueueChat(body);
+        });
+    }
 
+    private void showMessages(LinearLayout page) {
+        TextView heading = text("Messages", 30, true);
+        heading.setPadding(0, dp(12), 0, dp(10));
+        page.addView(heading, matchWrap());
+        List<QueuedMessage> queue = loadQueue();
+        if (queue.isEmpty()) page.addView(text("No queued messages.", 16, false), matchWrap());
+        else {
+            for (QueuedMessage item : queue) {
+                page.addView(text(item.message + "\nState: queued · attempts " + item.attempts, 15, false), matchWrap());
+            }
+        }
+    }
+
+    private void enqueueChat(String message) {
+        List<QueuedMessage> queue = loadQueue();
+        long now = System.currentTimeMillis();
+        for (QueuedMessage q : queue) {
+            if (q.message.equals(message) && now - q.createdAt < 120_000L) {
+                status.setText("Already queued · duplicate suppressed");
+                return;
+            }
+        }
+        QueuedMessage item = new QueuedMessage(UUID.randomUUID().toString(), message, 0, now);
+        queue.add(item);
+        saveQueue(queue);
+        renderUserOnce(item);
+        status.setText("Sending to JANUS…");
+        sendQueued(item.id);
+    }
+
+    private void sendQueued(String id) {
+        if (inFlightMessageIds.contains(id)) return;
+        QueuedMessage item = findQueued(id);
+        if (item == null) return;
+        inFlightMessageIds.add(id);
+        io.execute(() -> {
             JSONObject payload = new JSONObject();
-            try {
-                payload.put("message", text);
-                payload.put("client_message_id", clientId);
-            } catch (Exception ignored) {}
-
-            io.execute(() -> {
-                HttpResult result = request("POST", "/desktop/chat", payload.toString(), true);
+            try { payload.put("message", item.message); payload.put("client_message_id", item.id); } catch (Exception ignored) {}
+            HttpResult result = request("POST", "/desktop/chat", payload.toString(), true);
+            inFlightMessageIds.remove(id);
+            if (result.ok()) {
                 String reply;
-                if (result.ok()) {
-                    try {
-                        JSONObject json = new JSONObject(result.body);
-                        reply = json.optString("reply", result.body);
-                    } catch (Exception e) {
-                        reply = result.body;
-                    }
-                } else {
-                    reply = "System\n" + friendlyError(result);
-                }
+                try { reply = new JSONObject(result.body).optString("reply", result.body); }
+                catch (Exception e) { reply = result.body; }
+                removeQueued(id);
                 String finalReply = reply;
                 ui.post(() -> {
-                    transcript.append("\nJANUS\n" + finalReply + "\n");
-                    scroller.post(() -> scroller.fullScroll(View.FOCUS_DOWN));
-                    send.setEnabled(true);
-                    status.setText(result.ok() ? "Interface active" : "Reduced capability · request failed");
+                    if (chatTranscript != null && "Chat".equals(activeTab)) {
+                        chatTranscript.append("\nJANUS\n" + finalReply + "\n");
+                        if (chatScroller != null) chatScroller.post(() -> chatScroller.fullScroll(View.FOCUS_DOWN));
+                    }
+                    status.setText("Interface active");
                 });
-            });
+                return;
+            }
+            int attempt = incrementAttempt(id);
+            ui.post(() -> status.setText("Queued locally · retry " + Math.min(attempt, RETRY_DELAYS_MS.length) + "/" + RETRY_DELAYS_MS.length + " · " + friendlyError(result)));
+            if (attempt <= RETRY_DELAYS_MS.length) flushQueueSoon(RETRY_DELAYS_MS[attempt - 1]);
         });
+    }
+
+    private void flushQueueSoon(long delayMs) {
+        ui.postDelayed(() -> {
+            if (accessToken == null || accessToken.isBlank()) return;
+            for (QueuedMessage q : loadQueue()) {
+                if (q.attempts <= RETRY_DELAYS_MS.length) sendQueued(q.id);
+            }
+        }, delayMs);
+    }
+
+    private void renderQueuedMessages() {
+        for (QueuedMessage q : loadQueue()) renderUserOnce(q);
+    }
+
+    private void renderUserOnce(QueuedMessage item) {
+        if (chatTranscript == null || !"Chat".equals(activeTab) || renderedMessageIds.contains(item.id)) return;
+        renderedMessageIds.add(item.id);
+        chatTranscript.append("\nYou\n" + item.message + "\nQueued locally\n");
+    }
+
+    private List<QueuedMessage> loadQueue() {
+        List<QueuedMessage> out = new ArrayList<>();
+        String raw = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(QUEUE, "[]");
+        try {
+            JSONArray array = new JSONArray(raw);
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject o = array.getJSONObject(i);
+                out.add(new QueuedMessage(o.optString("id"), o.optString("message"), o.optInt("attempts", 0), o.optLong("created_at", 0L)));
+            }
+        } catch (Exception ignored) {}
+        return out;
+    }
+
+    private void saveQueue(List<QueuedMessage> queue) {
+        JSONArray array = new JSONArray();
+        try {
+            for (QueuedMessage q : queue) {
+                JSONObject o = new JSONObject();
+                o.put("id", q.id); o.put("message", q.message); o.put("attempts", q.attempts); o.put("created_at", q.createdAt);
+                array.put(o);
+            }
+        } catch (Exception ignored) {}
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(QUEUE, array.toString()).apply();
+    }
+
+    private QueuedMessage findQueued(String id) {
+        for (QueuedMessage q : loadQueue()) if (q.id.equals(id)) return q;
+        return null;
+    }
+
+    private int incrementAttempt(String id) {
+        List<QueuedMessage> queue = loadQueue();
+        int result = 0;
+        for (int i = 0; i < queue.size(); i++) {
+            QueuedMessage q = queue.get(i);
+            if (q.id.equals(id)) {
+                result = q.attempts + 1;
+                queue.set(i, new QueuedMessage(q.id, q.message, result, q.createdAt));
+                break;
+            }
+        }
+        saveQueue(queue);
+        return result;
+    }
+
+    private void removeQueued(String id) {
+        List<QueuedMessage> queue = loadQueue();
+        queue.removeIf(q -> q.id.equals(id));
+        saveQueue(queue);
     }
 
     private void showOptions(LinearLayout page) {
         TextView heading = text("Options", 30, true);
         heading.setPadding(0, dp(12), 0, dp(12));
         page.addView(heading, matchWrap());
-        TextView server = text("Server: " + BuildConfig.SERVER_BASE_URL, 14, false);
-        page.addView(server, matchWrap());
+        page.addView(text("Server: " + BuildConfig.SERVER_BASE_URL, 14, false), matchWrap());
         Button health = button("Check system status");
         Button capabilities = button("Check compatibility");
+        Button retry = button("Retry queued messages now");
         Button logout = button("Sign out");
         page.addView(health, matchWrap());
         page.addView(capabilities, matchWrap());
+        page.addView(retry, matchWrap());
         page.addView(logout, matchWrap());
         health.setOnClickListener(v -> checkHealth());
         capabilities.setOnClickListener(v -> checkCapabilities());
-        logout.setOnClickListener(v -> {
-            clearToken();
-            showAuth();
-        });
+        retry.setOnClickListener(v -> flushQueueSoon(0));
+        logout.setOnClickListener(v -> { clearToken(); showAuth(); });
     }
 
     private void showPlaceholder(LinearLayout page, String headingText, String body) {
@@ -319,10 +385,7 @@ public final class MainActivity extends AppCompatActivity {
     private void checkCapabilities() {
         io.execute(() -> {
             HttpResult result = request("GET", "/protocol/capabilities", null, false);
-            ui.post(() -> {
-                if (result.ok()) status.setText("Interface active · compatibility received");
-                else checkHealth();
-            });
+            ui.post(() -> { if (result.ok()) status.setText("Interface active · compatibility received"); else checkHealth(); });
         });
     }
 
@@ -336,20 +399,15 @@ public final class MainActivity extends AppCompatActivity {
             connection.setReadTimeout(45_000);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("Connection", "close");
-            if (authenticated && accessToken != null && !accessToken.isBlank()) {
-                connection.setRequestProperty("Authorization", "Bearer " + accessToken);
-            }
+            if (authenticated && accessToken != null && !accessToken.isBlank()) connection.setRequestProperty("Authorization", "Bearer " + accessToken);
             if (body != null) {
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                try (OutputStream out = connection.getOutputStream()) {
-                    out.write(body.getBytes(StandardCharsets.UTF_8));
-                }
+                try (OutputStream out = connection.getOutputStream()) { out.write(body.getBytes(StandardCharsets.UTF_8)); }
             }
             int code = connection.getResponseCode();
             InputStream stream = code >= 200 && code < 400 ? connection.getInputStream() : connection.getErrorStream();
-            String text = read(stream);
-            return new HttpResult(code, text, null);
+            return new HttpResult(code, read(stream), null);
         } catch (Exception e) {
             return new HttpResult(0, "", e.getClass().getSimpleName() + ": " + e.getMessage());
         } finally {
@@ -409,23 +467,11 @@ public final class MainActivity extends AppCompatActivity {
         return button;
     }
 
-    private void toast(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-    }
+    private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_SHORT).show(); }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    private LinearLayout.LayoutParams matchWrap() { return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); }
+    private LinearLayout.LayoutParams wrapWrap() { return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); }
 
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    }
-
-    private LinearLayout.LayoutParams wrapWrap() {
-        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    }
-
-    private record HttpResult(int code, String body, String error) {
-        boolean ok() { return code >= 200 && code < 300; }
-    }
+    private record HttpResult(int code, String body, String error) { boolean ok() { return code >= 200 && code < 300; } }
+    private record QueuedMessage(String id, String message, int attempts, long createdAt) {}
 }
