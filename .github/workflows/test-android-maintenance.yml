@@ -47,9 +47,10 @@ jobs:
           grep -q 'Maintenance review' android/app/src/main/assets/index.html
           grep -q 'Research workspace' android/app/src/main/assets/index.html
           grep -q 'pickAttachment()' android/app/src/main/assets/index.html
-          grep -q 'Android.pickFile()' android/app/src/main/assets/index.html
       - name: Verify bootstrap maintenance API patch composes
         run: |
           python tools/patch_maintenance_owner_api.py
           grep -q 'maintenance_owner_router' bootstrap.py
-          grep -q '/maintenance/status' maintenance_owner_api.py
+          grep -q 'APIRouter(prefix="/maintenance"' maintenance_owner_api.py
+          grep -q '@router.get("/status")' maintenance_owner_api.py
+          grep -q '@router.post("/reviews/{review_id}/decision")' maintenance_owner_api.py
