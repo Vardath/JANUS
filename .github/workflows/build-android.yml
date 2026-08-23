@@ -35,6 +35,7 @@ jobs:
           python tools/patch_android_research_workspace.py
           python tools/patch_android_maintenance_review.py
           python tools/patch_android_research_provenance.py
+          python tools/patch_android_protocol_capabilities.py
           python tools/patch_android_runtime_cores_v068.py
 
       - uses: actions/setup-java@v5
