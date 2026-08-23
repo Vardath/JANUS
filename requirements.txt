@@ -8,3 +8,4 @@ google-auth>=2.40,<3
 openai>=1.99,<2
 argon2-cffi>=23.1,<26
 pypdf>=6,<7
+youtube-transcript-api>=1.2,<2
