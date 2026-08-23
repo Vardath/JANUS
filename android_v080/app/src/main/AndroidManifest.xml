@@ -3,7 +3,7 @@
     <application
         android:name=".JanusApplication"
         android:allowBackup="true"
-        android:label="JANUS v0.80"
+        android:label="JANUS"
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
         <activity android:name=".GoogleAuthActivity" android:label="JANUS Google Sign-In" android:exported="false" />
@@ -11,8 +11,8 @@
         <activity android:name=".MaintenanceActivity" android:label="JANUS Maintenance" android:exported="false" />
         <activity android:name=".ResearchActivity" android:label="JANUS Research" android:exported="false" />
         <activity android:name=".ArtifactActivity" android:label="JANUS Artifacts" android:exported="false" />
-        <activity android:name=".MainActivity" android:label="JANUS Chat" android:exported="false" />
-        <activity android:name=".HomeActivity" android:label="JANUS v0.80" android:exported="true">
+        <activity android:name=".HomeActivity" android:label="JANUS" android:exported="false" />
+        <activity android:name=".MainActivity" android:label="JANUS" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
