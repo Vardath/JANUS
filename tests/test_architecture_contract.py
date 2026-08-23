@@ -15,12 +15,13 @@ class ArchitectureContractTests(unittest.TestCase):
     def test_render_rebuilds_base_server_before_boot(self):
         text = (ROOT / "render.yaml").read_text(encoding="utf-8")
         self.assertIn("python tools/rebuild_server.py", text)
-        self.assertIn("uvicorn bootstrap:app", text)
+        self.assertIn("uvicorn janus_app:app", text)
 
     def test_docker_rebuilds_base_server_before_boot(self):
         text = (ROOT / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("RUN python tools/rebuild_server.py", text)
-        self.assertIn("uvicorn bootstrap:app", text)
+        self.assertIn("uvicorn janus_app:app", text)
+        self.assertNotIn("patch_url_media_ingestion.py", text)
 
     def test_server_fragments_exist(self):
         parts = sorted((ROOT / "src").glob("server.py.gz.b64.*"))
