@@ -61,3 +61,14 @@ def test_android_phase3_version_is_not_stale_v069():
     assert "versionCode 70" in text
     assert "versionName '0.70'" in text
     assert 'v0.70: Phase 3 productization baseline' in text
+
+
+def test_fast_offline_chat_retry_is_complete_and_not_half_committed():
+    queue = Path('android/app/src/main/java/com/vardath/janus/JanusOfflineQueue.java').read_text(encoding='utf-8')
+    worker_path = Path('android/app/src/main/java/com/vardath/janus/JanusQueueRetryWorker.java')
+    assert worker_path.exists(), 'JanusOfflineQueue schedules JanusQueueRetryWorker, so the worker must exist in the same commit.'
+    worker = worker_path.read_text(encoding='utf-8')
+    for marker in ['scheduleFastRetries', '8L, 25L, 60L', 'JanusQueueRetryWorker.class']:
+        assert marker in queue
+    for marker in ['class JanusQueueRetryWorker', 'JanusOfflineQueue.flush', 'pendingCount']:
+        assert marker in worker
