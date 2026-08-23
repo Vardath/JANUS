@@ -52,6 +52,7 @@ public final class JanusLocalCoreRuntime {
     private volatile long lastSyncAt=0,pendingBatchMaxAt=0;
     private volatile int lastDisagreementScore=0;
     private final String installationId;
+    private volatile String lastServerStatus="";
 
     private JanusLocalCoreRuntime(Context context){
         prefs=context.getSharedPreferences("janus",Context.MODE_PRIVATE);
@@ -60,7 +61,7 @@ public final class JanusLocalCoreRuntime {
         loadObserveEvents(); loadLocalMemories();
         String id=prefs.getString("core_installation_id",""); if(id==null||id.isEmpty()){id=UUID.randomUUID().toString();prefs.edit().putString("core_installation_id",id).apply();} installationId=id;
         lastConsensus=prefs.getString("core_consensus",""); lastInterface=prefs.getString("core_interface","");
-        lastSyncAt=prefs.getLong("core_last_sync_at",0L);
+        lastSyncAt=prefs.getLong("core_last_sync_at",0L); lastServerStatus=prefs.getString("core_server_status","");
         lastBackgroundCycleAt=prefs.getLong("core_last_background_cycle_at",0L);
         lastAutonomousAt=prefs.getLong("core_last_autonomous_at",0L);
         lastSelfAssessAt=prefs.getLong("core_last_self_assess_at",0L);
@@ -310,12 +311,14 @@ public final class JanusLocalCoreRuntime {
         JSONObject cj=new JSONObject();for(Core c:cores.values()){JSONObject x=new JSONObject().put("awake",started).put("available",started).put("processing_mode","interface".equals(c.name)?"continuous":("wake".equals(phase)?"full-rate":"low-duty")).put("cycle_count",c.cycles).put("pending_messages",c.inbox.size()).put("last_output",c.last);JSONArray w=new JSONArray();for(long v:c.fano)w.put(v);long line=c.fano[1]+c.fano[2]+c.fano[3],off=c.fano[4]+c.fano[5]+c.fano[6]+c.fano[7];x.put("fano",new JSONObject().put("weights",w).put("step_count",c.fanoSteps).put("active_direction",c.activeDirection).put("projection_1_3_4",new JSONObject().put("origin",c.fano[0]).put("line",line).put("off_line",off)));cj.put(c.name,x);}root.put("cores",cj);return root;
     }
 
+    synchronized String serverStatusJson(){return lastServerStatus==null?"":lastServerStatus;}
+
     private JSONObject summary() throws Exception{JSONObject cycles=new JSONObject();for(Core c:cores.values())cycles.put(c.name,c.cycles);return new JSONObject().put("device_id",installationId).put("phase",phase).put("consensus",lastConsensus).put("interface",lastInterface).put("cycles",cycles).put("observe_events",unsyncedObserveArray());}
     private void syncSafe(){try{sync();}catch(Exception e){lastSyncState="offline";}}
     private synchronized void sync() throws Exception{
         String token=prefs.getString("access_token","");if(token==null||token.trim().isEmpty()){lastSyncState="not-signed-in";return;}
         HttpURLConnection c=(HttpURLConnection)new URL(SERVER+"/core-sync/exchange").openConnection();c.setRequestMethod("POST");c.setDoOutput(true);c.setConnectTimeout(15000);c.setReadTimeout(30000);c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("Authorization","Bearer "+token.trim());JSONObject payload=summary();try(OutputStream os=c.getOutputStream()){os.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
         int code=c.getResponseCode();BufferedReader r=new BufferedReader(new InputStreamReader(code>=400?c.getErrorStream():c.getInputStream(),StandardCharsets.UTF_8));StringBuilder b=new StringBuilder();String line;while((line=r.readLine())!=null)b.append(line);r.close();
-        if(code<400){JSONObject server=new JSONObject(b.toString()).optJSONObject("server");if(server!=null){String rc=server.optString("consensus","");String ri=server.optString("interface","");if(!rc.isEmpty())send("interface","consensus","global consensus: "+rc);if(!ri.isEmpty())send("consensus","interface","global interface: "+ri);serviceBurst(true);}if(pendingBatchMaxAt>lastSyncAt)lastSyncAt=pendingBatchMaxAt;lastSyncState="connected";persist();}else lastSyncState="server-error-"+code;
+        if(code<400){JSONObject server=new JSONObject(b.toString()).optJSONObject("server");if(server!=null){lastServerStatus=server.toString();prefs.edit().putString("core_server_status",lastServerStatus).apply();}if(server!=null){String rc=server.optString("consensus","");String ri=server.optString("interface","");if(!rc.isEmpty())send("interface","consensus","global consensus: "+rc);if(!ri.isEmpty())send("consensus","interface","global interface: "+ri);serviceBurst(true);}if(pendingBatchMaxAt>lastSyncAt)lastSyncAt=pendingBatchMaxAt;lastSyncState="connected";persist();}else lastSyncState="server-error-"+code;
     }
 }

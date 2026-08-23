@@ -4,8 +4,13 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.database.Cursor;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.provider.OpenableColumns;
+import android.content.ContentValues;
+import android.provider.MediaStore;
+import android.util.Base64;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
@@ -27,6 +32,7 @@ import androidx.credentials.exceptions.GetCredentialException;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
+import androidx.core.content.FileProvider;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -41,6 +47,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -53,10 +63,16 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends Activity {
     static final String SERVER = "https://janus-global-core.onrender.com";
     private static final int RC_GOOGLE_COMPAT = 731;
+    private static final int RC_FILE_PICKER = 732;
+    private static final int RC_ARTIFACT_EXPORT = 733;
+    private static final int MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
     private WebView web;
     private CredentialManager credentialManager;
     private GoogleSignInClient legacyGoogleClient;
     private final ExecutorService pool = Executors.newCachedThreadPool();
+    private String pendingArtifactFileId = "";
+    private String pendingArtifactName = "JANUS-artifact.md";
+    private String pendingArtifactMime = "text/markdown";
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override public void onCreate(Bundle state) {
@@ -107,6 +123,7 @@ public class MainActivity extends Activity {
                         "window.janusLocalEvidence=function(p){try{var r=JSON.parse(Android.localCoreStatus());var events=(r.observe_events||[]).slice().reverse();if(p==='observe'){var rows=events.filter(function(x){return observeMode==='all'||(observeMode==='interactions'&&x.event_type==='interaction')||(observeMode==='thoughts'&&x.event_type!=='interaction');}).slice(0,160);var h=rows.map(function(x){return '<div class=\"card\"><b>local · '+esc((x.core_name||'core').replaceAll('_',' '))+(x.peer_core?' → '+esc(x.peer_core.replaceAll('_',' ')):'')+' · '+esc((x.event_type||'note').replaceAll('_',' '))+'</b><div class=\"small\">'+fmt(new Date(Number(x.created_at||0)).toISOString())+' · this device</div><div>'+esc(x.detail||'')+'</div></div>';}).join('');if(h){var old=observeList.innerHTML;if(old.indexOf('No observable core activity yet.')>=0)old='';observeList.innerHTML='<div class=\"card\"><b>This device · live local journal</b><div class=\"small\">Available without server sync.</div></div>'+h+old;}}if(p==='memory'){var mem=(r.local_memories||[]).slice().reverse().slice(0,80);if(mem.length){var old=memoryList.innerHTML;if(old.indexOf('No memories yet.')>=0)old='';memoryList.innerHTML='<div class=\"card\"><b>This device · local memory</b><div class=\"small\">App-private continuity used by autonomous local pulses.</div></div>'+mem.map(function(x){return '<div class=\"item\"><b>local · working</b><div>'+esc(x)+'</div></div>';}).join('')+old;}}if(p==='activity'){var rows=events.filter(function(x){return ['autonomous_pulse','self_assessment','process_note','interaction','user_topic','phase'].indexOf(x.event_type)>=0;}).slice(0,120);if(rows.length){var old=activityList.innerHTML;if(old.indexOf('No activity yet.')>=0)old='';activityList.innerHTML='<div class=\"card\"><b>This device · local activity</b></div>'+rows.map(function(x){return '<div class=\"item\"><b>'+esc((x.event_type||'activity').replaceAll('_',' '))+' · '+esc((x.core_name||'core').replaceAll('_',' '))+'</b><div class=\"small\">'+fmt(new Date(Number(x.created_at||0)).toISOString())+'</div><div>'+esc(x.detail||'')+'</div></div>';}).join('')+old;}}}catch(e){}};" +
                         "if(window.refresh&&!window.__janusCoreRefreshWrapped){window.__janusCoreRefreshWrapped=true;var oldRefresh=window.refresh;window.refresh=async function(p){var x;try{x=await oldRefresh(p);}catch(e){}if(p==='cores')setTimeout(window.refreshCoreTopology,80);if(p==='observe'||p==='memory'||p==='activity')setTimeout(function(){window.janusLocalEvidence(p);},80);return x;};}" +
                         "if(window.show&&!window.__janusCoreShowWrapped){window.__janusCoreShowWrapped=true;var oldShow=window.show;window.show=function(p){var x=oldShow(p);if(p==='cores')setTimeout(window.refreshCoreTopology,80);if(p==='observe'||p==='memory'||p==='activity')setTimeout(function(){window.janusLocalEvidence(p);},120);return x;};}";
+                js += "window.__janusTelemetryV068=true;window.refreshCoreTopology=function(){var host=document.getElementById('coreTopology');if(!host)return;var local={};try{local=JSON.parse(Android.localCoreStatus()||'{}');}catch(e){}var raw='';try{raw=Android.serverCoreStatus()||'';}catch(e){}var server={};try{if(raw)server=JSON.parse(raw);}catch(e){}var has=server&&server.cores&&Object.keys(server.cores).length>0;var intro='<div class=\"card\"><b>JANUS 11-core topology</b><div class=\"small\">This device and Server JANUS are independent runtimes. Server values come from the authenticated core-sync exchange already used by this app.</div></div>';var sh=has?window.renderCoreSide('SERVER JANUS · LIVE',server,false):'<div class=\"card\"><b>SERVER JANUS · WAITING FOR SYNC SNAPSHOT</b><div class=\"small\">Local sync: '+esc(local.sync_state||'unknown')+'. Snapshot bytes: '+esc(raw?raw.length:0)+'. Connected + zero bytes means native capture failed; nonzero bytes means rendering/parser failed.</div></div>';host.innerHTML=intro+window.renderCoreSide('THIS DEVICE JANUS · LIVE',local,true)+sh;};if(!window.__janusTelemetryPollV068){window.__janusTelemetryPollV068=setInterval(function(){try{var v=document.getElementById('cores');if(v&&v.classList.contains('active'))window.refreshCoreTopology();}catch(e){}},3000);}";
                 view.evaluateJavascript(js, null);
                 pool.submit(() -> {
                     JanusOfflineQueue.flush(MainActivity.this);
@@ -223,9 +240,169 @@ public class MainActivity extends Activity {
 
     private void startGoogleSignIn() { requestGoogleCredential(false); }
 
+
+
+    private String accessToken() {
+        String token = getSharedPreferences("janus", MODE_PRIVATE).getString("access_token", "");
+        return token == null ? "" : token;
+    }
+
+    private byte[] downloadArtifactBytes(String fileId) throws Exception {
+        if (fileId == null || fileId.isBlank()) throw new IllegalArgumentException("Artifact file is unavailable.");
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(SERVER + "/files/" + java.net.URLEncoder.encode(fileId, "UTF-8") + "/download").openConnection();
+            c.setRequestMethod("GET");
+            c.setConnectTimeout(20000);
+            c.setReadTimeout(120000);
+            String token = accessToken();
+            if (!token.isBlank()) c.setRequestProperty("Authorization", "Bearer " + token);
+            int code = c.getResponseCode();
+            if (code >= 400) throw new IllegalStateException("JANUS could not export this artifact (HTTP " + code + ").");
+            try (InputStream input = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[32768]; int n;
+                while ((n = input.read(buffer)) >= 0) out.write(buffer, 0, n);
+                return out.toByteArray();
+            }
+        } finally { if (c != null) c.disconnect(); }
+    }
+
+    private void artifactResult(boolean ok, String message) {
+        final String js = "if(window.__janusArtifactExportResult)window.__janusArtifactExportResult(" + ok + "," + quote(message == null ? "" : message) + ")";
+        runOnUiThread(() -> { if (web != null) web.evaluateJavascript(js, null); });
+    }
+
+    private void startArtifactExport(String fileId, String filename, String mime) {
+        pendingArtifactFileId = fileId == null ? "" : fileId;
+        pendingArtifactName = filename == null || filename.isBlank() ? "JANUS-artifact.md" : filename;
+        pendingArtifactMime = mime == null || mime.isBlank() ? "application/octet-stream" : mime;
+        try {
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType(pendingArtifactMime);
+            intent.putExtra(Intent.EXTRA_TITLE, pendingArtifactName);
+            startActivityForResult(intent, RC_ARTIFACT_EXPORT);
+        } catch (Exception e) { artifactResult(false, "Unable to open Android export: " + e.getMessage()); }
+    }
+
+    private void finishArtifactExport(Uri destination) {
+        final String fileId = pendingArtifactFileId;
+        pool.submit(() -> {
+            try {
+                byte[] bytes = downloadArtifactBytes(fileId);
+                try (OutputStream out = getContentResolver().openOutputStream(destination, "w")) {
+                    if (out == null) throw new IllegalStateException("Android could not open the selected destination.");
+                    out.write(bytes);
+                }
+                artifactResult(true, "Artifact exported successfully.");
+            } catch (Exception e) { artifactResult(false, e.getMessage()); }
+        });
+    }
+
+    private void shareArtifact(String fileId, String filename, String mime) {
+        final String safeName = (filename == null || filename.isBlank()) ? "JANUS-artifact.md" : filename.replaceAll("[\\/]+", "-");
+        final String safeMime = (mime == null || mime.isBlank()) ? "application/octet-stream" : mime;
+        pool.submit(() -> {
+            try {
+                byte[] bytes = downloadArtifactBytes(fileId);
+                File dir = new File(getCacheDir(), "shared_artifacts");
+                if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Could not prepare Android share storage.");
+                File out = new File(dir, safeName);
+                try (FileOutputStream stream = new FileOutputStream(out)) { stream.write(bytes); }
+                Uri uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", out);
+                runOnUiThread(() -> {
+                    try {
+                        Intent send = new Intent(Intent.ACTION_SEND);
+                        send.setType(safeMime);
+                        send.putExtra(Intent.EXTRA_STREAM, uri);
+                        send.putExtra(Intent.EXTRA_SUBJECT, safeName);
+                        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(send, "Share JANUS artifact"));
+                        artifactResult(true, "Android share sheet opened.");
+                    } catch (Exception e) { artifactResult(false, "Unable to share artifact: " + e.getMessage()); }
+                });
+            } catch (Exception e) { artifactResult(false, e.getMessage()); }
+        });
+    }
+
+    private void startFilePicker() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("*/*");
+            startActivityForResult(intent, RC_FILE_PICKER);
+        } catch (Exception e) {
+            deliverFilePickerError("Unable to open the file picker: " + e.getMessage());
+        }
+    }
+
+    private String displayName(Uri uri) {
+        String name = "attachment";
+        Cursor cursor = null;
+        try {
+            cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int i = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (i >= 0 && cursor.getString(i) != null && !cursor.getString(i).isBlank()) name = cursor.getString(i);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return name;
+    }
+
+    private byte[] readAttachment(Uri uri) throws Exception {
+        try (InputStream input = getContentResolver().openInputStream(uri); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            if (input == null) throw new IllegalArgumentException("The selected file could not be opened.");
+            byte[] buffer = new byte[32768];
+            int total = 0, n;
+            while ((n = input.read(buffer)) >= 0) {
+                total += n;
+                if (total > MAX_ATTACHMENT_BYTES) throw new IllegalArgumentException("JANUS currently accepts files up to 8 MiB.");
+                out.write(buffer, 0, n);
+            }
+            if (total == 0) throw new IllegalArgumentException("Empty files are not supported.");
+            return out.toByteArray();
+        }
+    }
+
+    private void deliverFilePickerError(String message) {
+        final String js = "if(window.__janusFilePickError)window.__janusFilePickError(" + quote(message == null ? "File selection failed." : message) + ")";
+        runOnUiThread(() -> { if (web != null) web.evaluateJavascript(js, null); });
+    }
+
+    private void deliverPickedFile(Uri uri) {
+        pool.submit(() -> {
+            try {
+                byte[] bytes = readAttachment(uri);
+                String mime = getContentResolver().getType(uri);
+                if (mime == null || mime.isBlank()) mime = "application/octet-stream";
+                JSONObject item = new JSONObject();
+                item.put("filename", displayName(uri));
+                item.put("mime_type", mime);
+                item.put("data_base64", Base64.encodeToString(bytes, Base64.NO_WRAP));
+                final String js = "if(window.__janusFilePicked)window.__janusFilePicked(JSON.parse(" + quote(item.toString()) + "))";
+                runOnUiThread(() -> { if (web != null) web.evaluateJavascript(js, null); });
+            } catch (Exception e) {
+                deliverFilePickerError(e.getMessage());
+            }
+        });
+    }
+
     @Override @SuppressWarnings("deprecation")
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RC_FILE_PICKER) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) deliverPickedFile(data.getData());
+            else deliverFilePickerError("File selection was cancelled.");
+            return;
+        }
+        if (requestCode == RC_ARTIFACT_EXPORT) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) finishArtifactExport(data.getData());
+            else artifactResult(false, "Artifact export was cancelled.");
+            return;
+        }
         if (requestCode != RC_GOOGLE_COMPAT) return;
         try {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
@@ -274,7 +451,11 @@ public class MainActivity extends Activity {
             try { return JanusLocalCoreRuntime.get(MainActivity.this).statusJson().toString(); }
             catch (Exception e) { return "{\"architecture\":\"11-core\",\"phase\":\"unknown\",\"error\":\"local status unavailable\"}"; }
         }
+        @JavascriptInterface public String serverCoreStatus() { try { return JanusLocalCoreRuntime.get(MainActivity.this).serverStatusJson(); } catch (Exception e) { return ""; } }
         @JavascriptInterface public void googleSignIn() { runOnUiThread(MainActivity.this::startGoogleSignIn); }
+        @JavascriptInterface public void pickFile() { runOnUiThread(MainActivity.this::startFilePicker); }
+        @JavascriptInterface public void exportArtifact(String fileId, String filename, String mime) { runOnUiThread(() -> startArtifactExport(fileId, filename, mime)); }
+        @JavascriptInterface public void shareArtifact(String fileId, String filename, String mime) { MainActivity.this.shareArtifact(fileId, filename, mime); }
         @JavascriptInterface public String serverUrl() { return SERVER; }
         @JavascriptInterface public void request(String id, String method, String path, String json) {
             final boolean isChat = "POST".equals(method) && "/desktop/chat".equals(path);
