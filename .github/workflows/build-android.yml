@@ -21,37 +21,39 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Validate hard-coded Android UI JavaScript
+      - name: Verify clean native rebuild boundary
         shell: bash
         run: |
           set -euxo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import re
-          html = Path('android/app/src/main/assets/index.html').read_text(encoding='utf-8')
-          scripts = re.findall(r'<script(?:\s[^>]*)?>([\s\S]*?)</script>', html, flags=re.I)
-          if not scripts:
-              raise SystemExit('No Android UI scripts found')
-          out = Path('/tmp/janus-js')
-          out.mkdir(exist_ok=True)
-          for i, script in enumerate(scripts):
-              (out / f'script-{i}.js').write_text(script, encoding='utf-8')
-          print(f'Extracted {len(scripts)} scripts for syntax validation')
-          PY
-          for f in /tmp/janus-js/*.js; do node --check "$f"; done
-
-      - name: Verify hard-coded Android product markers
-        shell: bash
-        run: |
-          set -euxo pipefail
-          grep -q 'id="attachBtn"' android/app/src/main/assets/index.html
-          grep -q 'Research workspace' android/app/src/main/assets/index.html
-          grep -q 'Maintenance review' android/app/src/main/assets/index.html
-          grep -q 'Compatibility' android/app/src/main/assets/index.html
-          grep -q 'janusUiRecovery' android/app/src/main/assets/index.html
-          grep -q 'pickFile()' android/app/src/main/java/com/vardath/janus/MainActivity.java
-          grep -q 'ACTION_CREATE_DOCUMENT' android/app/src/main/java/com/vardath/janus/MainActivity.java
-          grep -q 'ACTION_SEND' android/app/src/main/java/com/vardath/janus/MainActivity.java
+          SRC=android/app/src/main/java/com/vardath/janus/MainActivity.java
+          MAN=android/app/src/main/AndroidManifest.xml
+          GRADLE=android/app/build.gradle
+          test -s "$SRC"
+          test -s "$MAN"
+          test -s "$GRADLE"
+          test ! -e android/app/src/main/assets/index.html
+          ! grep -q 'WebView' "$SRC"
+          ! grep -q 'JavascriptInterface' "$SRC"
+          grep -q 'class MainActivity extends Activity' "$SRC"
+          grep -q 'applicationId '\''com.vardath.janus'\''' "$GRADLE"
+          grep -q 'versionName '\''0.81'\''' "$GRADLE"
+          grep -q 'Username or email' "$SRC"
+          grep -q 'Create account' "$SRC"
+          grep -q 'Continue with Google' "$SRC"
+          grep -q '"Chat", "Messages", "Observe", "Options"' "$SRC"
+          grep -q '/auth/login' "$SRC"
+          grep -q '"identifier"' "$SRC"
+          grep -q '/auth/register' "$SRC"
+          grep -q '/desktop/chat' "$SRC"
+          grep -q '/desktop/messages?username=' "$SRC"
+          grep -q '/desktop/runtime-cores?username=' "$SRC"
+          grep -q '/files/upload' "$SRC"
+          grep -q 'ACTION_OPEN_DOCUMENT' "$SRC"
+          grep -q 'Research workspace' "$SRC"
+          grep -q 'Maintenance review' "$SRC"
+          grep -q 'Background research' "$SRC"
+          grep -q 'System status' "$SRC"
+          test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
 
       - uses: actions/setup-java@v5
         with:
@@ -83,7 +85,7 @@ jobs:
           VERSION=$(sed -n "s/^[[:space:]]*versionName[[:space:]]*'\([^']*\)'.*/\1/p" android/app/build.gradle | head -n1)
           test -n "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "apk_name=JANUS-Android-v$VERSION.apk" >> "$GITHUB_OUTPUT"
+          echo "apk_name=JANUS-Android-v$VERSION-CLEAN-REBUILD.apk" >> "$GITHUB_OUTPUT"
 
       - name: Build debug APK
         working-directory: android
@@ -99,17 +101,18 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
           {
-            echo "JANUS Android OAuth build identity"
+            echo "JANUS Android clean rebuild identity"
             echo "Version: $VERSION"
             echo "Package: com.vardath.janus"
             echo "Source commit: $GITHUB_SHA"
+            echo "UI: native Android (no WebView)"
             echo "Signing certificate from build keystore:"
             keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1:|SHA256:' || true
           } > oauth-build-info.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: JANUS-Android-v${{ steps.app_version.outputs.version }}
+          name: JANUS-Android-v${{ steps.app_version.outputs.version }}-CLEAN-REBUILD
           path: |
             ${{ steps.app_version.outputs.apk_name }}
             oauth-build-info.txt
@@ -132,9 +135,9 @@ jobs:
           mkdir -p downloads
           cp "/tmp/janus-apk/$APK_NAME" downloads/
           cp /tmp/janus-apk/oauth-build-info.txt downloads/
-          printf '# JANUS Android downloads\n\nLatest debug APK: %s\n\n## OAuth build identity\n\n```text\n' "$APK_NAME" > README.md
+          printf '# JANUS Android downloads\n\nLatest clean rebuild APK: %s\n\n## Build identity\n\n```text\n' "$APK_NAME" > README.md
           cat /tmp/janus-apk/oauth-build-info.txt >> README.md
           printf '\n```\n' >> README.md
           git add README.md "downloads/$APK_NAME" downloads/oauth-build-info.txt
-          git commit -m "Publish JANUS Android v$VERSION APK"
+          git commit -m "Publish JANUS Android clean rebuild v$VERSION"
           git push --force origin HEAD:apk-download
