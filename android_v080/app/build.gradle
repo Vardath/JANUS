@@ -1,0 +1,28 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.vardath.janus.v080'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.vardath.janus.v080'
+        minSdk 26
+        targetSdk 36
+        versionCode 80
+        versionName '0.80-dev1'
+        def serverBaseUrl = project.findProperty('JANUS_SERVER_BASE_URL') ?: 'https://janus-global-core.onrender.com'
+        buildConfigField 'String', 'SERVER_BASE_URL', '"' + serverBaseUrl + '"'
+    }
+
+    buildFeatures { buildConfig true }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.core:core:1.16.0'
+}
