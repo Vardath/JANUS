@@ -29,6 +29,7 @@ HTML_MARKERS = [
     'Compatibility',
     'id="themeMode"',
     'id="themeAccent"',
+    'id="janusUiRecovery"',
 ]
 
 JAVA_MARKERS = [
@@ -43,22 +44,34 @@ def run_patch(path: str) -> None:
     subprocess.run([sys.executable, path], cwd=ROOT, check=True)
 
 
-def verify() -> None:
+def current_text() -> tuple[str, str, str]:
     html = (ROOT / "android/app/src/main/assets/index.html").read_text(encoding="utf-8")
     java = (ROOT / "android/app/src/main/java/com/vardath/janus/MainActivity.java").read_text(encoding="utf-8")
     gradle = (ROOT / "android/app/build.gradle").read_text(encoding="utf-8")
+    return html, java, gradle
 
+
+def already_consolidated() -> bool:
+    html, java, _ = current_text()
+    return all(marker in html for marker in HTML_MARKERS) and all(marker in java for marker in JAVA_MARKERS)
+
+
+def verify() -> None:
+    html, java, gradle = current_text()
     missing = [marker for marker in HTML_MARKERS if marker not in html]
     missing += [marker for marker in JAVA_MARKERS if marker not in java]
     if "versionCode 70" not in gradle or "versionName '0.70'" not in gradle:
         missing.append("Android v0.70 version identity")
     if missing:
         raise SystemExit("Phase 3 composition verification failed; missing: " + ", ".join(missing))
-
     print("[compose] Android Phase 3 composition verified")
 
 
 def main() -> int:
+    if already_consolidated():
+        print("[compose] Android source is already hard-coded/consolidated; no patch scripts will run")
+        verify()
+        return 0
     for patch in PATCHES:
         run_patch(patch)
     verify()
