@@ -36,6 +36,7 @@ jobs:
           set -euxo pipefail
           python tools/patch_android_file_attachments.py
           python tools/patch_android_artifacts.py
+          python tools/patch_android_artifact_export.py
           python tools/patch_android_research_workspace.py
           python tools/patch_android_maintenance_review.py
           python tools/patch_android_research_provenance.py
@@ -50,3 +51,6 @@ jobs:
           grep -q 'Research workspace' android/app/src/main/assets/index.html
           grep -q 'Artifacts' android/app/src/main/assets/index.html
           grep -q 'pickAttachment' android/app/src/main/assets/index.html
+          grep -q 'Download / Export' android/app/src/main/assets/index.html
+          grep -q 'shareArtifactNative' android/app/src/main/assets/index.html
+          grep -q 'fileprovider' android/app/src/main/AndroidManifest.xml
