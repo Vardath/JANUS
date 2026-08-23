@@ -13,14 +13,19 @@ Phase 2 established the stabilization baseline. Phase 3 turns the capabilities a
 ## Ordered plan
 
 1. **Reconcile capability/deferred registry** — remove stale roadmap entries for server features already completed and explicitly identify the client/product gaps that remain. **IMPLEMENTED.**
-2. **Android attachment workflow** — add file/image picker, upload progress, account-bound attachment list, deletion, and attachment references in Chat. Reuse the existing server attachment/document-grounding/vision stack rather than creating a second upload path.
-3. **Android generated-artifact workflow** — expose JANUS-created research notes, continuity reports, project snapshots and digests in the app with download/open/share actions.
-4. **Research workspace UI** — expose hypotheses, proven mathematical results, negative results, open questions, evidence and proposed tests as distinct readable categories in Android.
-5. **Maintenance/upgrade approval UI** — surface JANUS's 90-day maintenance proposal, owner notification state and approve/defer/reject workflow without permitting self-modification.
-6. **Background research provenance UI** — show useful completed autonomous research, source provenance, suppression reasons and external-compute usage in readable form rather than raw telemetry.
-7. **Protocol/capability negotiation** — publish an explicit server/client capability document so old Android clients can degrade cleanly when the server gains new endpoints and the server can distinguish missing client capabilities from failures.
-8. **Android release hardening** — consolidate patch scripts further, remove stale version text/legacy injection assumptions, and add UI-level regression checks for the major Android screens.
-9. **Phase 3 release checkpoint** — freeze feature additions, run the full server + Android matrix, document known limits and publish a known-good APK/server protocol baseline.
+2. **URL / YouTube / transcript research integration** — direct public URL text ingestion, per-video transcript attempts, provenance, profile-isolated caching, no-fabrication fallback and truthful capability reporting. **IMPLEMENTED 2026-08-23; deployment/regression validation pending.**
+3. **Android attachment workflow** — add file/image picker, upload progress, account-bound attachment list, deletion, and attachment references in Chat. Reuse the existing server attachment/document-grounding/vision stack rather than creating a second upload path. UI restored; end-to-end regression validation remains.
+4. **Android generated-artifact workflow** — expose JANUS-created research notes, continuity reports, project snapshots and digests in the app with download/open/share actions.
+5. **Research workspace UI** — expose hypotheses, proven mathematical results, negative results, open questions, evidence and proposed tests as distinct readable categories in Android.
+6. **Maintenance/upgrade approval UI** — surface JANUS's 90-day maintenance proposal, owner notification state and approve/defer/reject workflow without permitting self-modification.
+7. **Background research provenance UI** — show useful completed autonomous research, source provenance, suppression reasons and external-compute usage in readable form rather than raw telemetry.
+8. **Protocol/capability negotiation** — publish an explicit server/client capability document so old Android clients can degrade cleanly when the server gains new endpoints and the server can distinguish missing client capabilities from failures.
+9. **Android release hardening** — consolidate patch scripts further, remove stale version text/legacy injection assumptions, and add UI-level regression checks for the major Android screens.
+10. **Phase 3 release checkpoint** — freeze feature additions, run the full server + Android matrix, document known limits and publish a known-good APK/server protocol baseline.
+
+## URL/media implementation boundary
+
+Foreground pasted URLs are fetched directly where public text is available. YouTube video URLs attempt captions/transcripts and retain an explicit unavailable state rather than fabricating text. Retrieved material is injected into the existing multi-core research fabric, not answered from as a separate unexamined subsystem. Cache keys are profile + canonical URL. Channel-wide autonomous crawling remains disabled; bounded channel discovery can continue through the existing web-search fabric.
 
 ## Already implemented and therefore not deferred anymore
 
