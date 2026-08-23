@@ -1,0 +1,128 @@
+name: Phase 3 Release Checkpoint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.py'
+      - 'tests/**'
+      - 'android/**'
+      - 'tools/patch_android_*.py'
+      - 'tools/compose_android_phase3.py'
+      - 'requirements.txt'
+      - 'JANUS_PHASE3_PRODUCTIZATION.md'
+      - 'JANUS_PHASE3_RELEASE_CHECKPOINT.md'
+      - '.github/workflows/phase3-release-checkpoint.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  server-release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Reconstruct deployed server
+        run: python tools/rebuild_server.py
+      - name: Verify architecture, auth, persistence and product boundaries
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          JANUS_DB_PATH: /tmp/janus-phase3-release.sqlite3
+          JANUS_AUTH_DB: /tmp/janus-phase3-release.sqlite3
+          JANUS_FILE_DIR: /tmp/janus-phase3-release-files
+          OPENAI_API_KEY: test-key-not-used
+        run: >-
+          python -m pytest -q
+          tests/test_architecture_contract.py
+          tests/test_auth_local.py
+          tests/test_secure_desktop.py
+          tests/test_attachment_chat.py
+          tests/test_attachment_productization.py
+          tests/test_continuity_governance.py
+          tests/test_federated_sync.py
+          tests/test_cost_governor.py
+          tests/test_maintenance_review.py
+          tests/test_outbound_artifacts.py
+          tests/test_research_workspace.py
+          tests/test_background_usefulness.py
+
+  android-release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install test dependency
+        run: python -m pip install -q pytest
+      - name: Run Phase 3 Android productization regressions
+        run: >-
+          python -m pytest -q
+          tests/test_attachment_productization.py
+          tests/test_android_artifact_productization.py
+          tests/test_android_research_workspace.py
+          tests/test_android_maintenance_review.py
+          tests/test_android_research_provenance.py
+          tests/test_android_ui_hardening.py
+      - name: Compose authoritative Android Phase 3 product
+        run: python tools/compose_android_phase3.py
+      - name: Verify frozen release identity and product markers
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q "versionName '0.70'" android/app/build.gradle
+          grep -q "versionCode 70" android/app/build.gradle
+          grep -q 'id="attachBtn"' android/app/src/main/assets/index.html
+          grep -q 'Artifacts' android/app/src/main/assets/index.html
+          grep -q 'Download / Export' android/app/src/main/assets/index.html
+          grep -q 'Research workspace' android/app/src/main/assets/index.html
+          grep -q 'Maintenance review' android/app/src/main/assets/index.html
+          grep -q 'Background research' android/app/src/main/assets/index.html
+          grep -q 'Compatibility' android/app/src/main/assets/index.html
+          grep -q 'id="themeMode"' android/app/src/main/assets/index.html
+          grep -q 'ACTION_CREATE_DOCUMENT' android/app/src/main/java/com/vardath/janus/MainActivity.java
+          grep -q 'ACTION_SEND' android/app/src/main/java/com/vardath/janus/MainActivity.java
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: '8.11.1'
+      - name: Ensure debug signing key exists
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+      - name: Assemble Phase 3 release-candidate APK
+        working-directory: android
+        env:
+          JANUS_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}
+        run: gradle :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
+      - name: Prepare release-candidate artifact
+        shell: bash
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk JANUS-Android-v0.70-phase3-rc.apk
+          {
+            echo "JANUS Phase 3 release candidate"
+            echo "Android version: 0.70"
+            echo "Package: com.vardath.janus"
+            echo "Commit: $GITHUB_SHA"
+            echo "Composer: tools/compose_android_phase3.py"
+          } > phase3-release-identity.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JANUS-Phase3-v0.70-Release-Candidate
+          path: |
+            JANUS-Android-v0.70-phase3-rc.apk
+            phase3-release-identity.txt
+          if-no-files-found: error
