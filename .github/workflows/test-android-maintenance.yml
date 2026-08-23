@@ -46,7 +46,8 @@ jobs:
           python tools/patch_android_maintenance_review.py
           grep -q 'Maintenance review' android/app/src/main/assets/index.html
           grep -q 'Research workspace' android/app/src/main/assets/index.html
-          grep -q 'attachmentPicker' android/app/src/main/assets/index.html
+          grep -q 'pickAttachment()' android/app/src/main/assets/index.html
+          grep -q 'Android.pickFile()' android/app/src/main/assets/index.html
       - name: Verify bootstrap maintenance API patch composes
         run: |
           python tools/patch_maintenance_owner_api.py
