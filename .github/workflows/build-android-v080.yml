@@ -7,6 +7,7 @@ on:
       - 'android_v080/**'
       - '.github/workflows/build-android-v080.yml'
       - 'JANUS_ANDROID_V080_STAGE0_MAP.md'
+      - 'JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md'
   workflow_dispatch:
 
 jobs:
@@ -32,7 +33,25 @@ jobs:
           grep -q "versionName '0.80-dev1'" android_v080/app/build.gradle
           grep -q 'uses-permission android:name="android.permission.INTERNET"' android_v080/app/src/main/AndroidManifest.xml
           grep -q '7→2→1→1' "$SRC"
-      - name: Verify Stage 4 native feature contract
+      - name: Verify single coherent launcher
+        run: |
+          set -euo pipefail
+          HOME=android_v080/app/src/main/java/com/vardath/janus/v080/HomeActivity.java
+          MAN=android_v080/app/src/main/AndroidManifest.xml
+          test -s "$HOME"
+          grep -q 'HomeActivity' "$MAN"
+          test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
+          grep -q 'Chat · Messages · Observe · System' "$HOME"
+          grep -q 'Research workspace' "$HOME"
+          grep -q 'Artifacts · Open · Share · Export' "$HOME"
+          grep -q 'Maintenance review' "$HOME"
+          grep -q 'Themes · Background · Options' "$HOME"
+          grep -q 'android:name=".MainActivity".*android:exported="false"' "$MAN"
+          grep -q 'android:name=".ResearchActivity".*android:exported="false"' "$MAN"
+          grep -q 'android:name=".ArtifactActivity".*android:exported="false"' "$MAN"
+          grep -q 'android:name=".MaintenanceActivity".*android:exported="false"' "$MAN"
+          grep -q 'android:name=".SettingsActivity".*android:exported="false"' "$MAN"
+      - name: Verify core native feature contract
         run: |
           set -euo pipefail
           SRC=android_v080/app/src/main/java/com/vardath/janus/v080/MainActivity.java
@@ -106,8 +125,12 @@ jobs:
           grep -q 'no automatic changes' "$MAINT"
           grep -q 'AppCompatDelegate.setDefaultNightMode' "$THEME"
           grep -q 'JanusApplication' "$MAN"
-          grep -q 'SettingsActivity' "$MAN"
-          grep -q 'MaintenanceActivity' "$MAN"
+      - name: Verify parity audit exists
+        run: |
+          set -euo pipefail
+          test -s JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
+          grep -q 'Google sign-in parity remains to be reintroduced' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
+          grep -q 'Legacy retirement gate' JANUS_ANDROID_V080_FEATURE_PARITY_AUDIT.md
       - name: Build native v0.80 debug APK
         working-directory: android_v080
         run: gradle --no-daemon --stacktrace :app:assembleDebug
