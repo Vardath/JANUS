@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.71: hard-coded Phase 3 product build; no runtime composition/patching in CI.
+// v0.80: original JANUS Android product surface is authoritative.
 android {
     namespace 'com.vardath.janus'
     compileSdk 36
@@ -18,8 +18,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 71
-        versionName '0.71'
+        versionCode 80
+        versionName '0.80'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
