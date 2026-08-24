@@ -33,12 +33,18 @@ public final class JanusChatResponseRegistry {
 
     public static synchronized void capture(String rawJson) {
         try {
-            JanusChatPresentation presentation = JanusChatPresentation.fromResponse(new JSONObject(rawJson), rawJson);
-            if (presentation.reply.isBlank() && presentation.sources.isEmpty() && presentation.generatedImage == null) return;
-            RECENT.addLast(presentation);
-            while (RECENT.size() > MAX) RECENT.removeFirst();
-            persist();
+            remember(JanusChatPresentation.fromResponse(new JSONObject(rawJson), rawJson));
         } catch (Exception ignored) {}
+    }
+
+    /** Re-seed the bounded renderer registry from authoritative structured history. */
+    public static synchronized void remember(JanusChatPresentation presentation) {
+        if (presentation == null) return;
+        if (presentation.reply.isBlank() && presentation.sources.isEmpty() && presentation.generatedImage == null) return;
+        RECENT.removeIf(p -> !presentation.reply.isBlank() && presentation.reply.equals(p.reply));
+        RECENT.addLast(presentation);
+        while (RECENT.size() > MAX) RECENT.removeFirst();
+        persist();
     }
 
     /** Non-destructive lookup so source and image renderers can share the same presentation. */
