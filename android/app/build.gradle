@@ -1,6 +1,7 @@
 plugins { id 'com.android.application' }
 
-// v1.08 + RC hardening: governed self-diagnosis, Supervisor handoff and release-signing preparation.
+// v1.08: governed self-diagnosis, capability-request ledger and ChatGPT Supervisor handoff.
+// RC hardening adds release-signing preparation without changing the tested v1.08 product identity.
 // No WebView UI, no generated HTML, no composer/patch pipeline.
 android {
     namespace 'com.vardath.janus'
