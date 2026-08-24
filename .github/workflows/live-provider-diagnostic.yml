@@ -87,3 +87,5 @@ jobs:
           git commit -m "Record live JANUS v2 provider diagnostic" || true
           git push || true
           exit "$STATUS"
+
+# manual retrigger: 2026-08-24T11:07+10:00
