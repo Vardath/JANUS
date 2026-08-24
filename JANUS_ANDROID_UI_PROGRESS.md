@@ -28,25 +28,30 @@ Implemented and published: centralized account-owned path policy, bearer-token o
 Implemented and published: `JanusScreenStatePolish` extracted consistent loading, empty, failure, inbox and account/session state presentation from `MainActivity`; CI assertion corrected and matching APK published.
 
 ## v0.89 — Memory / Research / Account feature extraction
-Implemented and published:
-- `JanusFeaturePolish` contains feature-specific presentation behavior without networking or cognition logic;
-- Memory has client-side visible-memory search and All / Trace / Working / Episodic / Core filters;
-- Research evidence counts and epistemic categories are clearer;
-- Account has a dedicated Session & security section and clearer per-device/all-device sign-out actions.
+Implemented and published: visible-memory search and tier filters, clearer Research evidence/category presentation, and clearer Account session/security actions.
 
 ## v0.90 — Messages reply-context extraction
-Implemented on main; release verification pending:
-- new `JanusReplyContextPolish` converts the legacy visible `Regarding your message:` composer prefix into a separate native `Replying to JANUS` context card;
-- the composer contains only the user's new reply while they type;
-- immediately before Send, the hidden quoted context is restored to the outgoing composer payload so the existing `/desktop/chat` transport receives the same contextual message as before;
-- after the send clears the composer, the temporary reply-context state/card is cleared;
-- no server, cognition, federation or message-state contract changed;
-- CI now requires the reply-context bridge and all earlier UI/runtime/security invariants before v0.90 can publish.
+Implemented and published:
+- `JanusReplyContextPolish` converts the legacy visible quoted composer prefix into a separate native `Replying to JANUS` context card;
+- the composer shows only the user's new text while typing;
+- hidden quoted context is restored immediately before Send so the existing chat transport retains the same context;
+- temporary reply context clears after send;
+- no server/cognition/federation contract changed.
+
+## v0.91 — Chat source-card presentation
+Implemented on integration branch; release verification pending:
+- new `JanusSourcePolish` extracts the current source appendix from rendered JANUS answers into a dedicated `Sources · N` panel;
+- source title and domain are presented separately from the answer body;
+- source rows with URLs are tappable and open through Android `ACTION_VIEW`;
+- answer text no longer displays the raw appended `Sources:` block;
+- source rendering is isolated from network/cognition logic and preserves the existing server response contract;
+- this is a compatibility presentation bridge: MainActivity still flattens the structured server source array before render, and a later transport refactor can pass the raw source objects directly;
+- the Android workflow is consolidated to reduce brittle historical literal-string checks while retaining native-boundary, safe-inset, reply-context, source-card, route-hygiene, 11-core architecture, Java compile, APK assemble and publication checks.
 
 ## Next intended passes
 
-1. Replace the compatibility bridge with explicit reply-context payload fields if/when `server_v2` gains a first-class reply-context contract.
-2. Add richer Chat source/evidence cards from structured source metadata rather than appended plain source text.
-3. Continue moving endpoint and feature responsibilities out of `MainActivity`, then consolidate repository continuity/CI once the Android product UI settles.
+1. Move raw source metadata and reply context into explicit Chat presentation models so the renderer no longer needs compatibility parsing.
+2. Continue extracting endpoint/feature responsibilities from `MainActivity` into dedicated native surfaces/controllers.
+3. Improve wider-screen/tablet responsiveness and remaining accessibility/details after the core product surfaces are separated.
 
 Release rule: do not mark an Android pass fully released until the `apk-download` branch publishes the matching version after CI compilation and APK assembly.
