@@ -28,6 +28,7 @@ public class JanusApplication extends Application {
                 JanusFeaturePolish.install(activity);
                 JanusReplyContextPolish.install(activity);
                 JanusSourcePolish.install(activity);
+                JanusGeneratedImagePolish.install(activity);
                 JanusAdaptiveUi.install(activity);
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
