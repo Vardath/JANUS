@@ -23,7 +23,7 @@ public class JanusApplication extends Application {
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private void install(Activity activity) {
-                JanusChatHistoryBridge.prepare(activity);
+                JanusChatV2Surface.install(activity);
                 JanusUiPolish.install(activity);
                 JanusProductPolish.install(activity);
                 JanusScreenStatePolish.install(activity);
@@ -32,7 +32,6 @@ public class JanusApplication extends Application {
                 JanusSourcePolish.install(activity);
                 JanusGeneratedImagePolish.install(activity);
                 JanusAdaptiveUi.install(activity);
-                JanusChatHistoryBridge.capture(activity);
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
