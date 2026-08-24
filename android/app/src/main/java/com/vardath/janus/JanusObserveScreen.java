@@ -36,7 +36,7 @@ public final class JanusObserveScreen {
         if (host == null || content == null) return;
         Activity a = host.activity();
         content.addView(text(a, "Observe", 28, true), full());
-        content.addView(text(a, "Readable externalizable JANUS process activity. This is a stable, read-only snapshot and does not auto-jump while you read it.", 13, false), full());
+        content.addView(text(a, "Readable externalizable JANUS process activity. Sensory cards identify where information came from. This is a stable, read-only snapshot and does not auto-jump while you read it.", 13, false), full());
         LinearLayout filters = horizontal(a);
         for (String mode : new String[]{"all", "thoughts", "interactions"}) {
             Button b = button(a, mode.equals("all") ? "All" : capitalize(mode));
@@ -63,7 +63,52 @@ public final class JanusObserveScreen {
     }
 
     private static boolean matches(String mode, JSONObject x) { if ("all".equals(mode)) return true; String type=x.optString("event_type","").toLowerCase(Locale.ROOT); return "interactions".equals(mode) ? type.contains("interaction") : !type.contains("interaction"); }
-    private static void addCard(Activity a, LinearLayout list, JSONObject x, String source) { LinearLayout card=card(a); String core=pretty(x.optString("core_name","core")); String peer=x.optString("peer_core",""); String route=peer.isEmpty()?core:core+" → "+pretty(peer); card.addView(text(a,route+" · "+pretty(x.optString("event_type","note")),13,true)); card.addView(text(a,x.optString("detail",x.optString("summary","")),15,false)); card.addView(text(a,formatTime(x.opt("created_at"))+" · "+source,12,false)); String raw=x.optString("raw_detail",""); if(!raw.isBlank()&&!raw.equals(x.optString("detail",""))){ Button tech=button(a,"Technical details"); tech.setOnClickListener(v->new AlertDialog.Builder(a).setTitle(route).setMessage(raw).setPositiveButton("Close",null).show()); card.addView(tech,wrap()); } list.addView(card,full()); }
+
+    private static void addCard(Activity a, LinearLayout list, JSONObject x, String source) {
+        LinearLayout card=card(a);
+        String core=pretty(x.optString("core_name","core"));
+        String peer=x.optString("peer_core","");
+        String route=peer.isEmpty()?core:core+" → "+pretty(peer);
+        String eventType=x.optString("event_type","note");
+        card.addView(text(a,route+" · "+pretty(eventType),13,true));
+        String provenance=provenance(x,source);
+        if(!provenance.isBlank()) card.addView(text(a,provenance,12,true));
+        card.addView(text(a,x.optString("detail",x.optString("summary","")),15,false));
+        card.addView(text(a,formatTime(x.opt("created_at"))+" · "+source,12,false));
+        String raw=x.optString("raw_detail","");
+        if(!raw.isBlank()&&!raw.equals(x.optString("detail",""))){ Button tech=button(a,"Technical details"); tech.setOnClickListener(v->new AlertDialog.Builder(a).setTitle(route).setMessage(raw).setPositiveButton("Close",null).show()); card.addView(tech,wrap()); }
+        list.addView(card,full());
+    }
+
+    /** Externalizable provenance only; never exposes credentials or hidden reasoning. */
+    private static String provenance(JSONObject x, String displaySource) {
+        String type=x.optString("event_type","");
+        if(!"sensory_input".equals(type) && x.optString("sense_modality","").isBlank()) return "";
+        String modality=x.optString("sense_modality","");
+        String origin=x.optString("sense_origin","");
+        String detail=x.optString("detail","");
+        if(modality.isBlank()) {
+            String low=detail.toLowerCase(Locale.ROOT);
+            int a=low.indexOf("a "); int b=low.indexOf(" sense");
+            if(a>=0 && b>a+2) modality=detail.substring(a+2,b).trim();
+        }
+        if(origin.isBlank()) {
+            String core=x.optString("core_name","");
+            if(!core.isBlank() && !isCanonicalCore(core)) origin=core;
+            else origin=displaySource;
+        }
+        return "Sense · " + pretty(modality.isBlank()?"unknown":modality) + " · from " + prettyOrigin(origin);
+    }
+
+    private static boolean isCanonicalCore(String s) {
+        String x=s==null?"":s;
+        return x.equals("evidence")||x.equals("safety")||x.equals("counterpoint")||x.equals("context")||x.equals("logic")||x.equals("novelty")||x.equals("memory")||x.equals("left_hemisphere")||x.equals("right_hemisphere")||x.equals("front")||x.equals("consensus")||x.equals("interface");
+    }
+
+    private static String prettyOrigin(String s) {
+        String x=s==null?"":s.replace('_',' ').replace(':',' · ');
+        return x.isBlank()?"unknown":x;
+    }
 
     private static LinearLayout vertical(Activity a){LinearLayout x=new LinearLayout(a);x.setOrientation(LinearLayout.VERTICAL);return x;} private static LinearLayout horizontal(Activity a){LinearLayout x=new LinearLayout(a);x.setOrientation(LinearLayout.HORIZONTAL);return x;}
     private static LinearLayout card(Activity a){LinearLayout x=vertical(a);int p=dp(a,12);x.setPadding(p,p,p,p);LinearLayout.LayoutParams lp=full();lp.setMargins(0,dp(a,6),0,dp(a,6));x.setLayoutParams(lp);x.setBackgroundColor(0x181C8CFF);return x;}
