@@ -30,6 +30,7 @@ public class JanusApplication extends Application {
                 JanusScreenStatePolish.install(activity);
                 JanusFeaturePolish.install(activity);
                 JanusReplyContextPolish.install(activity);
+                JanusSourcePolish.install(activity);
             }
             @Override public void onActivityStarted(Activity activity) {}
             @Override public void onActivityResumed(Activity activity) {
@@ -38,6 +39,7 @@ public class JanusApplication extends Application {
                 JanusScreenStatePolish.install(activity);
                 JanusFeaturePolish.install(activity);
                 JanusReplyContextPolish.install(activity);
+                JanusSourcePolish.install(activity);
             }
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
