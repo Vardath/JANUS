@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusFanoPolicy JanusUiPolish JanusSystemChrome JanusCoreMapView JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge JanusClientDiagnostics JanusMaintenanceSupervisorPolish; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusFanoPolicy JanusSensePolicy JanusUiPolish JanusSystemChrome JanusCoreMapView JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge JanusClientDiagnostics JanusMaintenanceSupervisorPolish; do test -s "$BASE/$f.java"; done
           test ! -e "$BASE/JanusChatV2Surface.java"
           test ! -e "$BASE/JanusChatHistoryBridge.java"
           test ! -e "$BASE/JanusThoughtContextPolish.java"
@@ -63,7 +63,7 @@ jobs:
           grep -q 'JanusClientDiagnostics.install(this)' "$APP"
           grep -q 'JanusMaintenanceSupervisorPolish.install(activity)' "$APP"
           grep -q 'JanusClientDiagnostics.flushPending(activity)' "$APP"
-          python -m py_compile server_v2/diagnostics.py server_v2/chat.py server_v2/maintenance.py server_v2/entrypoint.py server_v2/protocol.py
+          python -m py_compile server_v2/diagnostics.py server_v2/chat.py server_v2/maintenance.py server_v2/entrypoint.py server_v2/protocol.py server_v2/topology.py server_v2/senses.py server_v2/mind.py
       - name: Verify v1.07 system chrome, Back and Runtime Cores hardening remains intact
         shell: bash
         run: |
@@ -78,17 +78,18 @@ jobs:
           ! grep -q 'LAYER_TYPE_SOFTWARE' "$MAP"
           ! grep -q 'setShadowLayer' "$MAP"
           grep -q 'drawFallback' "$MAP"
-      - name: Verify v1.06 thought bridge and active Fano attention remain intact
+      - name: Verify active Fano and sensory contracts remain intact
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          THOUGHT="$BASE/JanusThoughtBridge.java"; FANO="$BASE/JanusFanoPolicy.java"; CORE="$BASE/JanusLocalCoreRuntime.java"; API="$BASE/JanusApiClient.java"
+          THOUGHT="$BASE/JanusThoughtBridge.java"; FANO="$BASE/JanusFanoPolicy.java"; SENSE="$BASE/JanusSensePolicy.java"; CORE="$BASE/JanusLocalCoreRuntime.java"; API="$BASE/JanusApiClient.java"
           grep -q 'between messages' "$THOUGHT"
           grep -q '\[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT\]' "$THOUGHT"
           grep -q 'Current Fano attention orientations' "$THOUGHT"
           grep -q 'JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message)' "$API"
-          grep -q 'grounding/support' "$FANO"; grep -q 'structure/causality' "$FANO"; grep -q 'counterexample/falsification' "$FANO"; grep -q 'continuity/memory' "$FANO"; grep -q 'novelty/adjacent possibility' "$FANO"
+          grep -q 'truth/grounding' "$FANO"; grep -q 'valence/welfare' "$FANO"; grep -q 'significance/conflict' "$FANO"; grep -q 'pattern/context' "$FANO"; grep -q 'understanding/model' "$FANO"; grep -q 'possibility/imagination' "$FANO"; grep -q 'continuity/experience' "$FANO"
+          grep -q 'actionPosture' "$SENSE"; grep -q 'confidence' "$SENSE"; grep -q 'valence' "$SENSE"; grep -q 'risk' "$SENSE"; grep -q 'opportunity' "$SENSE"
           grep -q 'JanusFanoPolicy.directive(direction)' "$CORE"; grep -q 'active_orientation' "$CORE"; grep -q 'active_salience_percent' "$CORE"
       - name: Verify v1.04 Chat decoration performance regression remains fixed
         shell: bash
@@ -145,7 +146,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.08 governed self-diagnosis + owner-controlled ChatGPT Supervisor handoff + crash replay diagnostics; v1.07 themed system bars/Back/Cores hardening and v1.06 Fano/thought bridge retained\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.08 governed self-diagnosis + owner-controlled ChatGPT Supervisor handoff + crash replay diagnostics; v1.07 themed system bars/Back/Cores hardening retained\nArchitecture migration: conceptual 1-3-7; mechanical 7 subconscious -> 2 hemispheres -> Front -> Interface; local runtime compatibility migration in progress\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
