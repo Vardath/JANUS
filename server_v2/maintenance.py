@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 
-from . import auth, diagnostics, storage
+from . import auth, diagnostics, maintenance_channel, storage
 
 router = APIRouter()
 
@@ -39,6 +39,7 @@ def status(authorization: Optional[str]=Header(default=None)):
         "maintenance":{
             "enabled":True,"interval_days":90,"due":False,"automatic_code_changes":False,"automatic_deploy":False,"owner_gated":True,
             "self_diagnosis":True,"supervisor_handoff":True,"automatic_chatgpt_injection":False,
+            "submission_boundary":maintenance_channel.boundary_status(),
         },
         "is_owner":is_owner,"owner_resolution":basis if is_owner else "restricted","reviews":reviews,
         "capability_requests":requests,"open_capability_requests":open_count,
@@ -50,34 +51,26 @@ def status(authorization: Optional[str]=Header(default=None)):
 def requests(include_closed:bool=True,authorization:Optional[str]=Header(default=None)):
     account=auth.require_account(authorization); aid=int(account["id"])
     items=diagnostics.list_requests(aid,include_closed=bool(include_closed),limit=300)
-    return {"ok":True,"items":items,"count":len(items),"automatic_changes":False,"automatic_deploy":False}
+    return {"ok":True,"items":items,"count":len(items),"automatic_changes":False,"automatic_deploy":False,
+            "submission_boundary":maintenance_channel.boundary_status()}
 
 
 @router.get("/maintenance/supervisor-handoff")
 def supervisor_handoff(authorization:Optional[str]=Header(default=None)):
     account,basis=_require_owner(authorization); aid=int(account["id"])
     packet=diagnostics.handoff_packet(aid,str(account["username"]))
-    packet.update({"ok":True,"owner_resolution":basis})
+    packet.update({"ok":True,"owner_resolution":basis,"submission_boundary":maintenance_channel.boundary_status()})
     return packet
 
 
 @router.post("/maintenance/diagnostics/report")
 def diagnostic_report(payload:dict[str,Any],authorization:Optional[str]=Header(default=None)):
-    """Authenticated externalizable failure reporting for clients/tools.
-
-    This records a request; it grants no maintenance authority and cannot trigger a
-    code/configuration/deployment action.
-    """
+    """Authenticated, bounded failure reporting. No source/deploy authority exists here."""
     account=auth.require_account(authorization); aid=int(account["id"])
-    item=diagnostics.record_request(
-        aid,
-        str(payload.get("capability") or payload.get("kind") or "client_or_tool"),
-        str(payload.get("title") or "JANUS detected a client/tool failure"),
-        str(payload.get("detail") or payload.get("error") or "A JANUS client or tool reported a failure point."),
-        evidence=str(payload.get("evidence") or ""),
-        severity=str(payload.get("severity") or "normal"),
-    )
-    return {"ok":True,"request":item,"queued_for_supervisor_review":True,"automatic_changes":False,"automatic_deploy":False}
+    item=maintenance_channel.submit(aid,payload)
+    return {"ok":True,"request":item,"queued_for_supervisor_review":True,
+            "automatic_changes":False,"automatic_deploy":False,
+            "submission_boundary":maintenance_channel.boundary_status()}
 
 
 @router.post("/maintenance/reviews/{review_id}/decision")
