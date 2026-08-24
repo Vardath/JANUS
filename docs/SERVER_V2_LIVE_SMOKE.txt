@@ -1,104 +1,119 @@
 JANUS SERVER V2 LIVE SMOKE
-trigger_sha=641daba1c2e8f3bbbc11e77a59e09b6aa617de34
-exit=1
+trigger_sha=e211a5c6396c35a17af4f10b2d9e63d9524a0b01
+structural_exit=0
 
 {
+  "deployed_commit": "48ab80ccb752ae200a6ee47b49191d3bc231c7ed",
   "report": [
     {
-      "test": "v2 deployed and reachable",
+      "test": "stable v2 deployment",
       "ok": true,
-      "detail": "health=200 caps=200 {\"ok\":true,\"protocol_version\":2,\"server_generation\":\"v2-clean-reconstruction\",\"deployed_commit\":\"7267c937b170ca524a8fc3821a86b8446f474004\",\"architecture\":\"7->2->1->1\",\"core_count\":11,\"features\":{\"password_auth\":true,\"google_auth\":true,\"email_verification\":true,\"password_reset\":true,\"account_deletion"
+      "provider_external": false,
+      "detail": "commit=48ab80ccb752ae200a6ee47b49191d3bc231c7ed streak=3 health=200 caps=200"
     },
     {
       "test": "health",
       "ok": true,
-      "detail": "{'status': 'ok', 'service': 'janus-global-core-v2', 'architecture': '7->2->1->1', 'core_count': 11, 'database_ok': True, 'main_app_loaded': True, 'deployed_commit': '7267c937b170ca524a8fc3821a86b8446f474004'}"
+      "provider_external": false,
+      "detail": "{'status': 'ok', 'service': 'janus-global-core-v2', 'architecture': '7->2->1->1', 'core_count': 11, 'database_ok': True, 'main_app_loaded': True, 'deployed_commit': '48ab80ccb752ae200a6ee47b49191d3bc231c7ed'}"
     },
     {
       "test": "capability contract",
       "ok": true,
-      "detail": "{'ok': True, 'protocol_version': 2, 'server_generation': 'v2-clean-reconstruction', 'deployed_commit': '7267c937b170ca524a8fc3821a86b8446f474004', 'architecture': '7->2->1->1', 'core_count': 11, 'features': {'password_auth': True, 'google_auth': True, 'email_verification': True, 'password_reset': True, 'account_deletion': True, 'chat': True, 'messages': True, 'observe': True, 'memory': True, 'persistent_core_runtime': True, 'protected_identity_core': True, 'local_global_sync': True, 'selective_no_overwrite_sync': True, 'attachments': True, 'document_grounding': True, 'visual_analysis': True, 'visual_memory': True, 'foreground_web': True, 'youtube_transcripts': True, 'research_workspace': True, 'research_provenance': True, 'artifacts': True, 'image_generation': True, 'medium_quality_images': True, 'rare_explanatory_images': True, 'background_multi_core_image_generation': False, 'background_cognition': True, 'proactive_messages': True, 'cost_governor': True, 'adaptive_bridge_authority': True, 'core_reliability_calibration': True, 'luna_terra_sol_escalation': True, 'maintenance': True, 'quarterly_maintenance': True, 'owner_gated_maintenance': True, 'maintenance_email_notice': True}, '"
+      "provider_external": false,
+      "detail": "{'ok': True, 'protocol_version': 2, 'server_generation': 'v2-clean-reconstruction', 'deployed_commit': '48ab80ccb752ae200a6ee47b49191d3bc231c7ed', 'architecture': '7->2->1->1', 'core_count': 11, 'features': {'password_auth': True, 'google_auth': True, 'email_verification': True, 'password_reset': True, 'account_deletion': True, 'chat': True, 'messages': True, 'observe': True, 'memory': True, 'persistent_core_runtime': True, 'protected_identity_core': True, 'local_global_sync': True, 'selective_no_overwrite_sync': True, 'attachments': True, 'document_grounding': True, 'visual_analysis': True, 'visual_memory': True, 'foreground_web': True, 'youtube_transcripts': True, 'research_workspace': True, 'research_provenance': True, 'artifacts': True, 'image_generation': True, 'medium_quality_images': True, 'rare_explanatory_images': True, 'background_multi_core_image_generation': False, 'background_cognition': True, 'proactive_messages': True, 'cost_governor': True, 'adaptive_bridge_authority': True, 'core_reliability_calibration': True, 'luna_terra_sol_escalation': True, 'maintenance': True, 'quarterly_maintenance': True, 'owner_gated_maintenance': True, 'maintenance_email_notice': True}, 'invariants': {'specialists': 7, 'hemispheres': 2, 'consensus': 1, 'interface': 1, 'bridge_authority_min': 0.2, 'bridge_authority_max': 0.8, 'background_core_model_calls': 0, 'identity_overwrite_by_chat': False, 'sync_overwrites_peer_state': False}}"
     },
     {
       "test": "register",
       "ok": true,
-      "detail": "{\"ok\":true,\"access_token\":\"H1ArJd57nRXnTO_GJekoxiMHwPx-5xQG1W7iAhVaO67YktNaaqFP8g\",\"account\":{\"id\":3,\"username\":\"ci-1ezr4ibdom\",\"email\":\"ci-1ezr4ibdom@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787532998},\"development_verification_token\":\"l0_D9eUReCFzlEvaDOLFMtxCqVh9kHBn\"}"
+      "provider_external": false,
+      "detail": "{\"ok\":true,\"access_token\":\"-weqjcZ04SqRkh373IRUZjrQe4Wc5Tu6_XArGKM9ouVMrFWXTpuiYA\",\"account\":{\"id\":8,\"username\":\"ci-l3pfatwdin\",\"email\":\"ci-l3pfatwdin@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787533793},\"development_verification_token\":\"IKJM7c0p5x3D1sR17lBpqz0Q45A60KDp\"}"
     },
     {
       "test": "session auth",
       "ok": true,
-      "detail": "{\"ok\":true,\"account\":{\"id\":3,\"username\":\"ci-1ezr4ibdom\",\"email\":\"ci-1ezr4ibdom@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787532998}}"
+      "provider_external": false,
+      "detail": "{\"ok\":true,\"account\":{\"id\":8,\"username\":\"ci-l3pfatwdin\",\"email\":\"ci-l3pfatwdin@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787533793}}"
     },
     {
       "test": "selective federation",
       "ok": true,
-      "detail": "{\"ok\":true,\"server_phase\":\"wake\",\"architecture\":\"7->2->1->1\",\"guidance\":{\"sync_policy\":\"selective-no-overwrite\",\"memory_policy\":\"local-and-global-remain-distinct\",\"background_external_api\":false},\"server\":{\"phase\":\"wake\",\"core_count\":11,\"consensus\":\"\",\"interface\":\"\",\"architecture\":\"7->2->1->1\",\"sync_policy\":\"selective-no-overwrite\"},\"presence\":{\"online\":1,\"registered\":1,\"clients\":[{\"device_id\":\"ci-live-device\",\"client_version\":\"v0.82\",\"phase\":\"wake\",\"last_seen_at\":1787532999}]}}"
+      "provider_external": false,
+      "detail": "{\"ok\":true,\"server_phase\":\"sleep\",\"architecture\":\"7->2->1->1\",\"guidance\":{\"sync_policy\":\"selective-no-overwrite\",\"memory_policy\":\"local-and-global-remain-distinct\",\"background_external_api\":false},\"server\":{\"phase\":\"sleep\",\"core_count\":11,\"consensus\":\"\",\"interface\":\"\",\"architecture\":\"7->2->1->1\",\"sync_policy\":\"selective-no-overwrite\"},\"presence\":{\"online\":1,\"registered\":1,\"clients\":[{\"device_id\":\"ci-live-device\",\"client_version\":\"v0.82\",\"phase\":\"wake\",\"last_seen_at\":1787533794}]}}"
     },
     {
-      "test": "live 11-core model chat",
-      "ok": false,
-      "detail": "{'status': 200, 'reply': 'JANUS completed the 11-core integration, but the interface model call failed this turn (RateLimitError).', 'model_policy': {'selected_model': 'gpt-5.6-luna', 'preflight': {'score': 0.0304, 'uncertainty': 0, 'conflict': 0, 'salience': 0, 'novelty_terms': 5, 'evidence': False, 'web': False, 'memory_count': 0}}}"
+      "test": "11-core route executes",
+      "ok": true,
+      "provider_external": false,
+      "detail": "{'status': 200, 'route': ['evidence', 'logic', 'counterpoint', 'context', 'memory', 'safety', 'novelty', 'left_hemisphere', 'right_hemisphere', 'consensus', 'interface'], 'model_policy': {'selected_model': 'gpt-5.6-luna', 'preflight': {'score': 0.0304, 'uncertainty': 0, 'conflict': 0, 'salience': 0, 'novelty_terms': 5, 'evidence': False, 'web': False, 'memory_count': 0}}}"
     },
     {
-      "test": "live foreground web research",
-      "ok": false,
-      "detail": "{'status': 200, 'web': False, 'sources': [], 'reply': 'JANUS completed the 11-core integration, but the interface model call failed this turn (RateLimitError).'}"
+      "test": "external language model response",
+      "ok": true,
+      "provider_external": true,
+      "detail": "{'status': 200, 'reply': 'Hello! I\u2019m JANUS. How can I help?', 'model_policy': {'selected_model': 'gpt-5.6-luna', 'preflight': {'score': 0.0304, 'uncertainty': 0, 'conflict': 0, 'salience': 0, 'novelty_terms': 5, 'evidence': False, 'web': False, 'memory_count': 0}}}"
+    },
+    {
+      "test": "observe covers all 11 cores",
+      "ok": true,
+      "provider_external": false,
+      "detail": "{'cores': ['consensus', 'context', 'counterpoint', 'evidence', 'interface', 'left_hemisphere', 'logic', 'memory', 'novelty', 'right_hemisphere', 'safety'], 'status': 200}"
     },
     {
       "test": "file upload",
       "ok": true,
-      "detail": "{\"ok\":true,\"file\":{\"id\":\"d9599b3cc12e45a2b5d67a7ec9b983d7\",\"filename\":\"live-smoke.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":50,\"created_at\":1787533011}}"
+      "provider_external": false,
+      "detail": "{\"ok\":true,\"file\":{\"id\":\"428d913b874244f7983965c1985c049a\",\"filename\":\"live-smoke.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":50,\"created_at\":1787533796}}"
     },
     {
       "test": "file grounding through specialists",
       "ok": true,
-      "detail": "{\"reply\":\"JANUS completed the 11-core integration, but the interface model call failed this turn (RateLimitError).\",\"sources\":[],\"architecture\":\"7->2->1->1\",\"route_trace\":[\"evidence\",\"logic\",\"counterpoint\",\"context\",\"memory\",\"safety\",\"novelty\",\"left_hemisphere\",\"right_hemisphere\",\"consensus\",\"interface\"],\"web\":false,\"retrieved\":false,\"bridge_authority\":{\"left\":{\"evidence\":0.72,\"logic\":0.72,\"counterpoint\":0.68,\"safety\":0.5,\"memory\":0.35,\"context\":0.32,\"novelty\":0.3},\"right\":{\"novelty\":0.7,\"context\":0.68,\"memory\":0.647,\"safety\":0.5,\"counterpoint\":0.32,\"evidence\":0.28,\"logic\":0.28}},\"model_policy\":{\"selected_model\":\"gpt-5.6-luna\",\"preflight\":{\"score\":0.1146,\"uncertainty\":0,\"conflict\":0,\"salience\":0,\"novelty_terms\":4,\"evidence\":true,\"web\":false,\"memory_count\":2}},\"profile\":\"ci-1ezr4ibdom\",\"client_message_id\":\"live-file-1\",\"attachments\":[{\"id\":\"d9599b3cc12e45a2b5d67a7ec9b983d7\",\"filename\":\"live-smoke.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":50,\"grounded\":true}],\"attachment_grounding\":true,\"research_grounding\":false}"
+      "provider_external": false,
+      "detail": "{\"reply\":\"**Smoke-test summary:**  \\nThe attached evidence consists of a single line identifying **\u201cJANUS clean v2 file grounding live smoke evidence.\u201d** It indicates that a live smoke test was performed for JANUS\u2019s file-grounding functionality, but provides no test steps, results, pass/fail status, errors, or supporting details.\",\"sources\":[],\"architecture\":\"7->2->1->1\",\"route_trace\":[\"evidence\",\"logic\",\"counterpoint\",\"context\",\"memory\",\"safety\",\"novelty\",\"left_hemisphere\",\"right_hemisphere\",\"consensus\",\"interface\"],\"web\":false,\"retrieved\":false,\"bridge_authority\":{\"left\":{\"evidence\":0.72,\"logic\":0.72,\"counterpoint\":0.68,\"safety\":0.5,\"memory\":0.35,\"context\":0.32,\"novelty\":0.3},\"right\":{\"novelty\":0.7,\"context\":0.68,\"memory\":0.65,\"safety\":0.5,\"counterpoint\":0.32,\"evidence\":0.28,\"logic\":0.28}},\"model_policy\":{\"selected_model\":\"gpt-5.6-luna\",\"preflight\":{\"score\":0.1096,\"uncertainty\":0,\"conflict\":0,\"salience\":0,\"novelty_terms\":4,\"evidence\":true,\"web\":false,\"memory_count\":1}},\"profile\":\"ci-l3pfatwdin\",\"client_message_id\":\"live-file-1\",\"attachments\":[{\"id\":\"428d913b874244f7983965c1985c049a\",\"filename\":\"live-smoke.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":50,\"grounded\":true}],\"attachment_grounding\":true,\"research_grounding\":false}"
     },
     {
       "test": "private persistent 11-core runtime",
-      "ok": false,
-      "detail": "{'status': 502, 'core_count': None, 'registered_clients': None}"
+      "ok": true,
+      "provider_external": false,
+      "detail": "{'status': 200, 'core_count': 11, 'registered_clients': 1}"
     },
     {
       "test": "research workspace",
-      "ok": false,
-      "detail": "{'seed': '<!DOCTYPE html>\\n<html lang=\"en\">\\n  <head>\\n    <meta charset=\"utf-8\">\\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n    <title>502</title>\\n    <style>@font-face {\\n  font-family: \"Roobert\";\\n  font-weight: 500;\\n  font-style: normal;\\n  font-stretch: normal;\\n  src: url(\"data:fo', 'workspace': '<!DOCTYPE html>\\n<html lang=\"en\">\\n  <head>\\n    <meta charset=\"utf-8\">\\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n    <title>502</title>\\n    <style>@font-face {\\n  font-family: \"Roobert\";\\n  font-weight: 500;\\n  font-style: normal;\\n  font-stretch: normal;\\n  src: url(\"data:font/woff2;base64,d09GMk9UVE8AAKewAAwAAAABa6QAAKdfAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYKmehqCHhuC4UocpRQGYACLBgE2AiQDkygEBgWFRwcgW8pqkQKZcr0u0nk2H+gc25rBL5CqkDOqYXNqo87dNmL1mgByHi4yIGwcgLFJz2f/////f/pSkaHKgl52HEgorIWX0m0/lzuLglQtUxbMiGh9qonlnolc+1JbmihzmbbylQ/Xs2Knu/rUH62ibhOWZkpgVpo4nLnvzMOZ87/06Lk2hMnb'}"
+      "ok": true,
+      "provider_external": false,
+      "detail": "{'seed_status': 200, 'workspace_status': 200, 'count': 3}"
     },
     {
       "test": "artifact creation",
-      "ok": false,
-      "detail": "{'create': '<!DOCTYPE html>\\n<html lang=\"en\">\\n  <head>\\n    <meta charset=\"utf-8\">\\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n    <title>502</title>\\n    <style>@font-face {\\n  font-family: \"Roobert\";\\n  font-weight: 500;\\n  font-style: normal;\\n  font-stretch: normal;\\n  src: url(\"data:font/woff2;base64,d09GMk9UVE8AAKewAAwAAAABa6QAAKdfAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYKmehqCHhuC4UocpRQGYACLBgE2AiQDkygEBgWFRwcgW8pqkQKZcr0u0nk2H+gc25rBL5CqkDOqYXNqo87dNmL1mgByHi4yIGwcgLFJz2f/////f/pSkaHK', 'get': ''}"
+      "ok": true,
+      "provider_external": false,
+      "detail": "{'create_status': 200, 'get_status': 200}"
     },
     {
       "test": "maintenance surface",
-      "ok": false,
-      "detail": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <title>502</title>\n    <style>@font-face {\n  font-family: \"Roobert\";\n  font-weight: 500;\n  font-style: normal;\n  font-stretch: normal;\n  src: url(\"data:font/woff2;base64,d09GMk9UVE8AAKewAAwAAAABa6QAAKdfAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYKmehqCHhuC4UocpRQGYACLBgE2AiQDkygEBgWFRwcgW8pqkQKZcr0u0nk2H+gc25rBL5CqkDOqYXNqo87dNmL1mgByHi4yIGwcgLFJz2f/////f/pSkaHKgl52HEgorIWX0m0/lzuLglQtUxbMiGh9qonlnolc+1JbmihzmbbylQ/Xs2Knu/rUH62ibhOWZkpgVpo4nLnvzMOZ87/06Lk2hMnbe1EpM1cUezJlZtqCZIKYIPYeoS6VhFPJXNa5j7Y8LmH67MF2qJYI49/FNzQbwX7cqeRUbzyDffdLybw5cxRTIbdy4y5BVskcP6vu3uo+6GtnQl/up3nkVnDZmKlEpYHB1w/usr46inVsWjdEIE2gBgoC36WYsC4qXJjwYb9YbH9vayYROp/tXkp72nOEOvigu6g0+gsN"
+      "ok": true,
+      "provider_external": false,
+      "detail": "{'status': 200, 'body': '{\"ok\":true,\"maintenance\":{\"enabled\":true,\"interval_days\":90,\"due\":false,\"automatic_code_changes\":false,\"automatic_deploy\":false,\"owner_gated\":true},\"is_owner\":false,\"owner_resolution\":\"restricted\",\"reviews\":[]}'}"
     },
     {
-      "test": "live image generation medium pipeline",
-      "ok": false,
-      "detail": "{'generate_status': 502, 'inline_status': None, 'quality': None}"
+      "test": "external foreground web research",
+      "ok": true,
+      "provider_external": true,
+      "detail": "{'status': 200, 'web': True, 'sources': [{'title': 'Retrieved source', 'url': 'https://openai.com/index/introducing-ai-futures/'}], 'reply': 'OpenAI says it launched **AI Futures**, a Strategic Futures team focused on helping free societies preserve individual rights and agency amid transformative AI. [OpenAI, August 20, 2026](https://openai.com/index/introducing-ai-futures/)'}"
     },
     {
-      "test": "observe covers all 11 cores",
-      "ok": false,
-      "detail": "{'cores': []}"
+      "test": "external medium image pipeline",
+      "ok": true,
+      "provider_external": true,
+      "detail": "{'generate_status': 200, 'body': '{\"ok\":true,\"generated_image\":{\"id\":\"2472c86e333b43d7a237dbff15e4a063\",\"filename\":\"janus-generated.png\",\"mime_type\":\"image/png\",\"size_bytes\":1188655,\"created_at\":1787533825,\"inline_path\":\"/images/2472c86e333b43d7a237dbff15e4a063/inline\",\"automatic\":false,\"quality\":\"medium\"},\"image\":{\"id\":\"2472c86e333b43d7a237dbff15e4a063\",\"filename\":\"janus-generated.png\",\"mime_type\":\"image/png\",\"size_bytes\":1188655,\"created_at\":1787533825,\"inline_path\":\"/images/2472c86e333b43d7a237dbff15e4a063/inline\",\"automatic\":false,\"quality\":\"medium\"}}', 'inline_status': 200, 'quality': 'medium'}"
     },
     {
       "test": "smoke account cleanup",
-      "ok": false,
-      "detail": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <title>502</title>\n    <style>@font-face {\n  font-family: \"Roobert\";\n  font-weight: 500;\n  font-style: normal;\n  font-stretch: normal;\n  src: url(\"data:font/woff2;base64,d09GMk9UVE8AAKewAAwAAAABa6QAAKdfAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYKmehqCHhuC4UocpRQGYACLBgE2AiQDkygEBgWFRwcgW8pqkQKZcr0u0nk2H+gc25rBL5CqkDOqYXNqo87dNmL1mgByHi4yIGwcgLFJz2f/////f/pSkaHKgl52HEgorIWX0m0/lzuLglQtUxbMiGh9qonlnolc+1JbmihzmbbylQ/Xs2Knu/rUH62ibhOWZkpgVpo4nLnvzMOZ87/06Lk2hMnbe1EpM1cUezJlZtqCZIKYIPYeoS6VhFPJXNa5j7Y8LmH67MF2qJYI49/FNzQbwX7cqeRUbzyDffdLybw5cxRTIbdy4y5BVskcP6vu3uo+6GtnQl/up3nkVnDZmKlEpYHB1w/usr46inVsWjdEIE2gBgoC36WYsC4qXJjwYb9YbH9vayYROp/tXkp72nOEOvigu6g0+gsN/z6hg7+Ga7wNb8j2p2kypxDmhZipdHuzSaKxAmIassxsPiDbztOUdESnEj+YhrsptpjfP0Hqxu9m0n7j/zGR6I7LbDy56KLRVoGx6yFqcqyz6j2en9u998cYY4wxBowxxhjRI2rAqBAp6RKUahWwULEQCwsLURAJI7GwEBUQEbERFaMoFbH8cO4rM0neNG3/64f8LjCoVbsH5AAVoJck1Am96tS5Ewp5/mF/fL/2uW8SlSAksKRJEJMRiTj+oOqP9PRt+r2XqlLltmKcWHH6TePrrCjDuW1E1+Rwc7uLp0Y7RKah1PglWKQC0fXMo55+7/+vZ+37yMGHaBE2ZfcLB44vHEqhQSjQOuQzQG775+BYcg6W4IKTebAdEwfgWicJolLiRrRt23qkaT71"
+      "ok": true,
+      "provider_external": false,
+      "detail": "200 {\"ok\":true}"
     }
   ],
-  "failures": [
-    "live 11-core model chat",
-    "live foreground web research",
-    "private persistent 11-core runtime",
-    "research workspace",
-    "artifact creation",
-    "maintenance surface",
-    "live image generation medium pipeline",
-    "observe covers all 11 cores",
-    "smoke account cleanup"
-  ]
+  "structural_failures": [],
+  "provider_failures": []
 }
