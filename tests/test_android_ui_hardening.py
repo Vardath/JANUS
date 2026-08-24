@@ -8,15 +8,15 @@ def test_authoritative_build_is_native_and_patch_free():
     assert 'python tools/compose_android_phase3.py' not in workflow
     assert 'python tools/patch_android_' not in workflow
     assert 'Verify authoritative native Android boundary' in workflow
-    assert 'Verify v1.03 structured Chat and extracted screen ownership' in workflow
+    assert 'Verify v1.04 Chat decoration performance regression' in workflow
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
-def test_android_v103_is_direct_native_product():
+def test_android_v104_is_direct_native_product():
     text = Path('android/app/build.gradle').read_text(encoding='utf-8')
-    assert "versionCode 103" in text
-    assert "versionName '1.03'" in text
-    assert 'extracted native Messages + read-only Observe screen ownership' in text
+    assert "versionCode 104" in text
+    assert "versionName '1.04'" in text
+    assert 'eliminate repeated Chat decoration/global-layout UI spam and typing lag' in text
     main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
     assert 'android.webkit.WebView' not in main
     assert 'JavascriptInterface' not in main
@@ -27,6 +27,25 @@ def test_native_ui_keeps_accessibility_and_safe_area_hardening():
     adaptive = (BASE / 'JanusAdaptiveUi.java').read_text(encoding='utf-8')
     for marker in ['WindowInsetsCompat.Type.systemBars()', 'setContentDescription']:
         assert marker in ui or marker in adaptive
+
+
+def test_chat_decorators_are_idempotent_and_debounced():
+    ui = (BASE / 'JanusUiPolish.java').read_text(encoding='utf-8')
+    sources = (BASE / 'JanusSourcePolish.java').read_text(encoding='utf-8')
+    images = (BASE / 'JanusGeneratedImagePolish.java').read_text(encoding='utf-8')
+    reply = (BASE / 'JanusReplyContextPolish.java').read_text(encoding='utf-8')
+    assert 'CHAT_ENHANCED' in ui
+    assert 'BASE_POLISHED' in ui
+    assert 'POLISH_DEBOUNCE_MS' in ui
+    assert 'layout.setTag("janus-chat-enhanced")' not in ui
+    assert 'child instanceof TextView && !(child instanceof Button)' in ui
+    assert 'ENHANCED' in sources and 'MAIN.postDelayed(next, 220L)' in sources
+    assert 'MAIN.postDelayed(next, 260L)' in images
+    assert 'MAIN.postDelayed(next, 240L)' in reply
+    assert 'private static final Map<Activity, Runnable> PENDING' in ui
+    assert 'private static final Map<Activity, Runnable> PENDING' in sources
+    assert 'private static final Map<Activity, Runnable> PENDING' in images
+    assert 'private static final Map<Activity, Runnable> PENDING' in reply
 
 
 def test_structured_chat_history_is_authoritative():
