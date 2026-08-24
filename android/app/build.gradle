@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.91: authoritative native JANUS Android structured Chat source-card presentation pass.
+// v0.92: authoritative native JANUS Android adaptive/accessibility + Chat model extraction pass.
 // No WebView UI, no generated HTML, no composer/patch pipeline.
 android {
     namespace 'com.vardath.janus'
@@ -19,18 +19,14 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 91
-        versionName '0.91'
+        versionCode 92
+        versionName '0.92'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
 
-    buildTypes {
-        debug { signingConfig signingConfigs.debug }
-    }
-
+    buildTypes { debug { signingConfig signingConfigs.debug } }
     buildFeatures { buildConfig true }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
