@@ -1,16 +1,23 @@
 package com.vardath.janus;
 
+import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
+
 import androidx.annotation.NonNull;
+import androidx.core.app.ContextCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -34,19 +41,22 @@ public class JanusMessageWorker extends Worker {
         // app-private storage and shown the next time the JANUS UI is active.
         JanusOfflineQueue.flush(ctx);
 
+        HttpURLConnection c = null;
         try {
             String profile = ctx.getSharedPreferences("janus", Context.MODE_PRIVATE).getString("profile_id", "");
             String suffix = (profile == null || profile.isEmpty()) ? "" : "?username=" + java.net.URLEncoder.encode(profile, StandardCharsets.UTF_8) + "&limit=20";
             if (suffix.isEmpty()) suffix = "?limit=20";
-            HttpURLConnection c = (HttpURLConnection) new URL(MainActivity.SERVER + "/desktop/messages" + suffix).openConnection();
+            c = (HttpURLConnection) new URL(MainActivity.SERVER + "/desktop/messages" + suffix).openConnection();
             c.setRequestMethod("GET");
             c.setConnectTimeout(20000);
             c.setReadTimeout(30000);
             c.setRequestProperty("Accept", "application/json");
+            c.setRequestProperty("Connection", "close");
             c.setRequestProperty("Authorization", "Bearer " + token);
             int code = c.getResponseCode();
             if (code == 401 || code == 403) return Result.success();
-            if (code >= 400) return Result.retry();
+            if (code == 408 || code == 425 || code == 429 || code >= 500) return Result.retry();
+            if (code >= 400) return Result.success();
             BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder b = new StringBuilder(); String line;
             while ((line = r.readLine()) != null) b.append(line);
@@ -62,14 +72,21 @@ public class JanusMessageWorker extends Worker {
                 long id = x.optLong("id", 0);
                 if (id > candidateId) { candidate = x; candidateId = id; }
             }
-            if (candidate != null) {
+            if (candidate != null && notificationsAllowed(ctx)) {
                 notifyMessage(candidate, candidateId);
                 ctx.getSharedPreferences("janus", Context.MODE_PRIVATE).edit().putLong("last_notified_message", candidateId).apply();
             }
             return Result.success();
         } catch (Exception e) {
             return Result.retry();
+        } finally {
+            if (c != null) c.disconnect();
         }
+    }
+
+    private static boolean notificationsAllowed(Context ctx) {
+        return Build.VERSION.SDK_INT < 33
+                || ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void notifyMessage(JSONObject item, long id) {
