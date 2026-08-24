@@ -171,6 +171,8 @@ public final class JanusLocalCoreRuntime {
             long line = c.fano[1] + c.fano[2] + c.fano[3];
             long off = c.fano[4] + c.fano[5] + c.fano[6] + c.fano[7];
             x.put("fano", new JSONObject().put("weights", weights).put("active_direction", c.fanoDirection)
+                    .put("active_orientation", JanusFanoPolicy.orientation(c.fanoDirection))
+                    .put("active_salience_percent", JanusFanoPolicy.salience(c.fano, c.fanoDirection))
                     .put("projection_1_3_4", new JSONObject().put("origin", c.fano[0]).put("line", line).put("off_line", off)));
             all.put(c.name, x);
         }
@@ -193,7 +195,6 @@ public final class JanusLocalCoreRuntime {
             record("interface", "", "phase", "Local JANUS entered full-rate deterministic processing.", "");
         }
 
-        // Foreground Interface work is always serviced.
         if (!cores.get("interface").inbox.isEmpty()) cycle("interface");
 
         if (prefs.getBoolean("background_cycles_enabled", true)) {
@@ -244,9 +245,9 @@ public final class JanusLocalCoreRuntime {
         String input = c.inbox.isEmpty() ? "maintenance / retained state" : c.inbox.pollFirst();
         while (!c.inbox.isEmpty() && input.length() < 1000) input += " | " + c.inbox.pollFirst();
         updateFano(c, input);
-        String output = roleSummary(name, input, c.fanoDirection);
+        String output = roleSummary(name, input, c.fanoDirection, c.fano);
         c.last = output; c.cycles++;
-        record(name, "", "process_note", externalSummary(name, input), output);
+        record(name, "", "process_note", externalSummary(name, input) + " Fano attention: " + JanusFanoPolicy.orientation(c.fanoDirection) + ".", output);
         route(name, output);
         if ("memory".equals(name) || "novelty".equals(name) || "consensus".equals(name)) remember("core:" + name + ": " + clip(output, 500));
     }
@@ -290,7 +291,7 @@ public final class JanusLocalCoreRuntime {
         }
     }
 
-    private String roleSummary(String name, String input, int direction) {
+    private String roleSummary(String name, String input, int direction, long[] weights) {
         String role;
         switch (name) {
             case "evidence": role = "separate support from inference and identify missing observations"; break;
@@ -305,7 +306,12 @@ public final class JanusLocalCoreRuntime {
             case "consensus": role = "combine both hemispheres while preserving unresolved disagreement"; break;
             default: role = "form an externalizable user-facing shared state";
         }
-        return name + ": " + role + "; Fano d" + direction + "; focus=" + clip(input, 420);
+        return name + ": " + role
+                + "; Fano d" + direction + "=" + JanusFanoPolicy.orientation(direction)
+                + "; directional salience=" + JanusFanoPolicy.salience(weights, direction) + "%"
+                + "; attention directive=" + JanusFanoPolicy.directive(direction)
+                + "; " + JanusFanoPolicy.projection(weights)
+                + "; focus=" + clip(input, 420);
     }
 
     private String externalSummary(String name, String input) {
@@ -432,7 +438,6 @@ public final class JanusLocalCoreRuntime {
                 prefs.edit().putString("core_server_status", lastServerStatus).apply();
                 String feedback = clip(server.optString("consensus", "") + " " + server.optString("interface", ""), 1000);
                 if (!feedback.isBlank()) {
-                    // Re-enter remote state through specialist review only.
                     cores.get("evidence").inbox.addLast("[feedback-only global] verify: " + feedback);
                     cores.get("context").inbox.addLast("[feedback-only global] contextualize: " + feedback);
                     cores.get("counterpoint").inbox.addLast("[feedback-only global] challenge: " + feedback);
