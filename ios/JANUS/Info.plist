@@ -20,6 +20,10 @@
     <string>1</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>JANUS uses the microphone only when you press the voice input control.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>JANUS converts speech you explicitly submit into text for the normal JANUS chat path.</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UILaunchScreen</key>
