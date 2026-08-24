@@ -23,10 +23,28 @@ jobs:
           test ! -e "$BASE/JanusChatHistoryBridge.java"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '1.03'" android/app/build.gradle
-          grep -q "versionCode 103" android/app/build.gradle
+          grep -q "versionName '1.04'" android/app/build.gradle
+          grep -q "versionCode 104" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
-      - name: Verify v1.03 structured Chat and extracted screen ownership
+      - name: Verify v1.04 Chat decoration performance regression
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=android/app/src/main/java/com/vardath/janus
+          UI="$BASE/JanusUiPolish.java"
+          SOURCES="$BASE/JanusSourcePolish.java"
+          IMAGES="$BASE/JanusGeneratedImagePolish.java"
+          REPLY="$BASE/JanusReplyContextPolish.java"
+          grep -q 'CHAT_ENHANCED' "$UI"
+          grep -q 'BASE_POLISHED' "$UI"
+          grep -q 'POLISH_DEBOUNCE_MS' "$UI"
+          ! grep -q 'layout.setTag("janus-chat-enhanced")' "$UI"
+          grep -q 'child instanceof TextView && !(child instanceof Button)' "$UI"
+          grep -q 'MAIN.postDelayed(next, 220L)' "$SOURCES"
+          grep -q 'MAIN.postDelayed(next, 260L)' "$IMAGES"
+          grep -q 'MAIN.postDelayed(next, 240L)' "$REPLY"
+          for f in "$UI" "$SOURCES" "$IMAGES" "$REPLY"; do grep -q 'Map<Activity, Runnable> PENDING' "$f"; done
+      - name: Verify v1.04 structured Chat and extracted screen ownership
         shell: bash
         run: |
           set -euxo pipefail
@@ -91,7 +109,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: direct foreground Chat + structured history and queued presentations + persistent sources/generated images + extracted Messages/Observe ownership; retired v1 bridges; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.04 idempotent/debounced Chat decoration + structured history + persistent sources/generated images + extracted Messages/Observe ownership; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
