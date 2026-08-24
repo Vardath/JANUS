@@ -5,16 +5,12 @@ on:
     branches: [main]
     paths:
       - 'android/**'
-      - 'tools/patch_android_*.py'
-      - 'tools/compose_android_phase3.py'
       - 'tests/test_android_ui_hardening.py'
       - '.github/workflows/build-android.yml'
       - '.github/workflows/test-android-ui-hardening.yml'
   pull_request:
     paths:
       - 'android/**'
-      - 'tools/patch_android_*.py'
-      - 'tools/compose_android_phase3.py'
       - 'tests/test_android_ui_hardening.py'
       - '.github/workflows/build-android.yml'
       - '.github/workflows/test-android-ui-hardening.yml'
@@ -30,21 +26,22 @@ jobs:
           python-version: '3.13'
       - name: Install test dependency
         run: python -m pip install -q pytest
-      - name: Verify UI hardening contracts
+      - name: Verify native UI hardening contracts
         run: python -m pytest -q tests/test_android_ui_hardening.py
-      - name: Verify consolidated Android Phase 3 composition
+      - name: Verify authoritative native product surface
         shell: bash
         run: |
           set -euxo pipefail
-          python tools/compose_android_phase3.py
-          grep -q 'id="themeMode"' android/app/src/main/assets/index.html
-          grep -q 'id="themeAccent"' android/app/src/main/assets/index.html
-          grep -q 'Compatibility' android/app/src/main/assets/index.html
-          grep -q 'Background research' android/app/src/main/assets/index.html
-          grep -q 'Maintenance review' android/app/src/main/assets/index.html
-          grep -q 'Research workspace' android/app/src/main/assets/index.html
-          grep -q 'Artifacts' android/app/src/main/assets/index.html
-          grep -q 'pickAttachment' android/app/src/main/assets/index.html
-          grep -q 'Download / Export' android/app/src/main/assets/index.html
-          grep -q 'shareArtifactNative' android/app/src/main/assets/index.html
-          grep -q 'fileprovider' android/app/src/main/AndroidManifest.xml
+          BASE=android/app/src/main/java/com/vardath/janus
+          test ! -e android/app/src/main/assets/index.html
+          test -s "$BASE/MainActivity.java"
+          test -s "$BASE/JanusUiPolish.java"
+          test -s "$BASE/JanusAdaptiveUi.java"
+          test -s "$BASE/JanusChatHistoryStore.java"
+          test -s "$BASE/JanusOfflineQueue.java"
+          grep -q 'Research workspace' "$BASE/MainActivity.java"
+          grep -q 'Artifacts' "$BASE/MainActivity.java"
+          grep -q 'Maintenance review' "$BASE/MainActivity.java"
+          grep -q 'Compatibility' "$BASE/MainActivity.java"
+          grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
+          ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
