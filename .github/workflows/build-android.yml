@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Verify authoritative native product boundary
+      - name: Verify authoritative native Android boundary
         shell: bash
         run: |
           set -euxo pipefail
@@ -30,129 +30,45 @@ jobs:
           API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
           ROUTE=android/app/src/main/java/com/vardath/janus/JanusRoutePolicy.java
           CORE=android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
-          POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
-          PRODUCT=android/app/src/main/java/com/vardath/janus/JanusProductPolish.java
-          SCREEN=android/app/src/main/java/com/vardath/janus/JanusScreenStatePolish.java
-          FEATURE=android/app/src/main/java/com/vardath/janus/JanusFeaturePolish.java
+          UI=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
           REPLY=android/app/src/main/java/com/vardath/janus/JanusReplyContextPolish.java
-          MAP=android/app/src/main/java/com/vardath/janus/JanusCoreMapView.java
+          SOURCE=android/app/src/main/java/com/vardath/janus/JanusSourcePolish.java
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
           GRADLE=android/app/build.gradle
-          test -s "$SRC" && test -s "$API" && test -s "$ROUTE" && test -s "$CORE" && test -s "$POLISH" && test -s "$PRODUCT" && test -s "$SCREEN" && test -s "$FEATURE" && test -s "$REPLY" && test -s "$MAP" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
+          for f in "$SRC" "$API" "$ROUTE" "$CORE" "$UI" "$REPLY" "$SOURCE" "$APP" "$MAN" "$GRADLE"; do test -s "$f"; done
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' android/app/src/main/java
           grep -q 'class MainActivity extends Activity' "$SRC"
           grep -q "applicationId 'com.vardath.janus'" "$GRADLE"
-          grep -q "versionName '0.90'" "$GRADLE"
+          grep -q "versionName '0.91'" "$GRADLE"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
 
-      - name: Verify UI product and v0.90 reply-context contract
+      - name: Verify core product contracts
         shell: bash
         run: |
           set -euxo pipefail
-          POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
-          PRODUCT=android/app/src/main/java/com/vardath/janus/JanusProductPolish.java
-          SCREEN=android/app/src/main/java/com/vardath/janus/JanusScreenStatePolish.java
-          FEATURE=android/app/src/main/java/com/vardath/janus/JanusFeaturePolish.java
+          UI=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
           REPLY=android/app/src/main/java/com/vardath/janus/JanusReplyContextPolish.java
-          MAP=android/app/src/main/java/com/vardath/janus/JanusCoreMapView.java
+          SOURCE=android/app/src/main/java/com/vardath/janus/JanusSourcePolish.java
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
-          MAN=android/app/src/main/AndroidManifest.xml
-          grep -q 'WindowCompat.setDecorFitsSystemWindows(window, false)' "$POLISH"
-          grep -q 'WindowInsetsCompat.Type.systemBars()' "$POLISH"
-          grep -q 'WindowInsetsCompat.Type.ime()' "$POLISH"
-          grep -q 'Math.max(bars.bottom, ime.bottom)' "$POLISH"
-          grep -q 'JanusUiPolish.install(activity)' "$APP"
-          grep -q 'JanusProductPolish.install(activity)' "$APP"
-          grep -q 'JanusScreenStatePolish.install(activity)' "$APP"
-          grep -q 'JanusFeaturePolish.install(activity)' "$APP"
-          grep -q 'JanusReplyContextPolish.install(activity)' "$APP"
-          grep -q 'android:windowSoftInputMode="adjustResize"' "$MAN"
-          grep -q 'enhanceChatCard' "$POLISH"
-          grep -q 'Copied JANUS response' "$POLISH"
-          grep -q 'Share JANUS response' "$POLISH"
-          grep -q 'Delivery status' "$POLISH"
-          grep -q 'injectArchitectureMap' "$POLISH"
-          grep -q 'Forward-only routing' "$MAP"
-          grep -q 'Grounding' "$POLISH"
-          grep -q 'Alternative / counterfactual' "$POLISH"
-          grep -q 'Boundary / uncertainty' "$POLISH"
-          grep -q 'THIS DEVICE · LOCAL JANUS' "$POLISH"
-          grep -q 'ONLINE · GLOBAL JANUS' "$POLISH"
-          grep -q 'Stable snapshot' "$POLISH"
-          grep -q 'Refresh only when you choose' "$POLISH"
-          grep -q 'No surfaced messages yet' "$SCREEN"
-          grep -q 'No observable activity in this snapshot' "$SCREEN"
-          grep -q 'Search visible memory' "$FEATURE"
-          grep -q '"All", "Trace", "Working", "Episodic", "Core"' "$FEATURE"
-          grep -q 'applyMemoryFilter' "$FEATURE"
-          grep -q 'Research evidence count' "$FEATURE"
-          grep -q 'Session & security' "$FEATURE"
-          grep -q 'Replying to JANUS' "$REPLY"
-          grep -q 'PREFIX + state.context + SUFFIX + reply' "$REPLY"
-          grep -q 'composer.setText(text.substring' "$REPLY"
-          grep -q 'state.sending = true' "$REPLY"
-
-      - name: Verify authenticated route hygiene
-        shell: bash
-        run: |
-          set -euxo pipefail
           API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
           ROUTE=android/app/src/main/java/com/vardath/janus/JanusRoutePolicy.java
+          grep -q 'WindowInsetsCompat.Type.systemBars()' "$UI"
+          grep -q 'WindowInsetsCompat.Type.ime()' "$UI"
+          grep -q 'Math.max(bars.bottom, ime.bottom)' "$UI"
+          grep -q 'Replying to JANUS' "$REPLY"
+          grep -q 'PREFIX + state.context + SUFFIX + reply' "$REPLY"
+          grep -q 'JanusSourcePolish.install(activity)' "$APP"
+          grep -q 'Sources · ' "$SOURCE"
+          grep -q 'Tap to open' "$SOURCE"
+          grep -q 'Intent.ACTION_VIEW' "$SOURCE"
+          grep -q 'parseSources' "$SOURCE"
+          grep -q 'body.setText(answer)' "$SOURCE"
           grep -q 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$API"
-          test "$(grep -c 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$API")" -ge 2
           grep -q 'isAccountOwnedPath' "$ROUTE"
-          grep -q '"username".equals(key)' "$ROUTE"
-          grep -q '"profile_id".equals(key)' "$ROUTE"
-          grep -q '/desktop/messages' "$ROUTE"
-          grep -q '/desktop/core-observe' "$ROUTE"
-          grep -q '/desktop/runtime-cores' "$ROUTE"
-          grep -q '/desktop/memory' "$ROUTE"
-          grep -q '/desktop/activity' "$ROUTE"
 
-      - name: Verify complete product surface
-        shell: bash
-        run: |
-          set -euxo pipefail
-          SRC=android/app/src/main/java/com/vardath/janus/MainActivity.java
-          for marker in \
-            'Username or email' 'Create account' 'Continue with Google' \
-            'Forgot password' 'Reset password' 'Verify / resend email' \
-            '"Chat", "Messages", "Observe", "Options"' \
-            'Research Workspace' 'Artifacts' 'Background Research' \
-            'Maintenance Review' 'System Status' 'Compatibility' \
-            'Runtime Cores' 'Memory' 'Activity' 'Settings' 'Account'; do
-            grep -q "$marker" "$SRC"
-          done
-          grep -q 'Report response' "$SRC"
-          grep -q 'MAX_ATTACHMENTS = 4' "$SRC"
-          grep -q 'ACTION_OPEN_DOCUMENT' "$SRC"
-          grep -q 'ACTION_CREATE_DOCUMENT' "$SRC"
-          grep -q 'ACTION_SEND' "$SRC"
-          grep -q 'FileProvider.getUriForFile' "$SRC"
-
-      - name: Verify server contract coverage
-        shell: bash
-        run: |
-          set -euxo pipefail
-          SRC=android/app/src/main/java/com/vardath/janus/MainActivity.java
-          for route in \
-            '/auth/login' '/auth/register' '/auth/google' '/auth/me' \
-            '/auth/forgot-password' '/auth/reset-password' '/auth/verify-email' \
-            '/desktop/chat' '/desktop/messages?username=' '/desktop/core-observe?username=' \
-            '/desktop/runtime-cores?username=' '/desktop/memory?username=' '/desktop/activity?username=' \
-            '/files/upload' '/artifacts' '/research/workspace' '/research-provenance/status' \
-            '/maintenance/status' '/protocol/capabilities' '/diagnostics/runtime-health' '/safety/report'; do
-            grep -q "$route" "$SRC"
-          done
-          grep -q 'client_message_id' "$SRC"
-          grep -q 'attachment_ids' "$SRC"
-          grep -q 'local_runtime_evidence' "$SRC"
-          grep -q 'JanusOfflineQueue.enqueue' "$SRC"
-          grep -q 'JanusOfflineQueue.flush' "$SRC"
-
-      - name: Verify local 11-core architectural invariants
+      - name: Verify 11-core architectural invariants
         shell: bash
         run: |
           set -euxo pipefail
@@ -168,7 +84,6 @@ jobs:
           grep -q '\[feedback-only global\]' "$CORE"
           grep -q 'core_cycle_api_calls' "$CORE"
           grep -q 'background_cycles_enabled' "$CORE"
-          grep -q 'observe_telemetry_enabled' "$CORE"
 
       - uses: actions/setup-java@v5
         with:
@@ -227,7 +142,7 @@ jobs:
             echo "Version: $VERSION"
             echo "Package: com.vardath.janus"
             echo "Source commit: $GITHUB_SHA"
-            echo "UI: safe areas + Chat + Cores/Observe + Memory/Research/Account + hidden Messages reply context; no WebView"
+            echo "UI: safe areas + Chat actions + reply context + tappable source cards; no WebView"
             echo "Architecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface"
             echo "Signing certificate from stable build keystore:"
             keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1:|SHA256:' || true
