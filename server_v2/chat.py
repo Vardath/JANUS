@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 
-from . import auth, governance, media, storage, visual_memory
+from . import auth, governance, images, media, storage, visual_memory
 from .mind import mind
 
 router = APIRouter()
@@ -89,9 +89,6 @@ def chat(payload: dict[str,Any], authorization: Optional[str]=Header(default=Non
     evidence,files=_evidence(aid,ids,message)
     youtube,sources=_youtube_research(aid,message)
     combined="\n\n---\n\n".join(x for x in (evidence,youtube) if x)[:30000]
-    # A retrieved YouTube transcript is already current external evidence, so the
-    # Interface request is reframed to avoid a second web call. Ordinary current-
-    # information requests go through mind.web_research exactly once.
     mind_message=("Use the supplied transcript/evidence to answer the user's request: "+message) if youtube else (message or "Please assess the attached material.")
     result=mind.process(aid,mind_message,combined)
     if result.get("web"):
@@ -100,6 +97,10 @@ def chat(payload: dict[str,Any], authorization: Optional[str]=Header(default=Non
             (aid,"foreground",message,str(result.get("reply") or "")[:20000],storage.jdump(result.get("sources") or []),None,storage.now()),
         )
     if sources and not result.get("sources"): result["sources"]=sources
+    generated=images.maybe_explanatory_image(aid,message,str(result.get("reply") or ""))
+    if generated:
+        result["generated_image"]=generated
+        result["image"]=generated
     result.update({"profile":account["username"],"client_message_id":client_id,"attachments":files,"attachment_grounding":bool(evidence),"research_grounding":bool(youtube or result.get("web"))})
     if client_id:
         storage.execute("INSERT OR REPLACE INTO v2_chat_receipts(account_id,client_message_id,response_json,created_at) VALUES(?,?,?,?)",(aid,client_id,json.dumps(result,ensure_ascii=False),storage.now()))
