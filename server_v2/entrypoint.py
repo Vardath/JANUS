@@ -20,17 +20,22 @@ from .advanced import router as advanced_router  # noqa: E402
 from .background import background  # noqa: E402
 from .chat import router as chat_router  # noqa: E402
 from .identity_api import router as identity_router  # noqa: E402
+from .images import router as image_router  # noqa: E402
 from .sync_contract import router as sync_router  # noqa: E402
 
 # Route ownership is explicit. Provisional routes in app.py are removed and each
 # final reconstructed subsystem owns its endpoint exactly once.
-_FINAL_REPLACEMENTS = {("/core-sync/exchange","POST"), ("/desktop/chat","POST")}
+_FINAL_REPLACEMENTS = {
+    ("/core-sync/exchange","POST"), ("/desktop/chat","POST"),
+    ("/images/generate","POST"), ("/images/usage","GET"),
+}
 app.router.routes[:] = [
     route for route in app.router.routes
     if not any(getattr(route,"path",None)==path and method in getattr(route,"methods",set()) for path,method in _FINAL_REPLACEMENTS)
 ]
 app.include_router(chat_router)
 app.include_router(sync_router)
+app.include_router(image_router)
 app.include_router(identity_router)
 app.include_router(advanced_router)
 app.add_event_handler("startup", background.start)
