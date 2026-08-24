@@ -9,16 +9,10 @@ import androidx.work.WorkManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/** Persistent on-device outbound chat queue with retry-safe idempotency. */
+/** Persistent on-device outbound Chat queue with retry-safe idempotency. */
 public final class JanusOfflineQueue {
     private static final String PREFS = "janus";
     private static final String OUTBOX = "offline_chat_outbox_v1";
@@ -51,8 +45,7 @@ public final class JanusOfflineQueue {
         long[] delays = new long[]{8L, 25L, 60L};
         for (long delay : delays) {
             OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(JanusQueueRetryWorker.class)
-                    .setInitialDelay(delay, TimeUnit.SECONDS)
-                    .build();
+                    .setInitialDelay(delay, TimeUnit.SECONDS).build();
             WorkManager.getInstance(context.getApplicationContext()).enqueue(request);
         }
     }
@@ -80,10 +73,7 @@ public final class JanusOfflineQueue {
             }
             if (!found) {
                 JSONObject item = new JSONObject();
-                item.put("id", id);
-                item.put("body", body);
-                item.put("created_at", now);
-                item.put("attempts", 0);
+                item.put("id", id); item.put("body", body); item.put("created_at", now); item.put("attempts", 0);
                 next.put(item);
             }
             prefs.edit().putString(OUTBOX, next.toString()).apply();
@@ -101,6 +91,7 @@ public final class JanusOfflineQueue {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String token = prefs.getString("access_token", "");
         if (token == null || token.trim().isEmpty()) return 0;
+        JanusApiClient api = new JanusApiClient(context);
         try {
             JSONArray old = new JSONArray(prefs.getString(OUTBOX, "[]"));
             JSONArray keep = new JSONArray();
@@ -113,41 +104,24 @@ public final class JanusOfflineQueue {
                 JSONObject body = item.optJSONObject("body");
                 if (body == null) continue;
                 item.put("attempts", item.optInt("attempts", 0) + 1);
-                HttpURLConnection c = null;
-                try {
-                    c = (HttpURLConnection) new URL(MainActivity.SERVER + "/desktop/chat").openConnection();
-                    c.setRequestMethod("POST"); c.setDoOutput(true);
-                    c.setConnectTimeout(30000); c.setReadTimeout(120000);
-                    c.setRequestProperty("Accept", "application/json");
-                    c.setRequestProperty("Content-Type", "application/json");
-                    c.setRequestProperty("Authorization", "Bearer " + token.trim());
-                    c.setRequestProperty("Connection", "close");
-                    try (OutputStream os = c.getOutputStream()) { os.write(body.toString().getBytes(StandardCharsets.UTF_8)); }
-                    int code = c.getResponseCode();
-                    String response = readBody(c, code);
-                    if (code >= 200 && code < 300) {
-                        delivered++;
-                        rememberReply(prefs, item.optString("id"), response);
-                    } else if (code == 401 || code == 403) {
-                        keep.put(item); stopForAuth = true;
-                    } else if (code == 409 || code == 425 || code == 429 || code >= 500) keep.put(item);
-                    else rememberReply(prefs, item.optString("id"), new JSONObject()
-                            .put("reply", "A queued JANUS message could not be delivered (HTTP " + code + "). It has been removed from the retry queue.")
+
+                JanusChatController.Result result = JanusChatController.sendOnce(api, body.toString());
+                if (result.ok()) {
+                    delivered++;
+                    rememberReply(prefs, item.optString("id"), result.response.body);
+                } else if (result.authExpired) {
+                    keep.put(item); stopForAuth = true;
+                } else if (result.retryable || result.response.code == 409) {
+                    keep.put(item);
+                } else {
+                    rememberReply(prefs, item.optString("id"), new JSONObject()
+                            .put("reply", "A queued JANUS message could not be delivered (HTTP " + result.response.code + "). It has been removed from the retry queue.")
                             .put("mode", "queue_delivery_error").toString());
-                } catch (Exception e) { keep.put(item); }
-                finally { if (c != null) c.disconnect(); }
+                }
             }
             prefs.edit().putString(OUTBOX, keep.toString()).apply();
             return delivered;
         } catch (Exception e) { return 0; }
-    }
-
-    private static String readBody(HttpURLConnection c, int code) throws Exception {
-        if (code >= 400 && c.getErrorStream() == null) return "";
-        BufferedReader r = new BufferedReader(new InputStreamReader(code >= 400 ? c.getErrorStream() : c.getInputStream(), StandardCharsets.UTF_8));
-        StringBuilder b = new StringBuilder(); String line;
-        while ((line = r.readLine()) != null && b.length() < 16384) b.append(line);
-        r.close(); return b.toString();
     }
 
     private static synchronized void rememberReply(SharedPreferences prefs, String id, String rawResponse) {
