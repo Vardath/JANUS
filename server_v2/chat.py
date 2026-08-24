@@ -57,30 +57,88 @@ def _visual_assessment(account_id: int, row, prompt: str) -> str:
         return ""
 
 
+def _audio_transcript(account_id: int, row) -> str:
+    """Foreground, user-initiated audio-file transcription with account-bound caching."""
+    mime = str(row["mime_type"] or "")
+    if not mime.startswith("audio/"):
+        return ""
+    cached = str(row["extracted_text"] or "").strip()
+    if cached:
+        sensory_bus.ingest(
+            account_id, "audio", f"audio_attachment:{row['filename']}", cached[:16000],
+            salience=0.76, uncertainty=0.30, novelty=0.28,
+            metadata={"file_id": str(row["id"]), "filename": str(row["filename"]), "mime_type": mime, "cached": True, "transcript": True},
+            mode="foreground",
+        )
+        return cached[:16000]
+    if not os.getenv("OPENAI_API_KEY", "").strip():
+        return ""
+    if not governance.permit(account_id, "audio_transcription", 0.004):
+        return ""
+    try:
+        from openai import OpenAI
+        model = os.getenv("JANUS_AUDIO_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
+        data = Path(row["storage_path"]).read_bytes()
+        result = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "")).audio.transcriptions.create(
+            model=model,
+            file=(str(row["filename"]), data, mime),
+        )
+        text = (getattr(result, "text", "") or "").strip()[:16000]
+        if not text:
+            return ""
+        storage.execute("UPDATE v2_files SET extracted_text=?, extraction_status='audio_transcribed' WHERE account_id=? AND id=?", (text, int(account_id), str(row["id"])))
+        storage.add_event(account_id,"evidence","audio_transcription",f"Audio transcript stored for {row['filename']}",f"Audio transcript stored for {row['filename']}","foreground")
+        sensory_bus.ingest(
+            account_id, "audio", f"audio_attachment:{row['filename']}", text,
+            salience=0.82, uncertainty=0.32, novelty=0.62,
+            metadata={"file_id": str(row["id"]), "filename": str(row["filename"]), "mime_type": mime, "cached": False, "transcript": True, "model": model},
+            mode="foreground",
+        )
+        return text
+    except Exception:
+        return ""
+
+
 def _evidence(account_id: int, ids: list[str], message: str) -> tuple[str,list[dict[str,Any]]]:
     blocks=[]; files=[]
     for fid in ids[:4]:
         row=storage.get_file(account_id,fid)
         if not row: raise HTTPException(404,"Attached file not found")
-        meta={"id":row["id"],"filename":row["filename"],"mime_type":row["mime_type"],"size_bytes":row["size_bytes"]}
-        text=str(row["extracted_text"] or "").strip()
-        if text:
-            blocks.append(f"SOURCE DOCUMENT {row['filename']}:\n{text[:12000]}")
-            meta["grounded"]=True
-            sensory_bus.ingest(
-                account_id, "file", f"attachment:{row['filename']}", text[:12000],
-                salience=0.8, uncertainty=0.25, novelty=0.45,
-                metadata={"file_id": str(row["id"]), "filename": str(row["filename"]), "mime_type": str(row["mime_type"]), "size_bytes": int(row["size_bytes"])},
-                mode="foreground",
-            )
-        elif not str(row["mime_type"]).startswith("image/"):
-            sensory_bus.ingest(
-                account_id, "file", f"attachment:{row['filename']}",
-                f"File attached without extractable text: {row['filename']} ({row['mime_type']}, {row['size_bytes']} bytes).",
-                salience=0.58, uncertainty=0.62, novelty=0.4,
-                metadata={"file_id": str(row["id"]), "filename": str(row["filename"]), "mime_type": str(row["mime_type"]), "size_bytes": int(row["size_bytes"])},
-                mode="foreground",
-            )
+        mime=str(row["mime_type"] or "application/octet-stream")
+        meta={"id":row["id"],"filename":row["filename"],"mime_type":mime,"size_bytes":row["size_bytes"]}
+        if mime.startswith("audio/"):
+            transcript=_audio_transcript(account_id,row)
+            if transcript:
+                blocks.append(f"SOURCE AUDIO {row['filename']} — TRANSCRIPT:\n{transcript[:12000]}")
+                meta["grounded"]=True
+                meta["audio_transcription"]=True
+            else:
+                sensory_bus.ingest(
+                    account_id, "file", f"attachment:{row['filename']}",
+                    f"Audio file attached but no transcript was available: {row['filename']} ({mime}, {row['size_bytes']} bytes).",
+                    salience=0.58, uncertainty=0.72, novelty=0.45,
+                    metadata={"file_id": str(row["id"]), "filename": str(row["filename"]), "mime_type": mime, "size_bytes": int(row["size_bytes"]), "audio_transcription": False},
+                    mode="foreground",
+                )
+        else:
+            text=str(row["extracted_text"] or "").strip()
+            if text:
+                blocks.append(f"SOURCE DOCUMENT {row['filename']}:\n{text[:12000]}")
+                meta["grounded"]=True
+                sensory_bus.ingest(
+                    account_id, "file", f"attachment:{row['filename']}", text[:12000],
+                    salience=0.8, uncertainty=0.25, novelty=0.45,
+                    metadata={"file_id": str(row["id"]), "filename": str(row["filename"]), "mime_type": mime, "size_bytes": int(row["size_bytes"])},
+                    mode="foreground",
+                )
+            elif not mime.startswith("image/"):
+                sensory_bus.ingest(
+                    account_id, "file", f"attachment:{row['filename']}",
+                    f"File attached without extractable text: {row['filename']} ({mime}, {row['size_bytes']} bytes).",
+                    salience=0.58, uncertainty=0.62, novelty=0.4,
+                    metadata={"file_id": str(row["id"]), "filename": str(row["filename"]), "mime_type": mime, "size_bytes": int(row["size_bytes"])},
+                    mode="foreground",
+                )
         assessment=_visual_assessment(account_id,row,message)
         if assessment:
             blocks.append(f"SOURCE IMAGE {row['filename']} — PERSISTED VISUAL ASSESSMENT:\n{assessment[:12000]}")
@@ -131,7 +189,8 @@ def chat(payload: dict[str,Any], authorization: Optional[str]=Header(default=Non
     evidence,files=_evidence(aid,ids,visible_message)
     youtube,sources=_youtube_research(aid,visible_message)
     combined="\n\n---\n\n".join(x for x in (evidence,youtube) if x)[:30000]
-    mind_message=("Use the supplied transcript/evidence to answer the user's request: "+message) if youtube else (message or "Please assess the attached material.")
+    has_grounding=bool(evidence or youtube)
+    mind_message=("Use the supplied transcript/evidence to answer the user's request: "+message) if has_grounding else (message or "Please assess the attached material.")
     result=mind.process(aid,mind_message,combined)
     if result.get("web"):
         web_sources = result.get("sources") or []
