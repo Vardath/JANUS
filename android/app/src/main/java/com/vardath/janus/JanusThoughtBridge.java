@@ -48,8 +48,10 @@ public final class JanusThoughtBridge {
                 }
             }
 
-            String consensus = clip(s.optString("consensus", ""), 900);
+            String front = clip(s.optString("front", s.optString("consensus", "")), 900);
             String face = clip(s.optString("interface", ""), 900);
+            JSONObject frontAppraisal = s.optJSONObject("front_appraisal");
+            JSONObject interfaceAppraisal = s.optJSONObject("interface_appraisal");
             String context = "\n\n[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT]\n"
                     + "The Android local 11-core runtime reports phase=" + s.optString("phase", "unknown")
                     + ", running=" + s.optBoolean("running", false)
@@ -57,10 +59,12 @@ public final class JanusThoughtBridge {
                     + "These are persisted deterministic local processing events with zero model/API calls. They are real app-side JANUS processing between messages. Describe what the cores actually processed when asked, rather than claiming that no background thinking/processing occurred. Do not describe this as phenomenal consciousness or an uninterrupted private stream of consciousness.\n"
                     + (recent.length() == 0 ? "Recent externalizable local activity: none retained.\n" : "Recent externalizable local activity:\n" + recent)
                     + (fano.length() == 0 ? "" : "Current Fano attention orientations used by the local cores:\n" + fano)
-                    + (consensus.isEmpty() ? "" : "Current local consensus: " + consensus + "\n")
+                    + (front.isEmpty() ? "" : "Current local Front appraisal/intention state: " + front + "\n")
+                    + (frontAppraisal == null ? "" : "Front control appraisal: " + frontAppraisal.toString() + "\n")
                     + (face.isEmpty() ? "" : "Current local interface state: " + face + "\n")
-                    + "The seven Fano directions are computational attention lenses (grounding, structure, counterpoint, context, continuity, boundary, novelty). They influence what each core prioritizes, but they are not evidence that the Fano mathematics proves any claim being discussed.\n"
-                    + "Answer the user's question from this device activity. If there was activity, summarize its actual topics/results and, when useful, mention which attention orientations dominated. Distinguish deterministic local-core processing from server/model activity.\n"
+                    + (interfaceAppraisal == null ? "" : "Interface control appraisal: " + interfaceAppraisal.toString() + "\n")
+                    + "The seven Fano directions are computational attention lenses and home roles: d1 Evidence/truth-grounding; d2 Safety/valence-welfare; d3 Counterpoint/significance-conflict; d4 Context/pattern-relationship; d5 Logic/understanding-model; d6 Novelty/possibility-imagination; d7 Memory/continuity-experience. Both hemispheres receive all seven. Left emphasizes logic, constraint and explicit causal consistency; Right emphasizes imagination, association, alternatives and gestalt. Front integrates them into bounded appraisal/intention, and Interface chooses expression/action. These are control semantics, not evidence that Fano mathematics proves any external claim.\n"
+                    + "Answer the user's question from this device activity. If there was activity, summarize its actual topics/results and, when useful, mention which attention orientations or appraisal dimensions dominated. Distinguish deterministic local-core processing from server/model activity.\n"
                     + "[END DEVICE JANUS CONTEXT]";
             return userMessage + context;
         } catch (Exception ignored) {
