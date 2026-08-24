@@ -29,15 +29,34 @@ jobs:
           SRC=android/app/src/main/java/com/vardath/janus/MainActivity.java
           API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
           CORE=android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
+          POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
+          APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
           GRADLE=android/app/build.gradle
-          test -s "$SRC" && test -s "$API" && test -s "$CORE" && test -s "$MAN" && test -s "$GRADLE"
+          test -s "$SRC" && test -s "$API" && test -s "$CORE" && test -s "$POLISH" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' android/app/src/main/java
           grep -q 'class MainActivity extends Activity' "$SRC"
           grep -q "applicationId 'com.vardath.janus'" "$GRADLE"
-          grep -q "versionName '0.82'" "$GRADLE"
+          grep -q "versionName '0.83'" "$GRADLE"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
+
+      - name: Verify safe-area and UI polish contract
+        shell: bash
+        run: |
+          set -euxo pipefail
+          POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
+          APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
+          MAN=android/app/src/main/AndroidManifest.xml
+          grep -q 'WindowCompat.setDecorFitsSystemWindows(window, false)' "$POLISH"
+          grep -q 'WindowInsetsCompat.Type.systemBars()' "$POLISH"
+          grep -q 'WindowInsetsCompat.Type.ime()' "$POLISH"
+          grep -q 'Math.max(bars.bottom, ime.bottom)' "$POLISH"
+          grep -q 'JanusUiPolish.install(activity)' "$APP"
+          grep -q 'android:windowSoftInputMode="adjustResize"' "$MAN"
+          grep -q 'styleButton' "$POLISH"
+          grep -q 'styleInput' "$POLISH"
+          grep -q 'styleSurface' "$POLISH"
 
       - name: Verify complete product surface
         shell: bash
@@ -90,7 +109,6 @@ jobs:
           grep -q 'send(from, "right_hemisphere"' "$CORE"
           grep -q 'send(from, "consensus"' "$CORE"
           grep -q 'send(from, "interface"' "$CORE"
-          ! grep -q 'send(from, "consensus", output);.*interface' "$CORE" || true
           ! grep -q 'send("interface", "consensus"' "$CORE"
           ! grep -q 'send("consensus", "left_hemisphere"' "$CORE"
           ! grep -q 'send("consensus", "right_hemisphere"' "$CORE"
@@ -152,11 +170,11 @@ jobs:
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
           {
-            echo "JANUS Android full native rebuild identity"
+            echo "JANUS Android authoritative native build identity"
             echo "Version: $VERSION"
             echo "Package: com.vardath.janus"
             echo "Source commit: $GITHUB_SHA"
-            echo "UI: authoritative native Android; no WebView"
+            echo "UI: native Android with system/IME safe-area polish; no WebView"
             echo "Architecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface"
             echo "Signing certificate from stable build keystore:"
             keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1:|SHA256:' || true
@@ -187,9 +205,9 @@ jobs:
           mkdir -p downloads
           cp "/tmp/janus-apk/$APK_NAME" downloads/
           cp /tmp/janus-apk/oauth-build-info.txt downloads/
-          printf '# JANUS Android downloads\n\nLatest full rebuild APK: %s\n\n## Build identity\n\n```text\n' "$APK_NAME" > README.md
+          printf '# JANUS Android downloads\n\nLatest authoritative native APK: %s\n\n## Build identity\n\n```text\n' "$APK_NAME" > README.md
           cat /tmp/janus-apk/oauth-build-info.txt >> README.md
           printf '\n```\n' >> README.md
           git add README.md "downloads/$APK_NAME" downloads/oauth-build-info.txt
-          git commit -m "Publish JANUS Android full rebuild v$VERSION"
+          git commit -m "Publish JANUS Android native v$VERSION"
           git push --force origin HEAD:apk-download

@@ -1,8 +1,10 @@
 package com.vardath.janus;
 
+import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Bundle;
 
 /** Application bootstrap for the authoritative native JANUS Android rebuild. */
 public class JanusApplication extends Application {
@@ -20,6 +22,16 @@ public class JanusApplication extends Application {
             getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE).edit().clear().commit();
             boot.edit().putBoolean(CLEAN_MARKER, true).commit();
         }
+
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            @Override public void onActivityCreated(Activity activity, Bundle state) { JanusUiPolish.install(activity); }
+            @Override public void onActivityStarted(Activity activity) {}
+            @Override public void onActivityResumed(Activity activity) { JanusUiPolish.install(activity); }
+            @Override public void onActivityPaused(Activity activity) {}
+            @Override public void onActivityStopped(Activity activity) {}
+            @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
+            @Override public void onActivityDestroyed(Activity activity) {}
+        });
 
         JanusLocalCoreRuntime.get(this).start();
     }
