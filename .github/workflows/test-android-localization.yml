@@ -38,8 +38,13 @@ jobs:
           for code in ['es','fr','de','pt','it','nl','pl','tr','ru','uk','ar','fa','he','ur','hi','bn','id','vi','th','ja','ko','zh-Hans','zh-Hant']:
               assert f'all.put("{code}"' in s, f'missing language {code}'
           assert 'return english;' in s, 'English fallback must remain explicit'
-          assert 'activity.recreate();' in Path('android/app/src/main/java/com/vardath/janus/JanusLanguagePolish.java').read_text(encoding='utf-8')
-          assert 'JanusUiLocalizationPolish.install(activity);' in Path('android/app/src/main/java/com/vardath/janus/JanusApplication.java').read_text(encoding='utf-8')
+          lang = Path('android/app/src/main/java/com/vardath/janus/JanusLanguagePolish.java').read_text(encoding='utf-8')
+          ui = Path('android/app/src/main/java/com/vardath/janus/JanusUiLocalizationPolish.java').read_text(encoding='utf-8')
+          app = Path('android/app/src/main/java/com/vardath/janus/JanusApplication.java').read_text(encoding='utf-8')
+          assert 'activity.recreate();' in lang
+          assert 'JanusUiLocalizationPolish.install(activity);' in app
+          assert 'isConversationBody' in ui and 'parent.getChildAt(1) != view' in ui
+          assert 'view instanceof Button' in ui and "before.indexOf('\\n')" in ui
           print(f'Validated {len(methods)} translation tables x {len(keys)} common UI strings')
           PY
       - uses: actions/setup-java@v5
@@ -49,6 +54,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '8.11.1'
+      - name: Ensure stable debug signing key exists
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
       - name: Compile and assemble localized APK
         working-directory: android
         run: gradle --no-daemon :app:compileDebugJavaWithJavac :app:assembleDebug --stacktrace
