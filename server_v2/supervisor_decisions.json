@@ -1,5 +1,14 @@
 {
   "schema": "janus-supervisor-decisions-v1",
   "instructions": "ChatGPT Supervisor updates this file only while reviewing JANUS-generated capability requests. Each entry must record approve/disapprove/defer, reason, implementation state, and version. JANUS never writes or self-approves this file.",
-  "decisions": []
+  "decisions": [
+    {
+      "decision_key": "maintenance-isolation-v109-approved-20260824",
+      "fingerprint": "aeb38cafd8dd51cd046402be4f7aef1e",
+      "decision": "approved",
+      "reason": "Approved with a narrower security design than direct repository access. JANUS may submit bounded diagnostic records only through the authenticated server maintenance channel. The channel exposes no GitHub/source-repository credential, arbitrary repository/file read or write, process execution, package installation, configuration mutation, self-approval, or deployment primitive. Owner/ChatGPT Supervisor remains the authorization boundary for source changes.",
+      "implementation_state": "implemented",
+      "implemented_version": "server-v2 maintenance isolation / Android-compatible v1.08+"
+    }
+  ]
 }
