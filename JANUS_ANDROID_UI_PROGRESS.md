@@ -16,42 +16,31 @@ Updated: 2026-08-24
 - v1.00: structured Chat v2 became the visible surface authority.
 - v1.01: foreground Chat switched directly to `JanusChatController`; live `Sources:` appendix removed; structured v2 history became the normal read/write path.
 - v1.02: queued/offline replay retained structured sources/generated-image metadata; obsolete v1 bridge classes retired.
-- v1.03: Messages and read-only Observe gained dedicated native screen owners; all pre-merge checks passed and the APK was published.
+- v1.03: Messages and read-only Observe gained dedicated native screen owners.
+- v1.04: client-side Copy/Share duplication, full-tree typing lag and stray Observe-guide regression fixed with idempotent/debounced decorators; published APK verified.
 
-## v1.04 — Chat UI spam / typing-lag hotfix
-### Device-observed failure
-On a long Chat history, asking JANUS what it had been thinking about while away exposed a client rendering bug:
-- a JANUS response accumulated Copy/Share rows repeatedly without stopping;
-- the app progressively slowed;
-- composer keystrokes became delayed;
-- the Observe guide could appear on Chat near the bottom navigation.
+## v1.05 — Android Back semantics + local background-activity bridge
+### Device-observed failures
+1. Android system Back exited the Activity because JANUS swaps one native content container rather than using Android Fragments/Activities with a native back stack.
+2. The local 11-core runtime was visibly performing deterministic background cycles, but Chat could still answer that JANUS had not been thinking while away because the server-facing conversational request did not receive the device runtime's persisted externalizable state.
 
-### Root cause audit
-1. `JanusUiPolish` used the ordinary single `View.setTag()` slot to remember that a Chat card had received Copy/Share controls.
-2. `JanusSourcePolish` reused that same tag slot for its own structured-source marker, overwriting the Chat marker.
-3. On the next global-layout callback, `JanusUiPolish` therefore believed the same JANUS card was unprocessed and appended another Copy/Share row. Repetition created unbounded view growth.
-4. Four independent decorators (`JanusUiPolish`, `JanusSourcePolish`, `JanusGeneratedImagePolish`, `JanusReplyContextPolish`) performed recursive view-tree work from global-layout callbacks. With a long conversation this amplified UI-thread work during keyboard/composer layout changes.
-5. Observe-guide title matching accepted `Button` because Android `Button` subclasses `TextView`; the bottom navigation button labelled `Observe` could be mistaken for the actual Observe page title.
+### Implementation on `android-v105-navigation-thought-bridge`
+- `JanusNavigationPolish` translates Android Back into JANUS navigation: explicit child/subpage back button first, then non-Chat top-level page -> Chat, then Activity exit from Chat.
+- `JanusThoughtBridge` reads the persisted local runtime status/events and builds bounded background-activity context only for explicit questions about what JANUS was thinking/doing/processing while the user was away.
+- Context explicitly describes deterministic local processing and zero model/API calls; it forbids presenting the data as uninterrupted private consciousness or phenomenal experience.
+- Thought context is injected inside `JanusApiClient.postRaw()` at the authenticated `/desktop/chat` transport boundary, not into the visible composer. User bubbles and structured history therefore retain exactly the message the user typed.
+- The abandoned composer-injection prototype was deleted before release.
+- Android version advances to 1.05 / versionCode 105.
+- v1.04 anti-spam/debounce gates remain mandatory.
 
-### v1.04 remediation on `android-v104-ui-spam-fix`
-- `JanusUiPolish` now uses weak identity sets (`CHAT_ENHANCED`, `BASE_POLISHED`, dedicated core-map/Observe-guide sets) rather than shared plain `View.setTag()` ownership markers.
-- Copy/Share decoration is idempotent per Chat card.
-- base styling is idempotent per View rather than rewriting properties on every pass.
-- global-layout polishing is debounced so typing does not synchronously trigger a full recursive polish for every layout event.
-- source, generated-image and Reply-in-Chat scanners are independently debounced.
-- source decoration uses a weak `ENHANCED` set and no longer overwrites Chat-decoration ownership.
-- Observe/core-title matching excludes `Button` instances, preventing navigation labels from being treated as page titles.
-- Android version advances to 1.04 / versionCode 104.
-- UI-hardening tests and the Android build gate explicitly reject return of the shared-tag Chat marker and require the debounce/idempotence protections.
+## v1.05 release rule
+Do not merge until:
+1. navigation/thought-bridge static regression gate passes;
+2. v1.04 UI performance regression gate remains green;
+3. maintenance/auth/protocol checks remain green;
+4. authoritative Java compilation succeeds;
+5. APK assembly succeeds.
+After merge, verify `apk-download` records `Publish JANUS Android native v1.05`, then perform real-device validation of Back navigation and an away/background-processing question.
 
-## Release rule for v1.04
-Do not merge or publish until:
-1. UI hardening regression tests pass;
-2. existing maintenance/auth/protocol gates pass;
-3. authoritative Java compilation succeeds;
-4. APK assembly succeeds;
-5. after merge, `apk-download` records `Publish JANUS Android native v1.04`;
-6. real-device validation confirms one Copy/Share row per JANUS message, no Observe guide on Chat, and responsive typing with a long history.
-
-## Next intended work after the hotfix
-Resume architecture cleanup only after v1.04 is stable on-device. Continue reducing `MainActivity` responsibilities and improving tablet/wide-layout behavior, but do not stack UI architecture work on top of an unverified performance regression.
+## After v1.05
+Continue reducing `MainActivity` responsibilities and improve wider-screen/tablet layouts after the navigation and thought bridge are verified on-device.

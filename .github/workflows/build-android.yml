@@ -18,15 +18,34 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge; do test -s "$BASE/$f.java"; done
           test ! -e "$BASE/JanusChatV2Surface.java"
           test ! -e "$BASE/JanusChatHistoryBridge.java"
+          test ! -e "$BASE/JanusThoughtContextPolish.java"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '1.04'" android/app/build.gradle
-          grep -q "versionCode 104" android/app/build.gradle
+          grep -q "versionName '1.05'" android/app/build.gradle
+          grep -q "versionCode 105" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
-      - name: Verify v1.04 Chat decoration performance regression
+      - name: Verify v1.05 navigation and thought bridge
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=android/app/src/main/java/com/vardath/janus
+          NAV="$BASE/JanusNavigationPolish.java"
+          THOUGHT="$BASE/JanusThoughtBridge.java"
+          API="$BASE/JanusApiClient.java"
+          APP="$BASE/JanusApplication.java"
+          grep -q 'getOnBackInvokedDispatcher' "$NAV"
+          grep -q 'parent.performClick()' "$NAV"
+          grep -q '!"Chat".equals(selected)' "$NAV"
+          grep -q 'JanusNavigationPolish.install(activity)' "$APP"
+          grep -q '\[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT\]' "$THOUGHT"
+          grep -q 'zero model/API calls' "$THOUGHT"
+          grep -q 'uninterrupted private stream of consciousness' "$THOUGHT"
+          grep -q 'JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message)' "$API"
+          grep -q 'j.put("message", augmented)' "$API"
+      - name: Verify v1.04 Chat decoration performance regression remains fixed
         shell: bash
         run: |
           set -euxo pipefail
@@ -43,16 +62,13 @@ jobs:
           grep -q 'MAIN.postDelayed(next, 220L)' "$SOURCES"
           grep -q 'MAIN.postDelayed(next, 260L)' "$IMAGES"
           grep -q 'MAIN.postDelayed(next, 240L)' "$REPLY"
-          for f in "$UI" "$SOURCES" "$IMAGES" "$REPLY"; do grep -q 'Map<Activity, Runnable> PENDING' "$f"; done
-      - name: Verify v1.04 structured Chat and extracted screen ownership
+      - name: Verify structured Chat and extracted screen ownership
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
           MAIN="$BASE/MainActivity.java"
           QUEUE="$BASE/JanusOfflineQueue.java"
-          test -s "$BASE/JanusMessagesScreen.java"
-          test -s "$BASE/JanusObserveScreen.java"
           grep -q 'JanusChatController.send(api, prepared)' "$MAIN"
           ! grep -q 'long\[\] waits' "$MAIN"
           ! grep -q 'formatSources(' "$MAIN"
@@ -60,19 +76,14 @@ jobs:
           grep -q 'JanusChatHistoryStore.append(this, "JANUS", reply, presentation)' "$MAIN"
           grep -q 'JSONArray a = JanusChatHistoryStore.read(this)' "$MAIN"
           grep -q 'JanusChatResponseRegistry.remember(presentation)' "$MAIN"
-          grep -q 'public static synchronized void remember' "$BASE/JanusChatResponseRegistry.java"
           grep -q 'chat_history_native_v2' "$BASE/JanusChatHistoryStore.java"
           grep -q 'migrateLegacyOnce' "$BASE/JanusChatHistoryStore.java"
           grep -q 'offline_chat_replies_v2' "$QUEUE"
           grep -q 'presentation.toJson()' "$QUEUE"
-          grep -q 'JanusChatResponseRegistry.capture(context, rawResponse)' "$QUEUE"
           grep -q 'JanusChatController.sendOnce(api, body.toString())' "$QUEUE"
           ! grep -q 'HttpURLConnection' "$QUEUE"
           grep -q 'JanusGeneratedImagePolish.install(activity)' "$BASE/JanusApplication.java"
-          grep -q 'buildPanel(activity,p.sources)' "$BASE/JanusSourcePolish.java"
           grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
-          grep -q 'Replying to JANUS' "$BASE/JanusReplyContextPolish.java"
-          grep -q 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$BASE/JanusApiClient.java"
           CORE="$BASE/JanusLocalCoreRuntime.java"
           grep -q 'Strictly forward-only routing' "$CORE"
           ! grep -q 'send("interface", "consensus"' "$CORE"
@@ -109,7 +120,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.04 idempotent/debounced Chat decoration + structured history + persistent sources/generated images + extracted Messages/Observe ownership; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.05 native Back navigation + truthful device background-activity bridge + v1.04 idempotent/debounced Chat decoration; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD

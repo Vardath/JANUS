@@ -3,6 +3,8 @@ package com.vardath.janus;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -18,19 +20,18 @@ public final class JanusApiClient {
     public static final String PREFS = "janus";
     public static final String TOKEN = "access_token";
     public static final String PROFILE = "profile_id";
+    private final Context appContext;
     private final SharedPreferences prefs;
-    public JanusApiClient(Context context) { prefs = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE); }
+    public JanusApiClient(Context context) {
+        appContext = context.getApplicationContext();
+        prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
     public String token() { return prefs.getString(TOKEN, ""); }
     public String profile() { return prefs.getString(PROFILE, ""); }
     public void saveSession(String token, String profile) { prefs.edit().putString(TOKEN, token == null ? "" : token).putString(PROFILE, profile == null ? "" : profile).apply(); }
     public void clearSession() { prefs.edit().remove(TOKEN).remove(PROFILE).remove("last_notified_message").apply(); }
     public Response get(String path, boolean auth) { return request("GET", path, null, auth, true); }
 
-    /**
-     * All ordinary foreground Chat POSTs cross the shared controller boundary.
-     * MainActivity may still own its outer retry loop during the incremental extraction,
-     * but transport parsing/capture is no longer a separate API-client side effect.
-     */
     public Response post(String path, String body, boolean auth) {
         String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
         if (auth && "/desktop/chat".equals(effectivePath)) return JanusChatController.sendOnce(this, body).response;
@@ -39,8 +40,28 @@ public final class JanusApiClient {
 
     public Response delete(String path, String body, boolean auth) { return request("DELETE", path, body, auth, true); }
 
-    /** Raw transport primitive for higher-level controllers. It deliberately performs no Chat presentation side effects. */
-    Response postRaw(String path, String body, boolean auth) { return request("POST", path, body, auth, false); }
+    /** Raw Chat transport. Local thought context is injected here so UI/history retain only the user's visible message. */
+    Response postRaw(String path, String body, boolean auth) {
+        String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
+        String prepared = body;
+        if (auth && "/desktop/chat".equals(effectivePath)) prepared = augmentChatBody(body);
+        return request("POST", path, prepared, auth, false);
+    }
+
+    private String augmentChatBody(String body) {
+        if (body == null || body.isBlank()) return body;
+        try {
+            JSONObject j = new JSONObject(body);
+            String message = j.optString("message", "");
+            if (message.isBlank()) return body;
+            String augmented = JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message);
+            if (augmented.equals(message)) return body;
+            j.put("message", augmented);
+            return j.toString();
+        } catch (Exception ignored) {
+            return body;
+        }
+    }
 
     public Response request(String method, String path, String body, boolean auth) { return request(method, path, body, auth, true); }
 
