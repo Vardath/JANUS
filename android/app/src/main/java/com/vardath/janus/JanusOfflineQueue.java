@@ -12,11 +12,12 @@ import org.json.JSONObject;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/** Persistent on-device outbound Chat queue with retry-safe idempotency. */
+/** Persistent on-device outbound Chat queue with retry-safe idempotency and structured presentation replay. */
 public final class JanusOfflineQueue {
     private static final String PREFS = "janus";
     private static final String OUTBOX = "offline_chat_outbox_v1";
-    private static final String REPLIES = "offline_chat_replies_v1";
+    private static final String REPLIES = "offline_chat_replies_v2";
+    private static final String LEGACY_REPLIES = "offline_chat_replies_v1";
     private static final int MAX_OUTBOX = 100;
     private static final int MAX_REPLIES = 50;
     private static final long DUPLICATE_WINDOW_MS = 120_000L;
@@ -108,13 +109,13 @@ public final class JanusOfflineQueue {
                 JanusChatController.Result result = JanusChatController.sendOnce(api, body.toString());
                 if (result.ok()) {
                     delivered++;
-                    rememberReply(prefs, item.optString("id"), result.response.body);
+                    rememberReply(context, prefs, item.optString("id"), result.response.body);
                 } else if (result.authExpired) {
                     keep.put(item); stopForAuth = true;
                 } else if (result.retryable || result.response.code == 409) {
                     keep.put(item);
                 } else {
-                    rememberReply(prefs, item.optString("id"), new JSONObject()
+                    rememberReply(context, prefs, item.optString("id"), new JSONObject()
                             .put("reply", "A queued JANUS message could not be delivered (HTTP " + result.response.code + "). It has been removed from the retry queue.")
                             .put("mode", "queue_delivery_error").toString());
                 }
@@ -124,28 +125,43 @@ public final class JanusOfflineQueue {
         } catch (Exception e) { return 0; }
     }
 
-    private static synchronized void rememberReply(SharedPreferences prefs, String id, String rawResponse) {
+    private static synchronized void rememberReply(Context context, SharedPreferences prefs, String id, String rawResponse) {
         try {
-            String reply = rawResponse;
-            try {
-                JSONObject parsed = new JSONObject(rawResponse == null ? "{}" : rawResponse);
-                reply = parsed.optString("reply", parsed.optString("detail", rawResponse));
-            } catch (Exception ignored) {}
-            if (reply == null || reply.trim().isEmpty()) return;
+            JanusChatPresentation presentation = JanusChatPresentation.fromResponse(new JSONObject(rawResponse == null ? "{}" : rawResponse), rawResponse);
+            if (presentation.reply == null || presentation.reply.trim().isEmpty()) return;
+            JanusChatResponseRegistry.capture(context, rawResponse);
             JSONArray old = new JSONArray(prefs.getString(REPLIES, "[]"));
             JSONArray next = new JSONArray();
             for (int i = Math.max(0, old.length() - MAX_REPLIES + 1); i < old.length(); i++) {
                 JSONObject x = old.optJSONObject(i); if (x != null) next.put(x);
             }
-            next.put(new JSONObject().put("id", id).put("reply", reply).put("delivered_at", System.currentTimeMillis()));
+            next.put(new JSONObject()
+                    .put("id", id)
+                    .put("reply", presentation.reply)
+                    .put("presentation", presentation.toJson())
+                    .put("delivered_at", System.currentTimeMillis()));
             prefs.edit().putString(REPLIES, next.toString()).apply();
         } catch (Exception ignored) {}
     }
 
     public static synchronized String drainReplies(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String raw = prefs.getString(REPLIES, "[]");
-        prefs.edit().putString(REPLIES, "[]").apply();
-        return raw == null ? "[]" : raw;
+        try {
+            JSONArray structured = new JSONArray(prefs.getString(REPLIES, "[]"));
+            JSONArray legacy = new JSONArray(prefs.getString(LEGACY_REPLIES, "[]"));
+            for (int i = 0; i < legacy.length(); i++) {
+                JSONObject old = legacy.optJSONObject(i);
+                if (old == null) continue;
+                String reply = old.optString("reply", "").trim();
+                if (reply.isEmpty()) continue;
+                structured.put(new JSONObject().put("id", old.optString("id", ""))
+                        .put("reply", reply).put("delivered_at", old.optLong("delivered_at", System.currentTimeMillis())));
+            }
+            prefs.edit().putString(REPLIES, "[]").putString(LEGACY_REPLIES, "[]").apply();
+            return structured.toString();
+        } catch (Exception e) {
+            prefs.edit().putString(REPLIES, "[]").putString(LEGACY_REPLIES, "[]").apply();
+            return "[]";
+        }
     }
 }
