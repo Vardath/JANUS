@@ -18,33 +18,46 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusFanoPolicy JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge; do test -s "$BASE/$f.java"; done
           test ! -e "$BASE/JanusChatV2Surface.java"
           test ! -e "$BASE/JanusChatHistoryBridge.java"
           test ! -e "$BASE/JanusThoughtContextPolish.java"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '1.05'" android/app/build.gradle
-          grep -q "versionCode 105" android/app/build.gradle
+          grep -q "versionName '1.06'" android/app/build.gradle
+          grep -q "versionCode 106" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
-      - name: Verify v1.05 navigation and thought bridge
+      - name: Verify v1.06 thought bridge and active Fano attention
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
           NAV="$BASE/JanusNavigationPolish.java"
           THOUGHT="$BASE/JanusThoughtBridge.java"
+          FANO="$BASE/JanusFanoPolicy.java"
+          CORE="$BASE/JanusLocalCoreRuntime.java"
           API="$BASE/JanusApiClient.java"
           APP="$BASE/JanusApplication.java"
           grep -q 'getOnBackInvokedDispatcher' "$NAV"
           grep -q 'parent.performClick()' "$NAV"
           grep -q '!"Chat".equals(selected)' "$NAV"
           grep -q 'JanusNavigationPolish.install(activity)' "$APP"
+          grep -q 'between messages' "$THOUGHT"
+          grep -q 'what|anything|any' "$THOUGHT"
           grep -q '\[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT\]' "$THOUGHT"
-          grep -q 'zero model/API calls' "$THOUGHT"
-          grep -q 'uninterrupted private stream of consciousness' "$THOUGHT"
+          grep -q 'real app-side JANUS processing between messages' "$THOUGHT"
+          grep -q 'Current Fano attention orientations' "$THOUGHT"
           grep -q 'JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message)' "$API"
           grep -q 'j.put("message", augmented)' "$API"
+          grep -q 'grounding/support' "$FANO"
+          grep -q 'structure/causality' "$FANO"
+          grep -q 'counterexample/falsification' "$FANO"
+          grep -q 'continuity/memory' "$FANO"
+          grep -q 'novelty/adjacent possibility' "$FANO"
+          grep -q 'JanusFanoPolicy.directive(direction)' "$CORE"
+          grep -q 'active_orientation' "$CORE"
+          grep -q 'active_salience_percent' "$CORE"
+          grep -q 'Fano attention:' "$CORE"
       - name: Verify v1.04 Chat decoration performance regression remains fixed
         shell: bash
         run: |
@@ -120,7 +133,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.05 native Back navigation + truthful device background-activity bridge + v1.04 idempotent/debounced Chat decoration; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.06 natural background-thought bridge + active persistent Fano attention policy + native Back navigation + v1.04 idempotent/debounced Chat decoration; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD

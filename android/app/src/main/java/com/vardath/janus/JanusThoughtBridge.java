@@ -3,6 +3,7 @@ package com.vardath.janus;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.Iterator;
 import java.util.Locale;
 
 /**
@@ -31,17 +32,35 @@ public final class JanusThoughtBridge {
                     added++;
                 }
             }
-            String consensus = clip(s.optString("consensus", ""), 700);
-            String face = clip(s.optString("interface", ""), 700);
+
+            StringBuilder fano = new StringBuilder();
+            JSONObject cores = s.optJSONObject("cores");
+            if (cores != null) {
+                Iterator<String> names = cores.keys();
+                while (names.hasNext()) {
+                    String name = names.next();
+                    JSONObject core = cores.optJSONObject(name);
+                    JSONObject fs = core == null ? null : core.optJSONObject("fano");
+                    if (fs == null) continue;
+                    fano.append("- ").append(name).append(": d").append(fs.optInt("active_direction", 0))
+                            .append(" ").append(fs.optString("active_orientation", "unknown"))
+                            .append(", salience ").append(fs.optLong("active_salience_percent", 0L)).append("%\n");
+                }
+            }
+
+            String consensus = clip(s.optString("consensus", ""), 900);
+            String face = clip(s.optString("interface", ""), 900);
             String context = "\n\n[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT]\n"
                     + "The Android local 11-core runtime reports phase=" + s.optString("phase", "unknown")
                     + ", running=" + s.optBoolean("running", false)
                     + ", background_cycles_enabled=" + s.optBoolean("background_cycles_enabled", false) + ".\n"
-                    + "These are persisted deterministic local processing events with zero model/API calls. They may be described as what the local JANUS cores processed while the user was away, but do not describe them as an uninterrupted private stream of consciousness or phenomenal experience.\n"
+                    + "These are persisted deterministic local processing events with zero model/API calls. They are real app-side JANUS processing between messages. Describe what the cores actually processed when asked, rather than claiming that no background thinking/processing occurred. Do not describe this as phenomenal consciousness or an uninterrupted private stream of consciousness.\n"
                     + (recent.length() == 0 ? "Recent externalizable local activity: none retained.\n" : "Recent externalizable local activity:\n" + recent)
+                    + (fano.length() == 0 ? "" : "Current Fano attention orientations used by the local cores:\n" + fano)
                     + (consensus.isEmpty() ? "" : "Current local consensus: " + consensus + "\n")
                     + (face.isEmpty() ? "" : "Current local interface state: " + face + "\n")
-                    + "Answer the user's question using this device activity when relevant; distinguish local deterministic background processing from server/model activity.\n"
+                    + "The seven Fano directions are computational attention lenses (grounding, structure, counterpoint, context, continuity, boundary, novelty). They influence what each core prioritizes, but they are not evidence that the Fano mathematics proves any claim being discussed.\n"
+                    + "Answer the user's question from this device activity. If there was activity, summarize its actual topics/results and, when useful, mention which attention orientations dominated. Distinguish deterministic local-core processing from server/model activity.\n"
                     + "[END DEVICE JANUS CONTEXT]";
             return userMessage + context;
         } catch (Exception ignored) {
@@ -50,10 +69,20 @@ public final class JanusThoughtBridge {
     }
 
     static boolean asksAboutBackgroundActivity(String text) {
-        String s = text == null ? "" : text.toLowerCase(Locale.ROOT);
-        boolean away = s.contains("while i was away") || s.contains("while i was gone") || s.contains("since i left") || s.contains("in the background") || s.contains("background");
-        boolean thought = s.contains("think") || s.contains("thinking") || s.contains("thought") || s.contains("doing") || s.contains("working on") || s.contains("processing") || s.contains("up to");
-        return away && thought;
+        String s = text == null ? "" : text.toLowerCase(Locale.ROOT).trim();
+        boolean thought = s.contains("think") || s.contains("thinking") || s.contains("thought")
+                || s.contains("doing") || s.contains("working on") || s.contains("processing")
+                || s.contains("up to") || s.contains("considering") || s.contains("pondering");
+        if (!thought) return false;
+
+        boolean away = s.contains("while i was away") || s.contains("while i was gone")
+                || s.contains("since i left") || s.contains("since we spoke") || s.contains("since we talked")
+                || s.contains("between messages") || s.contains("between chats") || s.contains("between conversations")
+                || s.contains("in the background") || s.contains("background") || s.contains("while idle");
+        if (away) return true;
+
+        return s.matches(".*\\b(what|anything|any)\\b.*\\b(thinking|thoughts?)\\b.*")
+                && !s.matches(".*\\bthink about\\b.+");
     }
 
     private static String clip(String s, int max) {

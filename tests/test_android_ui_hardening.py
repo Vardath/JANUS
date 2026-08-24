@@ -8,15 +8,15 @@ def test_authoritative_build_is_native_and_patch_free():
     assert 'python tools/compose_android_phase3.py' not in workflow
     assert 'python tools/patch_android_' not in workflow
     assert 'Verify authoritative native Android boundary' in workflow
-    assert 'Verify v1.05 navigation and thought bridge' in workflow
+    assert 'Verify v1.06 thought bridge and active Fano attention' in workflow
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
-def test_android_v105_is_direct_native_product():
+def test_android_v106_is_direct_native_product():
     text = Path('android/app/build.gradle').read_text(encoding='utf-8')
-    assert "versionCode 105" in text
-    assert "versionName '1.05'" in text
-    assert 'native Back semantics + truthful device background-activity bridge' in text
+    assert "versionCode 106" in text
+    assert "versionName '1.06'" in text
+    assert 'natural background-thought bridge + active Fano attention policy' in text
     main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
     assert 'android.webkit.WebView' not in main
     assert 'JavascriptInterface' not in main
@@ -32,11 +32,28 @@ def test_navigation_and_background_activity_bridge_are_present():
     assert '!"Chat".equals(selected)' in nav
     assert 'JanusNavigationPolish.install(activity)' in app
     assert '[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT]' in thought
-    assert 'zero model/API calls' in thought
-    assert 'uninterrupted private stream of consciousness' in thought
+    assert 'between messages' in thought
+    assert 'real app-side JANUS processing between messages' in thought
+    assert 'Current Fano attention orientations' in thought
     assert 'JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message)' in api
     assert 'j.put("message", augmented)' in api
     assert not (BASE / 'JanusThoughtContextPolish.java').exists()
+
+
+def test_fano_state_is_an_active_attention_policy():
+    policy = (BASE / 'JanusFanoPolicy.java').read_text(encoding='utf-8')
+    runtime = (BASE / 'JanusLocalCoreRuntime.java').read_text(encoding='utf-8')
+    for marker in [
+        'grounding/support', 'structure/causality', 'counterexample/falsification',
+        'context/relationships', 'continuity/memory', 'boundary/risk',
+        'novelty/adjacent possibility',
+    ]:
+        assert marker in policy
+    assert 'JanusFanoPolicy.directive(direction)' in runtime
+    assert 'JanusFanoPolicy.salience(weights, direction)' in runtime
+    assert 'active_orientation' in runtime
+    assert 'active_salience_percent' in runtime
+    assert 'Fano attention:' in runtime
 
 
 def test_native_ui_keeps_accessibility_and_safe_area_hardening():
