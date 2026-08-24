@@ -31,12 +31,18 @@ jobs:
         shell: pwsh
         run: |
           python -m py_compile client/janus_client_v020.py client/janus_client_v021.py client/janus_client_v022.py client/janus_client_v023.py client/janus_client_v024.py
+      - name: Verify 1-3-7 client contract
+        shell: pwsh
+        run: |
+          Select-String -Path client/janus_client_v024.py -Pattern 'Global 1\|3\|7' -Quiet | ForEach-Object { if (-not $_) { exit 1 } }
+          Select-String -Path client/janus_client_v024.py -Pattern 'front_appraisal' -Quiet | ForEach-Object { if (-not $_) { exit 1 } }
+          Select-String -Path client/janus_client_v024.py -Pattern 'server.get\("front"\).*server.get\("consensus"\)' -Quiet | ForEach-Object { if (-not $_) { exit 1 } }
       - name: Build JANUS.exe
         shell: pwsh
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name JANUS client/janus_client_v024.py
           Copy-Item client/JANUS.bat dist/JANUS.bat
-          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.25`r`n`r`nAuthenticated desktop client with account-bound Chat attachments, generated images and global JANUS presence.`r`nThe client registers a stable device ID, sends a bounded authenticated heartbeat every 30 seconds, and shows online/registered client counts plus global phase/storage in Options.`r`nSelective synchronization never overwrites local queues, cycle state or device identity.`r`n`r`nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface.`r`nServer: https://janus-global-core.onrender.com"
+          Set-Content -Path dist/README.txt -Value "JANUS Windows Client v0.25`r`n`r`nAuthenticated desktop client with account-bound Chat attachments, generated images and global JANUS presence.`r`nThe client registers a stable device ID, sends a bounded authenticated heartbeat every 30 seconds, and shows online/registered client counts plus global phase and Front appraisal where available.`r`nSelective synchronization never overwrites local queues, cycle state or device identity.`r`n`r`nConceptual architecture: 1|3|7 — seven Fano subconscious cores; Left/Right/Front intermediaries; Interface.`r`nMechanical flow: 7 -> 2 -> 1 -> 1.`r`nLegacy Consensus is transport compatibility only; Front is canonical.`r`nServer: https://janus-global-core.onrender.com"
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:

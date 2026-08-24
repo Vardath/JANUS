@@ -7,6 +7,8 @@ final class APIClient: ObservableObject {
     let baseURL = URL(string: "https://janus-global-core.onrender.com")!
     @Published var status: String = "Dormant"
     @Published var accessToken: String = KeychainStore.readToken()
+    @Published var conceptualTopology: String = "1|3|7"
+    @Published var frontPosture: String = ""
 
     private let decoder = JSONDecoder()
     private let maxFileBytes = 8 * 1024 * 1024
@@ -20,8 +22,11 @@ final class APIClient: ObservableObject {
 
     func health() async {
         do {
-            _ = try await request(path: "/health", method: "GET", body: Optional<[String: String]>.none, authenticated: false) as Data
-            status = "Active"
+            let data: Data = try await request(path: "/health", method: "GET", body: Optional<[String: String]>.none, authenticated: false)
+            if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                conceptualTopology = root["conceptual_topology"] as? String ?? "1|3|7"
+            }
+            status = "Active · \(conceptualTopology)"
         } catch {
             status = "Dormant"
         }
@@ -56,6 +61,7 @@ final class APIClient: ObservableObject {
             _ = try? await request(path: "/auth/logout", method: "POST", body: [String: String]()) as Data
         }
         setToken("")
+        frontPosture = ""
     }
 
     func presenceHeartbeat() async {
@@ -79,7 +85,14 @@ final class APIClient: ObservableObject {
                 let online = presence["online"] as? Int ?? 0
                 let registered = presence["registered"] as? Int ?? 0
                 let phase = server["phase"] as? String ?? "unknown"
-                status = "Global \(phase) · \(online)/\(registered) clients"
+                conceptualTopology = server["conceptual_topology"] as? String ?? "1|3|7"
+                if let appraisal = server["front_appraisal"] as? [String: Any] {
+                    frontPosture = appraisal["action_posture"] as? String ?? ""
+                } else {
+                    frontPosture = ""
+                }
+                let postureSuffix = frontPosture.isEmpty ? "" : " · Front \(frontPosture.replacingOccurrences(of: "_", with: " "))"
+                status = "Global \(conceptualTopology) · \(phase) · \(online)/\(registered) clients\(postureSuffix)"
             }
         } catch {
             status = "Global offline"

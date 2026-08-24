@@ -13,7 +13,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -22,19 +21,25 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Device-local JANUS society.
+ * Device-local JANUS 1-3-7 society.
  *
- * Deterministic local processing uses zero model/API calls. Routing is strictly
- * forward-only: 7 specialists -> 2 hemispheres -> Consensus -> Interface.
- * Global sync is feedback-only and re-enters through specialists, never by
- * injecting remote Consensus/Interface directly into local integration stages.
+ * Deterministic local processing uses zero model/API calls. Every sensed event is
+ * broadcast to all seven subconscious cores. Both hemispheres receive all seven
+ * projections. Routing remains strictly forward-only:
+ * 7 subconscious -> 2 hemispheres -> Front/Bridge -> Interface.
+ * Global state re-enters as peer sensing through all seven and never injects a
+ * remote Front/Interface result directly into local Front.
  */
 public final class JanusLocalCoreRuntime {
+    private static final String FRONT = "front";
+    private static final String LEGACY_FRONT = "consensus";
     private static final String[] NAMES = new String[]{
-            "evidence","logic","counterpoint","context","memory","safety","novelty",
-            "left_hemisphere","right_hemisphere","consensus","interface"
+            "evidence","safety","counterpoint","context","logic","novelty","memory",
+            "left_hemisphere","right_hemisphere",FRONT,"interface"
     };
-    private static final String[] SPECIALISTS = new String[]{"evidence","logic","counterpoint","context","memory","safety","novelty"};
+    private static final String[] SPECIALISTS = new String[]{
+            "evidence","safety","counterpoint","context","logic","novelty","memory"
+    };
     private static final int MAX_EVENTS = 500;
     private static final int MAX_MEMORIES = 120;
     private static JanusLocalCoreRuntime instance;
@@ -51,6 +56,7 @@ public final class JanusLocalCoreRuntime {
         String last = "";
         int fanoDirection;
         final long[] fano = new long[]{8,1,1,1,1,1,1,1};
+        JanusSensePolicy.Appraisal appraisal = new JanusSensePolicy.Appraisal();
         Core(String name) { this.name = name; }
     }
 
@@ -67,7 +73,7 @@ public final class JanusLocalCoreRuntime {
     private volatile long lastAutonomousAt;
     private volatile long lastSyncAt;
     private volatile String syncState = "waiting";
-    private volatile String lastConsensus = "";
+    private volatile String lastFront = "";
     private volatile String lastInterface = "";
     private volatile String lastServerStatus = "";
     private volatile int disagreementScore;
@@ -79,7 +85,7 @@ public final class JanusLocalCoreRuntime {
         lastBackgroundAt = prefs.getLong("core_last_background_cycle_at", 0L);
         lastAutonomousAt = prefs.getLong("core_last_autonomous_at", 0L);
         lastSyncAt = prefs.getLong("core_last_sync_at", 0L);
-        lastConsensus = prefs.getString("core_consensus", "");
+        lastFront = prefs.getString("core_front", prefs.getString("core_consensus", ""));
         lastInterface = prefs.getString("core_interface", "");
         lastServerStatus = prefs.getString("core_server_status", "");
         disagreementScore = prefs.getInt("core_last_disagreement_score", 0);
@@ -91,11 +97,13 @@ public final class JanusLocalCoreRuntime {
         installationId = id;
         for (String name : NAMES) {
             Core c = new Core(name);
-            c.cycles = prefs.getLong("core_cycles_" + name, 0L);
-            c.last = prefs.getString("core_last_" + name, "");
-            c.fanoDirection = prefs.getInt("core_fano_active_" + name, 0);
+            String legacyName = FRONT.equals(name) ? LEGACY_FRONT : name;
+            c.cycles = Math.max(prefs.getLong("core_cycles_" + name, 0L), prefs.getLong("core_cycles_" + legacyName, 0L));
+            c.last = prefs.getString("core_last_" + name, prefs.getString("core_last_" + legacyName, ""));
+            c.fanoDirection = prefs.getInt("core_fano_active_" + name, prefs.getInt("core_fano_active_" + legacyName, 0));
             try {
-                JSONArray w = new JSONArray(prefs.getString("core_fano_" + name, "[]"));
+                String raw = prefs.getString("core_fano_" + name, prefs.getString("core_fano_" + legacyName, "[]"));
+                JSONArray w = new JSONArray(raw);
                 for (int i = 0; i < 8 && i < w.length(); i++) c.fano[i] = Math.max(1L, w.optLong(i, c.fano[i]));
             } catch (Exception ignored) {}
             cores.put(name, c);
@@ -115,11 +123,8 @@ public final class JanusLocalCoreRuntime {
         String clean = clip(text, 1200);
         if (clean.isEmpty()) return;
         remember("user: " + clean);
-        record("interface", "", "user_topic", "Local JANUS received the current user topic: " + clip(clean, 600), clean);
-        for (String specialist : SPECIALISTS) {
-            cores.get(specialist).inbox.addLast("user topic: " + clean);
-            record("interface", specialist, "interaction", "Interface seeded " + display(specialist) + " with the current user topic.", clean);
-        }
+        record("interface", "", "user_topic", "Local JANUS sensed the current user topic: " + clip(clean, 600), clean);
+        broadcastSense("user topic: " + clean, "interface", "text");
         serviceBurst(true);
         persist();
     }
@@ -128,24 +133,31 @@ public final class JanusLocalCoreRuntime {
         String clean = clip(text, 1200);
         if (clean.isEmpty()) return;
         remember("janus: " + clean);
-        // Server output becomes feedback-only evidence/context for the next local pass.
-        cores.get("evidence").inbox.addLast("[feedback-only] server reply to verify: " + clean);
-        cores.get("context").inbox.addLast("[feedback-only] server reply context: " + clean);
-        cores.get("memory").inbox.addLast("[feedback-only] server reply to retain: " + clean);
-        cores.get("counterpoint").inbox.addLast("[feedback-only] challenge unresolved claims in server reply: " + clean);
-        record("interface", "memory", "interaction", "A server reply was added to local continuity as feedback-only material.", clean);
+        broadcastSense("[feedback-only global peer] server reply: " + clean, "global", "peer");
+        record("interface", "memory", "peer_sense", "A server reply re-entered local JANUS as peer sensing through all seven subconscious cores.", clean);
         serviceBurst(true);
         persist();
     }
 
+    private void broadcastSense(String text, String source, String modality) {
+        for (String specialist : SPECIALISTS) {
+            Core core = cores.get(specialist);
+            core.inbox.addLast("[sense:" + modality + ":" + source + "] " + text);
+            record(source, specialist, "sensory_input", "A " + modality + " sense was made available to " + display(specialist) + ".", clip(text, 500));
+        }
+    }
+
     synchronized JSONObject statusJson() throws Exception {
         JSONObject root = new JSONObject();
-        root.put("architecture", "11 Fano/JANUS cores");
+        root.put("architecture", "1-3-7 JANUS: 7 subconscious -> 2 hemispheres -> Front -> Interface");
         root.put("topology", "7 -> 2 -> 1 -> 1");
+        root.put("conceptual_topology", "1|3|7");
         root.put("phase", phase);
         root.put("running", started);
         root.put("installation_id", installationId);
-        root.put("consensus", lastConsensus);
+        root.put("front", lastFront);
+        root.put("consensus", lastFront); // temporary compatibility alias
+        root.put("front_appraisal", cores.get(FRONT).appraisal.toJson());
         root.put("interface", lastInterface);
         root.put("last_sync_at", lastSyncAt);
         root.put("sync_state", syncState);
@@ -167,6 +179,7 @@ public final class JanusLocalCoreRuntime {
             x.put("cycle_count", c.cycles);
             x.put("pending_messages", c.inbox.size());
             x.put("last_output", c.last);
+            if (FRONT.equals(c.name) || "interface".equals(c.name)) x.put("appraisal", c.appraisal.toJson());
             JSONArray weights = new JSONArray(); for (long v : c.fano) weights.put(v);
             long line = c.fano[1] + c.fano[2] + c.fano[3];
             long off = c.fano[4] + c.fano[5] + c.fano[6] + c.fano[7];
@@ -176,6 +189,7 @@ public final class JanusLocalCoreRuntime {
                     .put("projection_1_3_4", new JSONObject().put("origin", c.fano[0]).put("line", line).put("off_line", off)));
             all.put(c.name, x);
         }
+        all.put(LEGACY_FRONT, new JSONObject(all.getJSONObject(FRONT).toString()).put("alias_for", FRONT));
         root.put("cores", all);
         return root;
     }
@@ -189,14 +203,12 @@ public final class JanusLocalCoreRuntime {
         long elapsed = now - phaseStarted;
         if ("wake".equals(phase) && elapsed >= 5 * 60_000L) {
             phase = "sleep"; phaseStarted = now;
-            record("interface", "", "phase", "Local JANUS entered low-duty mode; all cores remain available for foreground work.", "");
+            record("interface", "", "phase", "Local JANUS entered low-duty mode; all cores remain available for foreground sensing.", "");
         } else if ("sleep".equals(phase) && elapsed >= 10 * 60_000L) {
             phase = "wake"; phaseStarted = now;
             record("interface", "", "phase", "Local JANUS entered full-rate deterministic processing.", "");
         }
-
         if (!cores.get("interface").inbox.isEmpty()) cycle("interface");
-
         if (prefs.getBoolean("background_cycles_enabled", true)) {
             if ("wake".equals(phase) || now - lastBackgroundAt >= backgroundIntervalMs()) {
                 serviceBurst(false);
@@ -224,11 +236,8 @@ public final class JanusLocalCoreRuntime {
             return;
         }
         String topic = memories.peekLast();
-        cores.get("memory").inbox.addLast("autonomous revisit: " + topic);
-        cores.get("novelty").inbox.addLast("autonomous adjacent connection search: " + topic);
-        cores.get("evidence").inbox.addLast("autonomous grounding check: " + topic);
-        cores.get("counterpoint").inbox.addLast("autonomous falsification check: " + topic);
-        record("memory", "novelty", "autonomous_pulse", "Retained material was resurfaced for a bounded cross-core review.", topic);
+        broadcastSense("autonomous revisit: " + topic, "memory", "memory");
+        record("memory", "novelty", "autonomous_pulse", "Retained material resurfaced as a bounded all-seven sensory review.", topic);
         serviceBurst(true);
     }
 
@@ -236,40 +245,61 @@ public final class JanusLocalCoreRuntime {
         for (String n : SPECIALISTS) if (!cores.get(n).inbox.isEmpty()) cycle(n);
         if (!cores.get("left_hemisphere").inbox.isEmpty()) cycle("left_hemisphere");
         if (!cores.get("right_hemisphere").inbox.isEmpty()) cycle("right_hemisphere");
-        if (!cores.get("consensus").inbox.isEmpty()) cycle("consensus");
+        if (!cores.get(FRONT).inbox.isEmpty()) cycle(FRONT);
         if (includeInterface && !cores.get("interface").inbox.isEmpty()) cycle("interface");
     }
 
     private void cycle(String name) {
         Core c = cores.get(name); if (c == null) return;
         String input = c.inbox.isEmpty() ? "maintenance / retained state" : c.inbox.pollFirst();
-        while (!c.inbox.isEmpty() && input.length() < 1000) input += " | " + c.inbox.pollFirst();
+        while (!c.inbox.isEmpty() && input.length() < 1400) input += " | " + c.inbox.pollFirst();
         updateFano(c, input);
-        String output = roleSummary(name, input, c.fanoDirection, c.fano);
+        c.appraisal = appraise(name, input);
+        String output = roleSummary(name, input, c.fanoDirection, c.fano, c.appraisal);
         c.last = output; c.cycles++;
         record(name, "", "process_note", externalSummary(name, input) + " Fano attention: " + JanusFanoPolicy.orientation(c.fanoDirection) + ".", output);
         route(name, output);
-        if ("memory".equals(name) || "novelty".equals(name) || "consensus".equals(name)) remember("core:" + name + ": " + clip(output, 500));
+        if ("memory".equals(name) || "novelty".equals(name) || FRONT.equals(name)) remember("core:" + name + ": " + clip(output, 500));
+    }
+
+    private JanusSensePolicy.Appraisal appraise(String name, String input) {
+        JanusSensePolicy.Appraisal a = new JanusSensePolicy.Appraisal();
+        String low = input == null ? "" : input.toLowerCase();
+        a.salience = low.contains("user topic") ? 0.85 : 0.55;
+        a.novelty = low.contains("novel") || low.contains("new") || low.contains("idea") ? 0.75 : 0.45;
+        a.risk = containsAny(low, "danger", "unsafe", "breach", "harm", "security", "private", "crash") ? 0.85 : 0.2;
+        a.urgency = containsAny(low, "urgent", "immediately", "critical", "breach", "crash") ? 0.75 : 0.15;
+        a.opportunity = containsAny(low, "improve", "build", "create", "possible", "explore", "design", "upgrade") ? 0.75 : 0.35;
+        a.conflict = containsAny(low, "but", "however", "contradict", "conflict", "disagree", "versus") ? 0.7 : 0.25;
+        a.familiarity = memories.isEmpty() ? 0.25 : 0.55;
+        a.confidence = low.contains("[feedback-only") ? 0.45 : 0.6;
+        a.uncertainty = 1.0 - Math.min(0.9, a.confidence);
+        if (containsAny(low, "bad", "wrong", "fail", "broken", "problem", "harm", "risk")) a.valence -= 0.35;
+        if (containsAny(low, "good", "like", "love", "useful", "better", "success", "helpful")) a.valence += 0.35;
+        if ("safety".equals(name)) a.risk = Math.max(a.risk, 0.35);
+        if ("novelty".equals(name)) { a.novelty = Math.max(a.novelty, 0.65); a.opportunity = Math.max(a.opportunity, 0.5); }
+        if ("memory".equals(name)) a.familiarity = Math.max(a.familiarity, 0.55);
+        return a.bounded();
     }
 
     private void route(String from, String output) {
-        // Strictly forward-only routing.
-        if (Arrays.asList("evidence","logic","counterpoint").contains(from)) {
-            send(from, "left_hemisphere", output);
-        } else if (Arrays.asList("context","memory","novelty").contains(from)) {
-            send(from, "right_hemisphere", output);
-        } else if ("safety".equals(from)) {
+        // Strictly forward-only routing. All seven feed both hemispheres.
+        if (isSpecialist(from)) {
             send(from, "left_hemisphere", output);
             send(from, "right_hemisphere", output);
-            send(from, "consensus", output);
         } else if ("left_hemisphere".equals(from) || "right_hemisphere".equals(from)) {
-            send(from, "consensus", output);
-        } else if ("consensus".equals(from)) {
-            lastConsensus = output;
+            send(from, FRONT, output);
+        } else if (FRONT.equals(from)) {
+            lastFront = output;
             send(from, "interface", output);
         } else if ("interface".equals(from)) {
             lastInterface = output;
         }
+    }
+
+    private boolean isSpecialist(String name) {
+        for (String s : SPECIALISTS) if (s.equals(name)) return true;
+        return false;
     }
 
     private void send(String from, String to, String text) {
@@ -279,37 +309,38 @@ public final class JanusLocalCoreRuntime {
     }
 
     private void updateFano(Core c, String input) {
+        int home = JanusFanoPolicy.homeDirection(c.name);
         int h = (c.name + "|" + input).hashCode();
-        int d = 1 + Math.floorMod(h, 7);
+        int dynamic = 1 + Math.floorMod(h, 7);
+        int d = home > 0 ? home : dynamic;
         c.fano[d] += 3;
         c.fano[0] += 1;
         int companion = 1 + Math.floorMod(Integer.rotateLeft(h, 11), 7);
         c.fano[companion] += 1;
         c.fanoDirection = d;
-        for (int i = 0; i < c.fano.length; i++) {
-            if (c.fano[i] > 2000) c.fano[i] = Math.max(1, c.fano[i] / 2);
-        }
+        for (int i = 0; i < c.fano.length; i++) if (c.fano[i] > 2000) c.fano[i] = Math.max(1, c.fano[i] / 2);
     }
 
-    private String roleSummary(String name, String input, int direction, long[] weights) {
+    private String roleSummary(String name, String input, int direction, long[] weights, JanusSensePolicy.Appraisal appraisal) {
         String role;
         switch (name) {
-            case "evidence": role = "separate support from inference and identify missing observations"; break;
-            case "logic": role = "check consistency, causal structure and incompatible assumptions"; break;
-            case "counterpoint": role = "challenge the current interpretation and seek alternatives/failure modes"; break;
-            case "context": role = "relate the topic to retained context, goals and environment"; break;
-            case "memory": role = "compare with retained continuity and unfinished work"; break;
-            case "safety": role = "check privacy, security, boundaries and harmful failure modes"; break;
-            case "novelty": role = "look for unusual but testable adjacent connections"; break;
-            case "left_hemisphere": role = "integrate evidence, logic and counterpoint without erasing disagreement"; break;
-            case "right_hemisphere": role = "integrate context, memory and novelty without erasing disagreement"; break;
-            case "consensus": role = "combine both hemispheres while preserving unresolved disagreement"; break;
-            default: role = "form an externalizable user-facing shared state";
+            case "evidence": role = "sense truth/grounding, support versus inference and confidence"; break;
+            case "safety": role = "sense valence/welfare, benefit/harm, goals, boundaries and reversibility"; break;
+            case "counterpoint": role = "sense significance/conflict, consequential objections and failure modes"; break;
+            case "context": role = "sense pattern/context, relationships, framing and environment"; break;
+            case "logic": role = "combine grounding and pattern into understanding/models, causality and constraints"; break;
+            case "novelty": role = "combine value and pattern into possibility/imagination, alternatives and direction"; break;
+            case "memory": role = "combine truth, value and pattern into continuity/experience and learned appraisal"; break;
+            case "left_hemisphere": role = "constrain the complete seven-core field using logic, sequence, causality and consistency"; break;
+            case "right_hemisphere": role = "expand the complete seven-core field using imagination, association, gestalt and alternatives"; break;
+            case FRONT: role = "feel out both hemispheres as computational appraisal and form intention while preserving disagreement"; break;
+            default: role = "feel out how the integrated state should meet the user/environment and select expression or bounded action";
         }
         return name + ": " + role
                 + "; Fano d" + direction + "=" + JanusFanoPolicy.orientation(direction)
                 + "; directional salience=" + JanusFanoPolicy.salience(weights, direction) + "%"
                 + "; attention directive=" + JanusFanoPolicy.directive(direction)
+                + "; appraisal=" + appraisal.toJson().toString()
                 + "; " + JanusFanoPolicy.projection(weights)
                 + "; focus=" + clip(input, 420);
     }
@@ -317,17 +348,17 @@ public final class JanusLocalCoreRuntime {
     private String externalSummary(String name, String input) {
         String role;
         switch (name) {
-            case "evidence": role = "Evidence checked what is supported versus inferred."; break;
-            case "logic": role = "Logic checked structure and consistency."; break;
-            case "counterpoint": role = "Counterpoint challenged the current interpretation."; break;
-            case "context": role = "Context compared the topic with wider retained context."; break;
-            case "memory": role = "Memory compared the topic with retained continuity."; break;
-            case "safety": role = "Safety checked boundaries and failure modes."; break;
-            case "novelty": role = "Novelty searched for a useful testable connection."; break;
-            case "left_hemisphere": role = "The left hemisphere integrated analytic specialist results."; break;
-            case "right_hemisphere": role = "The right hemisphere integrated contextual specialist results."; break;
-            case "consensus": role = "Consensus integrated both hemispheres while keeping disagreement visible."; break;
-            default: role = "Interface updated the externalizable shared state.";
+            case "evidence": role = "Evidence sensed grounding and support."; break;
+            case "safety": role = "Safety sensed valence, welfare and boundaries."; break;
+            case "counterpoint": role = "Counterpoint sensed consequential conflict and objections."; break;
+            case "context": role = "Context sensed relationships and wider configuration."; break;
+            case "logic": role = "Logic built a constrained explanatory model."; break;
+            case "novelty": role = "Novelty explored possible directions."; break;
+            case "memory": role = "Memory compared the event with retained experience."; break;
+            case "left_hemisphere": role = "The left hemisphere constrained all seven projections analytically."; break;
+            case "right_hemisphere": role = "The right hemisphere expanded all seven projections imaginatively."; break;
+            case FRONT: role = "Front formed an appraisal/intention from both hemispheres."; break;
+            default: role = "Interface selected an outward response/action posture.";
         }
         return role + " Focus: " + clip(input, 260);
     }
@@ -391,7 +422,8 @@ public final class JanusLocalCoreRuntime {
                 .putLong("core_last_background_cycle_at", lastBackgroundAt)
                 .putLong("core_last_autonomous_at", lastAutonomousAt)
                 .putLong("core_last_sync_at", lastSyncAt)
-                .putString("core_consensus", lastConsensus)
+                .putString("core_front", lastFront)
+                .putString("core_consensus", lastFront)
                 .putString("core_interface", lastInterface)
                 .putString("core_observe_events", eventArray().toString())
                 .putString("core_local_memories", memoryArray().toString())
@@ -402,6 +434,10 @@ public final class JanusLocalCoreRuntime {
             JSONArray w = new JSONArray(); for (long v : c.fano) w.put(v);
             e.putString("core_fano_" + c.name, w.toString());
         }
+        Core front = cores.get(FRONT);
+        e.putLong("core_cycles_" + LEGACY_FRONT, front.cycles).putString("core_last_" + LEGACY_FRONT, front.last)
+                .putInt("core_fano_active_" + LEGACY_FRONT, front.fanoDirection);
+        JSONArray fw = new JSONArray(); for (long v : front.fano) fw.put(v); e.putString("core_fano_" + LEGACY_FRONT, fw.toString());
         e.apply();
     }
 
@@ -413,9 +449,12 @@ public final class JanusLocalCoreRuntime {
         JSONObject payload = new JSONObject();
         payload.put("device_id", installationId);
         payload.put("phase", phase);
-        payload.put("consensus", lastConsensus);
+        payload.put("front", lastFront);
+        payload.put("consensus", lastFront);
+        payload.put("front_appraisal", cores.get(FRONT).appraisal.toJson());
         payload.put("interface", lastInterface);
         JSONObject cycleCounts = new JSONObject(); for (Core c : cores.values()) cycleCounts.put(c.name, c.cycles);
+        cycleCounts.put(LEGACY_FRONT, cores.get(FRONT).cycles);
         payload.put("cycles", cycleCounts);
         JSONArray recent = new JSONArray();
         int start = Math.max(0, events.size() - 60); int index = 0;
@@ -436,12 +475,10 @@ public final class JanusLocalCoreRuntime {
             if (server != null) {
                 lastServerStatus = server.toString();
                 prefs.edit().putString("core_server_status", lastServerStatus).apply();
-                String feedback = clip(server.optString("consensus", "") + " " + server.optString("interface", ""), 1000);
+                String serverFront = server.optString("front", server.optString("consensus", ""));
+                String feedback = clip(serverFront + " " + server.optString("interface", ""), 1000);
                 if (!feedback.isBlank()) {
-                    cores.get("evidence").inbox.addLast("[feedback-only global] verify: " + feedback);
-                    cores.get("context").inbox.addLast("[feedback-only global] contextualize: " + feedback);
-                    cores.get("counterpoint").inbox.addLast("[feedback-only global] challenge: " + feedback);
-                    cores.get("memory").inbox.addLast("[feedback-only global] compare with continuity: " + feedback);
+                    broadcastSense("[feedback-only global] " + feedback, "global", "peer");
                     serviceBurst(true);
                 }
             }
@@ -451,6 +488,11 @@ public final class JanusLocalCoreRuntime {
         } else {
             syncState = "server-error-" + code;
         }
+    }
+
+    private static boolean containsAny(String text, String... terms) {
+        for (String term : terms) if (text.contains(term)) return true;
+        return false;
     }
 
     private static String clip(String value, int max) {

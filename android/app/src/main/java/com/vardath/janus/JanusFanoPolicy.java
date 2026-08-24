@@ -1,36 +1,49 @@
 package com.vardath.janus;
 
 /**
- * Turns the persistent seven-direction Fano state into an actual processing policy.
- * The directions are computational attention lenses; they are not claims that the
- * mathematical Fano plane itself proves anything about a topic.
+ * Canonical JANUS Fano semantics shared by the seven original subconscious roles.
+ *
+ * Primitive coordinates:
+ * E = epistemic/truth, V = valence/welfare, P = pattern/relationship.
+ * Directions are processing lenses and home positions, never truth oracles.
  */
 final class JanusFanoPolicy {
     private JanusFanoPolicy() {}
 
+    static int homeDirection(String core) {
+        if ("evidence".equals(core)) return 1;       // E
+        if ("safety".equals(core)) return 2;         // V
+        if ("counterpoint".equals(core)) return 3;   // E+V
+        if ("context".equals(core)) return 4;        // P
+        if ("logic".equals(core)) return 5;          // E+P
+        if ("novelty".equals(core)) return 6;        // V+P
+        if ("memory".equals(core)) return 7;         // E+V+P
+        return 0;
+    }
+
     static String orientation(int direction) {
         switch (direction) {
-            case 1: return "grounding/support";
-            case 2: return "structure/causality";
-            case 3: return "counterexample/falsification";
-            case 4: return "context/relationships";
-            case 5: return "continuity/memory";
-            case 6: return "boundary/risk";
-            case 7: return "novelty/adjacent possibility";
-            default: return "neutral integration";
+            case 1: return "evidence — truth/grounding";
+            case 2: return "safety — valence/welfare/boundary";
+            case 3: return "counterpoint — significance/conflict/consequence";
+            case 4: return "context — pattern/context/relationship";
+            case 5: return "logic — understanding/model/causality";
+            case 6: return "novelty — possibility/imagination/direction";
+            case 7: return "memory — continuity/experience/learned appraisal";
+            default: return "neutral/uncommitted reference";
         }
     }
 
     static String directive(int direction) {
         switch (direction) {
-            case 1: return "prioritize observations, evidence quality, and what would verify the claim";
-            case 2: return "prioritize internal consistency, dependencies, causal structure, and hidden assumptions";
-            case 3: return "prioritize alternatives, counterexamples, failure modes, and what would falsify the current view";
-            case 4: return "prioritize wider context, relationships, environment, and how the topic changes under reframing";
-            case 5: return "prioritize retained history, unfinished threads, continuity, and changes from earlier states";
-            case 6: return "prioritize limits, uncertainty, privacy, safety, reversibility, and boundary conditions";
-            case 7: return "prioritize unusual but testable adjacent connections and unexplored possibilities";
-            default: return "integrate the available material without a directional preference";
+            case 1: return "prioritize observations, evidence quality, confidence, uncertainty, and what would verify the claim";
+            case 2: return "prioritize benefit/harm, wanted/unwanted, user goals, boundaries, reversibility, privacy, and safety";
+            case 3: return "prioritize consequential contradictions, objections, salience, failure modes, and why the issue matters";
+            case 4: return "prioritize relationships, environment, framing, analogy, gestalt, and how the topic changes under reframing";
+            case 5: return "prioritize internal consistency, causal structure, mechanisms, constraints, predictions, and falsifiable models";
+            case 6: return "prioritize useful alternatives, creative hypotheses, opportunities, future paths, and testable adjacent possibilities";
+            case 7: return "prioritize retained history, learned significance, unfinished threads, identity continuity, and comparison with prior outcomes";
+            default: return "observe without privileging a projection until enough information is available";
         }
     }
 

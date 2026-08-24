@@ -4,7 +4,7 @@ import uuid
 
 import janus_client_v023 as v023
 
-APP_NAME = "JANUS - Global 7-2-1-1 v0.25"
+APP_NAME = "JANUS - Global 1|3|7 v0.25"
 
 
 class PresenceAPI(v023.AttachmentAPI):
@@ -58,8 +58,15 @@ class App(v023.App):
         online = int(presence.get("online") or 0)
         registered = int(presence.get("registered") or 0)
         phase = str(server.get("phase") or "unknown")
+        topology = str(server.get("conceptual_topology") or "1|3|7")
+        front = str(server.get("front") or server.get("consensus") or "").strip()
+        appraisal = server.get("front_appraisal") or {}
         persistent = bool(server.get("persistent_storage", server.get("persistent", False)))
-        self.status.set(f"Global {phase} · {online}/{registered} clients · storage {'persistent' if persistent else 'unknown'}")
+        posture = str(appraisal.get("action_posture") or "").strip()
+        suffix = f" · Front {posture}" if posture else ""
+        self.status.set(f"Global {topology} · {phase} · {online}/{registered} clients{suffix}")
+        self._last_front = front
+        self._last_front_appraisal = appraisal
         if self._presence_timer:
             try: self.after_cancel(self._presence_timer)
             except Exception: pass
@@ -76,11 +83,22 @@ class App(v023.App):
         online = int(runtime.get("remote_clients") or 0)
         registered = int(runtime.get("registered_clients") or 0)
         phase = str(runtime.get("phase") or "unknown")
+        topology = str(runtime.get("conceptual_topology") or runtime.get("topology") or "1|3|7")
+        flow = str(runtime.get("mechanical_flow") or runtime.get("mechanical_topology") or "7 -> 2 -> 1 -> 1")
         persistent = bool(runtime.get("persistent_storage"))
         clients = runtime.get("clients") or []
+        cores = runtime.get("cores") or {}
+        front = cores.get("front") or cores.get("consensus") or {}
+        appraisal = front.get("appraisal") or {}
         lines = [
-            f"\n\nGLOBAL CONNECTIVITY\nPhase: {phase}\nStorage: {'persistent' if persistent else 'unknown'}\nClients online: {online} / registered: {registered}"
+            f"\n\nGLOBAL CONNECTIVITY\nTopology: {topology} (mechanical {flow})\nPhase: {phase}\nStorage: {'persistent' if persistent else 'unknown'}\nClients online: {online} / registered: {registered}",
+            "Seven Fano subconscious cores all feed both hemispheres; Left emphasizes logic/constraint, Right imagination/expansion; Front appraises/intends; Interface expresses/acts.",
         ]
+        if appraisal:
+            lines.append(
+                "Front appraisal: "
+                + ", ".join(f"{k}={v}" for k, v in appraisal.items() if k in {"confidence", "valence", "uncertainty", "risk", "opportunity", "conflict"})
+            )
         for c in clients[:8]:
             lines.append(f"• {c.get('platform','device')} {c.get('client_version','?')} · {('online' if c.get('online') else 'offline')} · last seen {c.get('age_seconds','?')}s ago")
         try:

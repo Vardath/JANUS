@@ -64,14 +64,17 @@ def test_navigation_system_chrome_and_core_map_are_hardened():
 def test_background_activity_bridge_and_active_fano_policy_remain_present():
     thought = (BASE / 'JanusThoughtBridge.java').read_text(encoding='utf-8')
     policy = (BASE / 'JanusFanoPolicy.java').read_text(encoding='utf-8')
+    sense = (BASE / 'JanusSensePolicy.java').read_text(encoding='utf-8')
     runtime = (BASE / 'JanusLocalCoreRuntime.java').read_text(encoding='utf-8')
     api = (BASE / 'JanusApiClient.java').read_text(encoding='utf-8')
     assert '[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT]' in thought
     assert 'between messages' in thought
     assert 'Current Fano attention orientations' in thought
     assert 'JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message)' in api
-    for marker in ['grounding/support', 'structure/causality', 'counterexample/falsification', 'context/relationships', 'continuity/memory', 'boundary/risk', 'novelty/adjacent possibility']:
+    for marker in ['truth/grounding', 'valence/welfare', 'significance/conflict', 'pattern/context', 'understanding/model', 'possibility/imagination', 'continuity/experience']:
         assert marker in policy
+    for marker in ['confidence', 'valence', 'salience', 'uncertainty', 'novelty', 'urgency', 'familiarity', 'risk', 'opportunity', 'conflict']:
+        assert marker in sense
     assert 'JanusFanoPolicy.directive(direction)' in runtime
     assert 'active_orientation' in runtime
     assert 'active_salience_percent' in runtime

@@ -15,16 +15,26 @@ def exchange(payload: dict[str, Any], authorization: Optional[str] = Header(defa
     result = mind.ingest_device(int(account["id"]), payload)
     status = mind.status(int(account["id"]))
     cores = status.get("cores") or {}
-    # Android consumes consensus/interface from this envelope and re-enters them
-    # through local specialist review. iOS also consumes presence counts. Neither
-    # client receives authority to overwrite protected remote state.
+    front = cores.get("front") or cores.get("consensus") or {}
+    interface = cores.get("interface") or {}
+
+    # Clients receive only bounded externalizable state. The peer snapshot must
+    # re-enter the receiving society through all seven sensory projections; it has
+    # no authority to overwrite the receiving Front, Interface or protected state.
+    front_summary = str(front.get("summary") or "")
     result["server"] = {
         "phase": status.get("phase"),
         "core_count": status.get("core_count"),
-        "consensus": str((cores.get("consensus") or {}).get("summary") or ""),
-        "interface": str((cores.get("interface") or {}).get("summary") or ""),
-        "architecture": "7->2->1->1",
+        "front": front_summary,
+        "front_appraisal": front.get("appraisal") or {},
+        "consensus": front_summary,  # temporary compatibility alias
+        "interface": str(interface.get("summary") or ""),
+        "interface_appraisal": interface.get("appraisal") or {},
+        "architecture": status.get("architecture"),
+        "conceptual_topology": status.get("conceptual_topology", "1|3|7"),
+        "mechanical_flow": status.get("mechanical_flow", "7 -> 2 -> 1 -> 1"),
         "sync_policy": "selective-no-overwrite",
+        "peer_policy": "reenter-through-all-seven-senses",
     }
     result["presence"] = {
         "online": int(status.get("remote_clients") or 0),
