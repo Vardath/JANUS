@@ -22,7 +22,7 @@ def capabilities():
             "foreground_web":True,"youtube_transcripts":True,"research_workspace":True,"research_provenance":True,"artifacts":True,
             "image_generation":True,"medium_quality_images":True,"rare_explanatory_images":True,"background_multi_core_image_generation":False,
             "background_cognition":True,"proactive_messages":True,"cost_governor":True,"adaptive_bridge_authority":True,"core_reliability_calibration":True,
-            "luna_terra_sol_escalation":True,"quarterly_maintenance":True,"owner_gated_maintenance":True,"maintenance_email_notice":True,
+            "luna_terra_sol_escalation":True,"maintenance":True,"quarterly_maintenance":True,"owner_gated_maintenance":True,"maintenance_email_notice":True,
         },
         "invariants":{
             "specialists":7,"hemispheres":2,"consensus":1,"interface":1,
