@@ -3,9 +3,8 @@ from __future__ import annotations
 import os
 import threading
 import time
-from typing import Any
 
-from . import governance, storage
+from . import governance, mailer, storage
 from .mind import mind
 
 
@@ -67,7 +66,16 @@ class BackgroundCoordinator:
         storage.add_event(aid,"consensus","self_assessment",detail,detail,"background")
         self._touch(aid,"last_self_assessment_at",now)
 
+    def _is_maintenance_owner(self, aid: int) -> bool:
+        configured=os.getenv("JANUS_MAINTENANCE_OWNER_PROFILE","").strip()
+        if configured:
+            owner=storage.account_by_identifier(configured)
+        else:
+            owner=storage.one("SELECT * FROM v2_accounts ORDER BY id ASC LIMIT 1")
+        return bool(owner and int(owner["id"])==int(aid))
+
     def _maintenance(self, aid: int, now: int, state):
+        if not self._is_maintenance_owner(aid): return
         interval = 90 * 86400
         last = int(state["last_maintenance_at"] or 0)
         if not last:
@@ -88,13 +96,14 @@ class BackgroundCoordinator:
         }
         storage.execute("INSERT INTO v2_maintenance(account_id,report_json,review_state,created_at) VALUES(?,?,?,?)", (aid,storage.jdump(report),"awaiting_owner_review",now))
         storage.add_message(aid,"Maintenance","A quarterly JANUS maintenance review is ready for manual owner review.","maintenance")
+        account=storage.account_by_id(aid)
+        if account:
+            mailer.send(str(account["email"]),"JANUS quarterly maintenance review ready","JANUS has prepared its quarterly maintenance review. No code, deployment, model or API changes have been made. Open JANUS Maintenance Review and work through the proposal with ChatGPT before approving manual work.")
         self._touch(aid,"last_maintenance_at",now)
 
     def _proactive_message(self, aid: int, now: int, state):
         if os.getenv("JANUS_MESSAGE_QUEUE","1") != "1": return
         if now - int(state["last_message_at"] or 0) < 12 * 3600: return
-        # Prefer an explicit unresolved continuity thread; otherwise a high-tier
-        # durable memory. Never emit process telemetry as a user message.
         item = storage.one("SELECT title,detail FROM v2_continuity WHERE account_id=? AND state IN ('open','active','blocked') ORDER BY priority DESC,updated_at DESC LIMIT 1", (aid,))
         if item:
             text = f"I still have an open thread in mind: {item['title']}." + (f" {str(item['detail'])[:500]}" if item["detail"] else "")
@@ -113,10 +122,7 @@ class BackgroundCoordinator:
         if os.getenv("JANUS_CURIOSITY_WEB","1") != "1": return
         min_gap = max(3600, int(os.getenv("JANUS_CURIOSITY_MIN_GAP_SECONDS","7200")))
         if now - int(state["last_research_at"] or 0) < min_gap: return
-        # Curiosity is optional paid external work and is governed independently
-        # from the deterministic core cycle.
-        if not governance.permit(aid,"background_research",0.002):
-            return
+        if not governance.permit(aid,"background_research",0.002): return
         open_item = storage.one("SELECT title,detail FROM v2_continuity WHERE account_id=? AND state IN ('open','active') ORDER BY priority DESC,updated_at DESC LIMIT 1", (aid,))
         if open_item:
             query = f"Find one useful current development relevant to this JANUS continuity thread: {open_item['title']} {str(open_item['detail'])[:500]}"
@@ -126,7 +132,7 @@ class BackgroundCoordinator:
             if not mem: return
             query = "Find one useful current development connected to this durable context: " + str(mem["content"])[:700]
             mode = "adjacent"
-        text, sources = mind.web_research(query)
+        text, sources = mind.web_research(query, aid, governed=False)
         if not text:
             self._touch(aid,"last_research_at",now)
             return
