@@ -19,6 +19,7 @@ public class JanusApplication extends Application {
             boot.edit().putBoolean(CLEAN_MARKER, true).commit();
         }
         JanusChatResponseRegistry.init(this);
+        JanusChatHistoryStore.install(this);
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private void install(Activity activity) {
