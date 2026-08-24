@@ -6,8 +6,8 @@ on:
     paths:
       - 'protocol_capabilities.py'
       - 'tools/patch_protocol_capabilities.py'
-      - 'tools/patch_android_protocol_capabilities.py'
       - 'tests/test_protocol_capabilities.py'
+      - 'android/**'
       - '.github/workflows/test-protocol-capabilities.yml'
       - '.github/workflows/build-android.yml'
       - 'Dockerfile'
@@ -15,8 +15,8 @@ on:
     paths:
       - 'protocol_capabilities.py'
       - 'tools/patch_protocol_capabilities.py'
-      - 'tools/patch_android_protocol_capabilities.py'
       - 'tests/test_protocol_capabilities.py'
+      - 'android/**'
       - '.github/workflows/test-protocol-capabilities.yml'
       - '.github/workflows/build-android.yml'
       - 'Dockerfile'
@@ -40,14 +40,14 @@ jobs:
           grep -q 'protocol_capabilities_router' bootstrap.py
           grep -q 'APIRouter(prefix="/protocol"' protocol_capabilities.py
           grep -q '@router.get("/capabilities")' protocol_capabilities.py
-      - name: Verify Android product patch composes
+      - name: Verify native Android capability surface
+        shell: bash
         run: |
-          python tools/patch_android_file_attachments.py
-          python tools/patch_android_artifacts.py
-          python tools/patch_android_research_workspace.py
-          python tools/patch_android_maintenance_review.py
-          python tools/patch_android_research_provenance.py
-          python tools/patch_android_protocol_capabilities.py
-          grep -q 'Compatibility' android/app/src/main/assets/index.html
-          grep -q '/protocol/capabilities' android/app/src/main/assets/index.html
-          grep -q 'applyCapabilityVisibility' android/app/src/main/assets/index.html
+          set -euxo pipefail
+          MAIN=android/app/src/main/java/com/vardath/janus/MainActivity.java
+          test -s "$MAIN"
+          test ! -e android/app/src/main/assets/index.html
+          grep -q 'Compatibility' "$MAIN"
+          grep -q '/protocol/capabilities' "$MAIN"
+          grep -q 'showCompatibility' "$MAIN"
+          ! grep -q 'android.webkit.WebView' "$MAIN"
