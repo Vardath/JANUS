@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import re
 from typing import Any
@@ -33,9 +35,28 @@ def hash_password(password: str) -> str:
     return ph.hash(password)
 
 
-def verify_password(encoded: str | None, password: str) -> bool:
-    if not encoded:
+def _verify_pbkdf2(encoded: str, password: str) -> bool:
+    try:
+        alg, iterations, salt_hex, digest_hex = encoded.split("$", 3)
+        if alg != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), int(iterations))
+        return hmac.compare_digest(digest.hex(), digest_hex)
+    except Exception:
         return False
+
+
+def verify_password(encoded: str | None, password: str) -> bool:
+    """Verify either fresh v2 Argon2 hashes or imported account hashes.
+
+    Supporting the stored hash format is a data-continuity compatibility rule,
+    not reuse of the old authentication implementation. Successful legacy login
+    is immediately upgraded to Argon2.
+    """
+    if not encoded or encoded == "google_only":
+        return False
+    if encoded.startswith("pbkdf2_sha256$"):
+        return _verify_pbkdf2(encoded, password)
     try:
         return bool(ph.verify(encoded, password))
     except VerifyMismatchError:
@@ -72,6 +93,8 @@ def login(identifier: str, password: str) -> tuple[Any, str]:
     row = storage.account_by_identifier(identifier)
     if not row or not verify_password(row["password_hash"], password):
         raise HTTPException(401, "Invalid username/email or password")
+    if str(row["password_hash"] or "").startswith("pbkdf2_sha256$"):
+        row = storage.update_account(int(row["id"]), password_hash=ph.hash(password))
     return row, storage.new_session(int(row["id"]))
 
 
