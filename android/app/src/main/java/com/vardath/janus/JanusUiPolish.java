@@ -143,7 +143,8 @@ public final class JanusUiPolish {
 
     private static int parseFano(String s) {
         try {
-            int start = s.indexOf('d') + 1;
+            String marker = "Fano direction d";
+            int start = s.indexOf(marker) + marker.length();
             int end = start;
             while (end < s.length() && Character.isDigit(s.charAt(end))) end++;
             return Integer.parseInt(s.substring(start, end));
