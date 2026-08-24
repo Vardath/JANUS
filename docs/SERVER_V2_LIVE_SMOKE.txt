@@ -1,5 +1,5 @@
 JANUS SERVER V2 LIVE SMOKE
-trigger_sha=0963b7151599d5d9eb78072bd6b40a4ea30fdc6f
+trigger_sha=641daba1c2e8f3bbbc11e77a59e09b6aa617de34
 exit=1
 
 {
@@ -7,32 +7,32 @@ exit=1
     {
       "test": "v2 deployed and reachable",
       "ok": true,
-      "detail": "health=200 caps=200 {\"ok\":true,\"protocol_version\":2,\"server_generation\":\"v2-clean-reconstruction\",\"deployed_commit\":\"94ead88d9c7da17c4dd1175b9a934a42ed9f5221\",\"architecture\":\"7->2->1->1\",\"core_count\":11,\"features\":{\"password_auth\":true,\"google_auth\":true,\"email_verification\":true,\"password_reset\":true,\"account_deletion"
+      "detail": "health=200 caps=200 {\"ok\":true,\"protocol_version\":2,\"server_generation\":\"v2-clean-reconstruction\",\"deployed_commit\":\"7267c937b170ca524a8fc3821a86b8446f474004\",\"architecture\":\"7->2->1->1\",\"core_count\":11,\"features\":{\"password_auth\":true,\"google_auth\":true,\"email_verification\":true,\"password_reset\":true,\"account_deletion"
     },
     {
       "test": "health",
       "ok": true,
-      "detail": "{'status': 'ok', 'service': 'janus-global-core-v2', 'architecture': '7->2->1->1', 'core_count': 11, 'database_ok': True, 'main_app_loaded': True, 'deployed_commit': '94ead88d9c7da17c4dd1175b9a934a42ed9f5221'}"
+      "detail": "{'status': 'ok', 'service': 'janus-global-core-v2', 'architecture': '7->2->1->1', 'core_count': 11, 'database_ok': True, 'main_app_loaded': True, 'deployed_commit': '7267c937b170ca524a8fc3821a86b8446f474004'}"
     },
     {
       "test": "capability contract",
       "ok": true,
-      "detail": "{'ok': True, 'protocol_version': 2, 'server_generation': 'v2-clean-reconstruction', 'deployed_commit': '94ead88d9c7da17c4dd1175b9a934a42ed9f5221', 'architecture': '7->2->1->1', 'core_count': 11, 'features': {'password_auth': True, 'google_auth': True, 'email_verification': True, 'password_reset': True, 'account_deletion': True, 'chat': True, 'messages': True, 'observe': True, 'memory': True, 'persistent_core_runtime': True, 'protected_identity_core': True, 'local_global_sync': True, 'selective_no_overwrite_sync': True, 'attachments': True, 'document_grounding': True, 'visual_analysis': True, 'visual_memory': True, 'foreground_web': True, 'youtube_transcripts': True, 'research_workspace': True, 'research_provenance': True, 'artifacts': True, 'image_generation': True, 'medium_quality_images': True, 'rare_explanatory_images': True, 'background_multi_core_image_generation': False, 'background_cognition': True, 'proactive_messages': True, 'cost_governor': True, 'adaptive_bridge_authority': True, 'core_reliability_calibration': True, 'luna_terra_sol_escalation': True, 'maintenance': True, 'quarterly_maintenance': True, 'owner_gated_maintenance': True, 'maintenance_email_notice': True}, '"
+      "detail": "{'ok': True, 'protocol_version': 2, 'server_generation': 'v2-clean-reconstruction', 'deployed_commit': '7267c937b170ca524a8fc3821a86b8446f474004', 'architecture': '7->2->1->1', 'core_count': 11, 'features': {'password_auth': True, 'google_auth': True, 'email_verification': True, 'password_reset': True, 'account_deletion': True, 'chat': True, 'messages': True, 'observe': True, 'memory': True, 'persistent_core_runtime': True, 'protected_identity_core': True, 'local_global_sync': True, 'selective_no_overwrite_sync': True, 'attachments': True, 'document_grounding': True, 'visual_analysis': True, 'visual_memory': True, 'foreground_web': True, 'youtube_transcripts': True, 'research_workspace': True, 'research_provenance': True, 'artifacts': True, 'image_generation': True, 'medium_quality_images': True, 'rare_explanatory_images': True, 'background_multi_core_image_generation': False, 'background_cognition': True, 'proactive_messages': True, 'cost_governor': True, 'adaptive_bridge_authority': True, 'core_reliability_calibration': True, 'luna_terra_sol_escalation': True, 'maintenance': True, 'quarterly_maintenance': True, 'owner_gated_maintenance': True, 'maintenance_email_notice': True}, '"
     },
     {
       "test": "register",
       "ok": true,
-      "detail": "{\"ok\":true,\"access_token\":\"tOPycGmvMls-BhSCsjdMWe8Brk0enk_3WzEj4oYIl7EoQr1vqRHK5Q\",\"account\":{\"id\":2,\"username\":\"ci-60eje7yb9i\",\"email\":\"ci-60eje7yb9i@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787532862},\"development_verification_token\":\"_nKz31z4pIKwzuo2g8R6fbDAD0QoiTUq\"}"
+      "detail": "{\"ok\":true,\"access_token\":\"H1ArJd57nRXnTO_GJekoxiMHwPx-5xQG1W7iAhVaO67YktNaaqFP8g\",\"account\":{\"id\":3,\"username\":\"ci-1ezr4ibdom\",\"email\":\"ci-1ezr4ibdom@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787532998},\"development_verification_token\":\"l0_D9eUReCFzlEvaDOLFMtxCqVh9kHBn\"}"
     },
     {
       "test": "session auth",
       "ok": true,
-      "detail": "{\"ok\":true,\"account\":{\"id\":2,\"username\":\"ci-60eje7yb9i\",\"email\":\"ci-60eje7yb9i@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787532862}}"
+      "detail": "{\"ok\":true,\"account\":{\"id\":3,\"username\":\"ci-1ezr4ibdom\",\"email\":\"ci-1ezr4ibdom@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787532998}}"
     },
     {
       "test": "selective federation",
       "ok": true,
-      "detail": "{\"ok\":true,\"server_phase\":\"wake\",\"architecture\":\"7->2->1->1\",\"guidance\":{\"sync_policy\":\"selective-no-overwrite\",\"memory_policy\":\"local-and-global-remain-distinct\",\"background_external_api\":false},\"server\":{\"phase\":\"wake\",\"core_count\":11,\"consensus\":\"\",\"interface\":\"\",\"architecture\":\"7->2->1->1\",\"sync_policy\":\"selective-no-overwrite\"},\"presence\":{\"online\":1,\"registered\":1,\"clients\":[{\"device_id\":\"ci-live-device\",\"client_version\":\"v0.82\",\"phase\":\"wake\",\"last_seen_at\":1787532863}]}}"
+      "detail": "{\"ok\":true,\"server_phase\":\"wake\",\"architecture\":\"7->2->1->1\",\"guidance\":{\"sync_policy\":\"selective-no-overwrite\",\"memory_policy\":\"local-and-global-remain-distinct\",\"background_external_api\":false},\"server\":{\"phase\":\"wake\",\"core_count\":11,\"consensus\":\"\",\"interface\":\"\",\"architecture\":\"7->2->1->1\",\"sync_policy\":\"selective-no-overwrite\"},\"presence\":{\"online\":1,\"registered\":1,\"clients\":[{\"device_id\":\"ci-live-device\",\"client_version\":\"v0.82\",\"phase\":\"wake\",\"last_seen_at\":1787532999}]}}"
     },
     {
       "test": "live 11-core model chat",
@@ -47,32 +47,32 @@ exit=1
     {
       "test": "file upload",
       "ok": true,
-      "detail": "{\"ok\":true,\"file\":{\"id\":\"451cf6fb1432462abd77fe1d0afc522b\",\"filename\":\"live-smoke.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":50,\"created_at\":1787532875}}"
+      "detail": "{\"ok\":true,\"file\":{\"id\":\"d9599b3cc12e45a2b5d67a7ec9b983d7\",\"filename\":\"live-smoke.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":50,\"created_at\":1787533011}}"
     },
     {
       "test": "file grounding through specialists",
       "ok": true,
-      "detail": "{\"reply\":\"JANUS completed the 11-core integration, but the interface model call failed this turn (RateLimitError).\",\"sources\":[],\"architecture\":\"7->2->1->1\",\"route_trace\":[\"evidence\",\"logic\",\"counterpoint\",\"context\",\"memory\",\"safety\",\"novelty\",\"left_hemisphere\",\"right_hemisphere\",\"consensus\",\"interface\"],\"web\":false,\"retrieved\":false,\"bridge_authority\":{\"left\":{\"evidence\":0.72,\"logic\":0.72,\"counterpoint\":0.68,\"safety\":0.5,\"memory\":0.35,\"context\":0.32,\"novelty\":0.3},\"right\":{\"novelty\":0.7,\"context\":0.68,\"memory\":0.647,\"safety\":0.5,\"counterpoint\":0.32,\"evidence\":0.28,\"logic\":0.28}},\"model_policy\":{\"selected_model\":\"gpt-5.6-luna\",\"preflight\":{\"score\":0.1146,\"uncertainty\":0,\"conflict\":0,\"salience\":0,\"novelty_terms\":4,\"evidence\":true,\"web\":false,\"memory_count\":2}},\"profile\":\"ci-60eje7yb9i\",\"client_message_id\":\"live-file-1\",\"attachments\":[{\"id\":\"451cf6fb1432462abd77fe1d0afc522b\",\"filename\":\"live-smoke.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":50,\"grounded\":true}],\"attachment_grounding\":true,\"research_grounding\":false}"
+      "detail": "{\"reply\":\"JANUS completed the 11-core integration, but the interface model call failed this turn (RateLimitError).\",\"sources\":[],\"architecture\":\"7->2->1->1\",\"route_trace\":[\"evidence\",\"logic\",\"counterpoint\",\"context\",\"memory\",\"safety\",\"novelty\",\"left_hemisphere\",\"right_hemisphere\",\"consensus\",\"interface\"],\"web\":false,\"retrieved\":false,\"bridge_authority\":{\"left\":{\"evidence\":0.72,\"logic\":0.72,\"counterpoint\":0.68,\"safety\":0.5,\"memory\":0.35,\"context\":0.32,\"novelty\":0.3},\"right\":{\"novelty\":0.7,\"context\":0.68,\"memory\":0.647,\"safety\":0.5,\"counterpoint\":0.32,\"evidence\":0.28,\"logic\":0.28}},\"model_policy\":{\"selected_model\":\"gpt-5.6-luna\",\"preflight\":{\"score\":0.1146,\"uncertainty\":0,\"conflict\":0,\"salience\":0,\"novelty_terms\":4,\"evidence\":true,\"web\":false,\"memory_count\":2}},\"profile\":\"ci-1ezr4ibdom\",\"client_message_id\":\"live-file-1\",\"attachments\":[{\"id\":\"d9599b3cc12e45a2b5d67a7ec9b983d7\",\"filename\":\"live-smoke.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":50,\"grounded\":true}],\"attachment_grounding\":true,\"research_grounding\":false}"
     },
     {
       "test": "private persistent 11-core runtime",
-      "ok": true,
-      "detail": "{'status': 200, 'core_count': 11, 'registered_clients': 1}"
+      "ok": false,
+      "detail": "{'status': 502, 'core_count': None, 'registered_clients': None}"
     },
     {
       "test": "research workspace",
-      "ok": true,
-      "detail": "{'seed': '{\"ok\":true,\"seeded\":true}', 'workspace': '{\"ok\":true,\"claims\":[{\"id\":3,\"title\":\"Cost discipline\",\"statement\":\"Background cycles should be deterministic/zero-API by default; external research is bounded and purposeful.\",\"claim_kind\":\"policy\",\"epistemic_state\":\"active\",\"domain\":\"janus\",\"created_at\":1787532880,\"updated_at\":1787532880,\"tags\":[]},{\"id\":2,\"title\":\"Selective federation\",\"statement\":\"Local and global JANUS exchange bounded summaries and never overwrite each other\\'s protected core state.\",\"claim_kind\":\"design\",\"epistemic_state\":\"active\",\"domain\":\"janus\",\"created_at\":1787532880,\"updated_at\":1787532880,\"tags\":[]},{\"id\":1,\"title\"'}"
+      "ok": false,
+      "detail": "{'seed': '<!DOCTYPE html>\\n<html lang=\"en\">\\n  <head>\\n    <meta charset=\"utf-8\">\\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n    <title>502</title>\\n    <style>@font-face {\\n  font-family: \"Roobert\";\\n  font-weight: 500;\\n  font-style: normal;\\n  font-stretch: normal;\\n  src: url(\"data:fo', 'workspace': '<!DOCTYPE html>\\n<html lang=\"en\">\\n  <head>\\n    <meta charset=\"utf-8\">\\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n    <title>502</title>\\n    <style>@font-face {\\n  font-family: \"Roobert\";\\n  font-weight: 500;\\n  font-style: normal;\\n  font-stretch: normal;\\n  src: url(\"data:font/woff2;base64,d09GMk9UVE8AAKewAAwAAAABa6QAAKdfAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYKmehqCHhuC4UocpRQGYACLBgE2AiQDkygEBgWFRwcgW8pqkQKZcr0u0nk2H+gc25rBL5CqkDOqYXNqo87dNmL1mgByHi4yIGwcgLFJz2f/////f/pSkaHKgl52HEgorIWX0m0/lzuLglQtUxbMiGh9qonlnolc+1JbmihzmbbylQ/Xs2Knu/rUH62ibhOWZkpgVpo4nLnvzMOZ87/06Lk2hMnb'}"
     },
     {
       "test": "artifact creation",
-      "ok": true,
-      "detail": "{'create': '{\"ok\":true,\"artifact\":{\"id\":1,\"kind\":\"working_note\",\"title\":\"JANUS Working Note\",\"file\":{\"id\":\"769a81536a19414c934d33e08f53b7d5\",\"filename\":\"janus-working-note.md\",\"mime_type\":\"text/markdown\",\"size_bytes\":41,\"created_at\":1787532881}}}', 'get': '{\"ok\":true,\"artifact\":{\"id\":1,\"kind\":\"working_note\",\"title\":\"JANUS Working Note\",\"file_id\":\"769a81536a19414c934d33e08f53b7d5\",\"created_at\":1787532881,\"original_name\":\"janus-working-note.md\",\"mime_type\":\"text/markdown\",\"size_bytes\":41,\"download_path\":\"/files/769a81536a19414c934d33e08f53b7d5/download\",\"available\":true}}'}"
+      "ok": false,
+      "detail": "{'create': '<!DOCTYPE html>\\n<html lang=\"en\">\\n  <head>\\n    <meta charset=\"utf-8\">\\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n    <title>502</title>\\n    <style>@font-face {\\n  font-family: \"Roobert\";\\n  font-weight: 500;\\n  font-style: normal;\\n  font-stretch: normal;\\n  src: url(\"data:font/woff2;base64,d09GMk9UVE8AAKewAAwAAAABa6QAAKdfAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYKmehqCHhuC4UocpRQGYACLBgE2AiQDkygEBgWFRwcgW8pqkQKZcr0u0nk2H+gc25rBL5CqkDOqYXNqo87dNmL1mgByHi4yIGwcgLFJz2f/////f/pSkaHK', 'get': ''}"
     },
     {
       "test": "maintenance surface",
-      "ok": true,
-      "detail": "{\"ok\":true,\"maintenance\":{\"enabled\":true,\"interval_days\":90,\"due\":false,\"automatic_code_changes\":false,\"automatic_deploy\":false,\"owner_gated\":true},\"is_owner\":false,\"owner_resolution\":\"restricted\",\"reviews\":[]}"
+      "ok": false,
+      "detail": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <title>502</title>\n    <style>@font-face {\n  font-family: \"Roobert\";\n  font-weight: 500;\n  font-style: normal;\n  font-stretch: normal;\n  src: url(\"data:font/woff2;base64,d09GMk9UVE8AAKewAAwAAAABa6QAAKdfAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYKmehqCHhuC4UocpRQGYACLBgE2AiQDkygEBgWFRwcgW8pqkQKZcr0u0nk2H+gc25rBL5CqkDOqYXNqo87dNmL1mgByHi4yIGwcgLFJz2f/////f/pSkaHKgl52HEgorIWX0m0/lzuLglQtUxbMiGh9qonlnolc+1JbmihzmbbylQ/Xs2Knu/rUH62ibhOWZkpgVpo4nLnvzMOZ87/06Lk2hMnbe1EpM1cUezJlZtqCZIKYIPYeoS6VhFPJXNa5j7Y8LmH67MF2qJYI49/FNzQbwX7cqeRUbzyDffdLybw5cxRTIbdy4y5BVskcP6vu3uo+6GtnQl/up3nkVnDZmKlEpYHB1w/usr46inVsWjdEIE2gBgoC36WYsC4qXJjwYb9YbH9vayYROp/tXkp72nOEOvigu6g0+gsN"
     },
     {
       "test": "live image generation medium pipeline",
@@ -93,6 +93,10 @@ exit=1
   "failures": [
     "live 11-core model chat",
     "live foreground web research",
+    "private persistent 11-core runtime",
+    "research workspace",
+    "artifact creation",
+    "maintenance surface",
     "live image generation medium pipeline",
     "observe covers all 11 cores",
     "smoke account cleanup"
