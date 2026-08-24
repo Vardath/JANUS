@@ -11,22 +11,24 @@ Updated: 2026-08-24
 ## Verified published passes
 - v0.83-v0.96: native safe areas, Chat/product polish, Cores/Observe architecture, Memory/Research/Account improvements, Reply-in-Chat, structured sources/images, accessibility and shared Chat-controller foundations.
 - v0.97: queued delivery moved onto the shared Chat controller/API stack; generated-image metadata restored after restart.
-- v0.98: foreground `/desktop/chat` API posts cross the shared controller boundary; structured history v2 introduced alongside legacy history. Verified published 2026-08-24.
+- v0.98: foreground `/desktop/chat` API posts cross the shared controller boundary; structured history v2 introduced alongside legacy history.
+- v0.99: structured history v2 became an independent bounded store with one-way legacy migration; completed migration build verified and published.
 
-## v0.99 — authoritative structured Chat history
+## v1.00 — structured Chat v2 is the visible surface authority
 Implemented on integration branch; release verification pending:
-- `JanusChatHistoryStore` now treats `chat_history_native_v2` as the authoritative structured store instead of continuously mirroring legacy v1;
-- existing v1 history is imported once, only when v2 is empty, preserving existing conversations without repeatedly overwriting structured records;
-- new append/read/clear operations own schema-v2 history directly;
-- JANUS records can carry serialized `JanusChatPresentation`, keeping clean reply text, sources and generated-image metadata attached to the saved message;
-- history remains bounded to the most recent 80 records;
-- the old SharedPreferences change-listener mirroring path is removed, preventing v1 from silently replacing richer v2 records;
-- no server, cognition, federation, auth ownership or 11-core routing contract changed;
-- CI verifies one-way migration, authoritative append API, structured presentation metadata, shared foreground/queued Chat boundaries, source/image persistence, safe insets, reply context, route hygiene, forward-only core routing, Java compilation and APK assembly.
+- new `JanusChatV2Surface` watches the actual native Chat surface and projects authoritative v2 history into every newly-created Chat log before normal use;
+- subsequent user/JANUS/system bubbles are captured back into the v2 store when the visible Chat log changes;
+- the existing private `MainActivity.renderSavedChat()` is invoked only as a compatibility renderer after v2 has been projected, so `chat_history_native_v1` is now an adapter/migration surface rather than the durable source of truth;
+- the v2 store remains the long-lived bounded source for clean reply text plus structured sources/generated-image metadata;
+- application lifecycle installs the v2 surface authority and retains pause/stop/save capture as additional resilience;
+- Android version advances to 1.00 / versionCode 100;
+- no server, cognition, federation, auth ownership or 11-core routing contract changes;
+- CI requires the v2 surface authority, one-way legacy migration, shared foreground/queued Chat controller path, structured source/image restoration, safe insets, reply context, route hygiene, forward-only core routing, Java compilation and APK assembly.
 
-## Next intended passes
-1. Switch the visible Chat renderer/remember path in `MainActivity` to call the v2 read/append APIs directly, then retain v1 only as a migration source.
-2. Remove the Activity-local live `formatSources()` append and duplicate response parsing; keep Background Research source formatting independent.
-3. Continue extracting Chat/UI responsibilities from `MainActivity`, then return to Messages/Observe/Research and wider-screen polish.
+## Remaining Chat cleanup after v1.00
+1. Replace the foreground Activity's duplicate retry/JSON/source-append block with direct `JanusChatController.send()` usage once a safe targeted source-edit path is available.
+2. Remove `formatSources()` from foreground Chat completely; keep any Background Research formatting independent.
+3. Retire the v1 compatibility adapter after a release window once v2-only history has been exercised on-device.
+4. Continue extracting Messages/Observe/Research surfaces and wider-screen layouts.
 
 Release rule: do not mark a pass fully released until `apk-download` publishes the matching version after CI compilation and APK assembly.
