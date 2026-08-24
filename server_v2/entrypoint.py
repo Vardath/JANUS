@@ -21,6 +21,7 @@ from .background import background  # noqa: E402
 from .chat import router as chat_router  # noqa: E402
 from .identity_api import router as identity_router  # noqa: E402
 from .images import router as image_router  # noqa: E402
+from .maintenance import router as maintenance_router  # noqa: E402
 from .sync_contract import router as sync_router  # noqa: E402
 
 # Route ownership is explicit. Provisional routes in app.py are removed and each
@@ -28,6 +29,7 @@ from .sync_contract import router as sync_router  # noqa: E402
 _FINAL_REPLACEMENTS = {
     ("/core-sync/exchange","POST"), ("/desktop/chat","POST"),
     ("/images/generate","POST"), ("/images/usage","GET"),
+    ("/maintenance/status","GET"), ("/maintenance/reviews/{review_id}/decision","POST"),
 }
 app.router.routes[:] = [
     route for route in app.router.routes
@@ -36,6 +38,7 @@ app.router.routes[:] = [
 app.include_router(chat_router)
 app.include_router(sync_router)
 app.include_router(image_router)
+app.include_router(maintenance_router)
 app.include_router(identity_router)
 app.include_router(advanced_router)
 app.add_event_handler("startup", background.start)
