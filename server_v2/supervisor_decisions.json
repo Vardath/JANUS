@@ -1,0 +1,5 @@
+{
+  "schema": "janus-supervisor-decisions-v1",
+  "instructions": "ChatGPT Supervisor updates this file only while reviewing JANUS-generated capability requests. Each entry must record approve/disapprove/defer, reason, implementation state, and version. JANUS never writes or self-approves this file.",
+  "decisions": []
+}
