@@ -1,0 +1,79 @@
+JANUS V2 LIVE STRUCTURAL VERIFICATION
+exit=0
+
+{
+  "deployed_commit": "48ab80ccb752ae200a6ee47b49191d3bc231c7ed",
+  "tests": [
+    {
+      "test": "stable target deployment",
+      "ok": true,
+      "detail": "{'seen': '48ab80ccb752ae200a6ee47b49191d3bc231c7ed', 'streak': 3}"
+    },
+    {
+      "test": "register",
+      "ok": true,
+      "detail": "{\"ok\":true,\"access_token\":\"rD8clIeYFAvBtkkVRbmRI3N5Q9pws8k_59z9IWkHIHvBfL8H4pNqjg\",\"account\":{\"id\":6,\"username\":\"struct-lbs0dsx9\",\"email\":\"struct-lbs0dsx9@example.invalid\",\"email_verified\":false,\"google_linked\":false,\"created_at\":1787533451},\"development_verification_token\":\"R0zZvx83LouvHpAcDNr1UAgXee3IXUTK\"}"
+    },
+    {
+      "test": "federation contract",
+      "ok": true,
+      "detail": "{\"ok\":true,\"server_phase\":\"wake\",\"architecture\":\"7->2->1->1\",\"guidance\":{\"sync_policy\":\"selective-no-overwrite\",\"memory_policy\":\"local-and-global-remain-distinct\",\"background_external_api\":false},\"server\":{\"phase\":\"wake\",\"core_count\":11,\"consensus\":\"\",\"interface\":\"\",\"architecture\":\"7->2->1->1\",\"sync_policy\":\"selective-no-overwrite\"},\"presence\":{\"online\":1,\"registered\":1,\"clients\":[{\"device_id\":\"structure-check\",\"client_version\":\"v0.82\",\"phase\":\"wake\",\"last_seen_at\":1787533452}]}}"
+    },
+    {
+      "test": "file upload",
+      "ok": true,
+      "detail": "{\"ok\":true,\"file\":{\"id\":\"5f403d54c6bf41509213aeb3a99a6b1c\",\"filename\":\"proof.txt\",\"mime_type\":\"text/plain\",\"size_bytes\":30,\"created_at\":1787533452}}"
+    },
+    {
+      "test": "11-core grounded route",
+      "ok": true,
+      "detail": "{'status': 200, 'route': ['evidence', 'logic', 'counterpoint', 'context', 'memory', 'safety', 'novelty', 'left_hemisphere', 'right_hemisphere', 'consensus', 'interface'], 'grounded': True}"
+    },
+    {
+      "test": "observe all cores",
+      "ok": true,
+      "detail": "['consensus', 'context', 'counterpoint', 'evidence', 'interface', 'left_hemisphere', 'logic', 'memory', 'novelty', 'right_hemisphere', 'safety']"
+    },
+    {
+      "test": "runtime state",
+      "ok": true,
+      "detail": "{'core_count': 11, 'phase': 'wake'}"
+    },
+    {
+      "test": "research workspace",
+      "ok": true,
+      "detail": "{'seed': 200, 'workspace': 200, 'count': 3}"
+    },
+    {
+      "test": "artifacts",
+      "ok": true,
+      "detail": "{'create': 200, 'read': 200}"
+    },
+    {
+      "test": "maintenance",
+      "ok": true,
+      "detail": "{\"ok\":true,\"maintenance\":{\"enabled\":true,\"interval_days\":90,\"due\":false,\"automatic_code_changes\":false,\"automatic_deploy\":false,\"owner_gated\":true},\"is_owner\":false,\"owner_resolution\":\"restricted\",\"reviews\":[]}"
+    },
+    {
+      "test": "messages",
+      "ok": true,
+      "detail": "{\"profile\":\"struct-lbs0dsx9\",\"items\":[],\"unread\":0}"
+    },
+    {
+      "test": "account-bound memory",
+      "ok": true,
+      "detail": "{\"profile\":\"struct-lbs0dsx9\",\"items\":[{\"id\":13812,\"tier\":\"working\",\"kind\":\"conversation\",\"content\":\"User: Assess attached evidence JANUS: JANUS completed the 11-core integration, but the interface model call failed this turn (RateLimitError).\",\"salience\":0.55,\"access_count\":0,\"created_at\":1787533456,\"updated_at\":1787533456,\"level\":\"working\",\"role\":\"conversation\"}],\"promotion_ladder\":[\"trace\",\"working\",\"episodic\",\"core\"]}"
+    },
+    {
+      "test": "runtime health",
+      "ok": true,
+      "detail": "{\"status\":\"ok\",\"service\":\"janus-global-core-v2\",\"architecture\":\"7->2->1->1\",\"core_count\":11,\"database_ok\":true,\"main_app_loaded\":true,\"deployed_commit\":\"48ab80ccb752ae200a6ee47b49191d3bc231c7ed\",\"auth_schema_ok\":true,\"core_persistence_ok\":true,\"core_phase\":\"wake\",\"remote_clients\":0,\"background_external_api_budget_used\":0,\"file_chat_grounding_enabled\":true,\"outbound_working_artifacts_enabled\":true,\"lightweight_image_generation_enabled\":true,\"background_multi_core_image_generation_enabled\":false,\"quarterly_maintenance_review_enabled\":true,\"server_generation\":\"v2-clean-reconstruction\"}"
+    },
+    {
+      "test": "cleanup",
+      "ok": true,
+      "detail": "{\"ok\":true}"
+    }
+  ],
+  "failures": []
+}
