@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v1.09-rc1: Android release-candidate hardening.
+// v1.08 + RC hardening: governed self-diagnosis, Supervisor handoff and release-signing preparation.
 // No WebView UI, no generated HTML, no composer/patch pipeline.
 android {
     namespace 'com.vardath.janus'
@@ -32,8 +32,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 109
-        versionName '1.09-rc1'
+        versionCode 108
+        versionName '1.08'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
