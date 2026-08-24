@@ -3,7 +3,7 @@
 No legacy application modules are imported here. Persisted account/memory records
 are migrated as data only, then all runtime composition is provided by server_v2.
 """
-from . import governance, identity, storage, visual_memory
+from . import diagnostics, governance, identity, storage, visual_memory
 from .migrate import migrate_persistent_data_once
 from .runtime_persistence import runtime_persistence
 
@@ -11,9 +11,11 @@ storage.init_schema()
 governance.init_schema()
 identity.init_schema()
 visual_memory.init_schema()
+diagnostics.init_schema()
 runtime_persistence.init_schema()
 MIGRATION_RESULT = migrate_persistent_data_once()
 RUNTIME_RESTORE_RESULT = runtime_persistence.restore_all()
+SUPERVISOR_DECISION_SYNC = diagnostics.apply_supervisor_decisions()
 
 from .app import app  # noqa: E402
 from .advanced import router as advanced_router  # noqa: E402
@@ -59,5 +61,6 @@ app.add_event_handler("shutdown", background.stop)
 app.state.server_generation = "v2-clean-reconstruction"
 app.state.persistence_migration = MIGRATION_RESULT
 app.state.runtime_restore = RUNTIME_RESTORE_RESULT
+app.state.supervisor_decision_sync = SUPERVISOR_DECISION_SYNC
 app.state.legacy_application_modules_loaded = False
 app.state.background_multi_core_image_generation_enabled = False
