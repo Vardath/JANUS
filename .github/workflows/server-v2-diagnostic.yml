@@ -6,6 +6,7 @@ on:
     paths:
       - 'server_v2/**'
       - 'tools/verify_server_v2.py'
+      - 'tools/verify_server_v2_session_cutover.py'
       - '.github/workflows/server-v2-diagnostic.yml'
   workflow_dispatch:
 
@@ -31,10 +32,12 @@ jobs:
         run: |
           set +e
           mkdir -p docs
-          python -m py_compile server_v2/*.py tools/verify_server_v2.py > /tmp/compile.log 2>&1
+          python -m py_compile server_v2/*.py tools/verify_server_v2.py tools/verify_server_v2_session_cutover.py > /tmp/compile.log 2>&1
           COMPILE=$?
           python tools/verify_server_v2.py > /tmp/verify.log 2>&1
           VERIFY=$?
+          python tools/verify_server_v2_session_cutover.py > /tmp/session.log 2>&1
+          SESSION=$?
           grep -R "^from \(bootstrap\|janus_dashboard\|dashboard_api\|interface_chat\|secure_desktop\|attachment_chat\|image_response_compat\|src\.janus_sleep_cycle\)" server_v2 > /tmp/legacy.log 2>&1
           LEGACY_FROM=$?
           grep -R "^import \(bootstrap\|janus_dashboard\|dashboard_api\|interface_chat\|secure_desktop\|attachment_chat\|image_response_compat\)" server_v2 >> /tmp/legacy.log 2>&1
@@ -44,6 +47,7 @@ jobs:
             echo "verified_sha=${GITHUB_SHA}"
             echo "compile_exit=${COMPILE}"
             echo "verify_exit=${VERIFY}"
+            echo "session_cutover_exit=${SESSION}"
             echo "legacy_from_grep_exit=${LEGACY_FROM}"
             echo "legacy_import_grep_exit=${LEGACY_IMPORT}"
             echo
@@ -53,6 +57,9 @@ jobs:
             echo "--- verifier log ---"
             tail -400 /tmp/verify.log
             echo
+            echo "--- session cutover log ---"
+            tail -200 /tmp/session.log
+            echo
             echo "--- legacy import matches ---"
             cat /tmp/legacy.log
           } > docs/SERVER_V2_DIAGNOSTIC.txt
@@ -61,6 +68,6 @@ jobs:
           git add docs/SERVER_V2_DIAGNOSTIC.txt
           git commit -m "Record JANUS server v2 diagnostic result" || true
           git push || true
-          if [ "$COMPILE" -ne 0 ] || [ "$VERIFY" -ne 0 ] || [ "$LEGACY_FROM" -eq 0 ] || [ "$LEGACY_IMPORT" -eq 0 ]; then
+          if [ "$COMPILE" -ne 0 ] || [ "$VERIFY" -ne 0 ] || [ "$SESSION" -ne 0 ] || [ "$LEGACY_FROM" -eq 0 ] || [ "$LEGACY_IMPORT" -eq 0 ]; then
             exit 1
           fi
