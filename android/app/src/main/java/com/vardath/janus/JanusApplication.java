@@ -35,6 +35,7 @@ public class JanusApplication extends Application {
                 JanusAdaptiveUi.install(activity);
                 JanusNavigationPolish.install(activity);
                 JanusMaintenanceSupervisorPolish.install(activity);
+                JanusVoiceUiPolish.install(activity);
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
@@ -46,7 +47,7 @@ public class JanusApplication extends Application {
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
-            @Override public void onActivityDestroyed(Activity activity) {}
+            @Override public void onActivityDestroyed(Activity activity) { JanusVoiceUiPolish.destroy(activity); }
         });
 
         JanusLocalCoreRuntime.get(this).start();
