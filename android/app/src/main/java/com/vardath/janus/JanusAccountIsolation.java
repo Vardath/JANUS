@@ -18,7 +18,8 @@ final class JanusAccountIsolation {
     private static final String BINDING_KEY = "profile";
     private static final String[] DEVICE_KEYS = new String[]{
             "theme_mode", "accent", "background_cycles_enabled",
-            "observe_telemetry_enabled", "local_background_interval_seconds"
+            "observe_telemetry_enabled", "local_background_interval_seconds",
+            JanusLanguageSettings.LANGUAGE_KEY, JanusLanguageSettings.SPEECH_KEY
     };
 
     private JanusAccountIsolation() {}
@@ -31,8 +32,6 @@ final class JanusAccountIsolation {
         boolean switched = !previous.isBlank() && !clean.isBlank() && !previous.equals(clean);
         if (switched) {
             resetAccountBoundState(app);
-            // The old in-memory society was stopped. Start a fresh local 11-core
-            // runtime now; saveSession writes the new token/profile immediately after.
             JanusLocalCoreRuntime.get(app).start();
         }
         if (!clean.isBlank()) binding.edit().putString(BINDING_KEY, clean).apply();
@@ -46,7 +45,6 @@ final class JanusAccountIsolation {
 
     private static void resetAccountBoundState(Context app) {
         stopAndDetachLocalRuntime();
-
         SharedPreferences prefs = app.getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE);
         Map<String, Object> keep = new LinkedHashMap<>();
         Map<String, ?> all = prefs.getAll();
@@ -55,7 +53,6 @@ final class JanusAccountIsolation {
         SharedPreferences.Editor restore = prefs.edit();
         for (Map.Entry<String, Object> entry : keep.entrySet()) put(restore, entry.getKey(), entry.getValue());
         restore.commit();
-
         JanusChatResponseRegistry.clear(app);
         deleteRecursively(new File(app.getCacheDir(), "shared_artifacts"));
     }
@@ -69,15 +66,10 @@ final class JanusAccountIsolation {
                 Field schedulerField = JanusLocalCoreRuntime.class.getDeclaredField("scheduler");
                 schedulerField.setAccessible(true);
                 Object scheduler = schedulerField.get(runtime);
-                if (scheduler instanceof ScheduledExecutorService) {
-                    ((ScheduledExecutorService) scheduler).shutdownNow();
-                }
+                if (scheduler instanceof ScheduledExecutorService) ((ScheduledExecutorService) scheduler).shutdownNow();
             }
             instanceField.set(null, null);
-        } catch (Exception ignored) {
-            // Fail closed on persistence: preferences are still cleared below. A process
-            // restart will then instantiate a clean local runtime if reflection changes.
-        }
+        } catch (Exception ignored) {}
     }
 
     private static void put(SharedPreferences.Editor editor, String key, Object value) {
