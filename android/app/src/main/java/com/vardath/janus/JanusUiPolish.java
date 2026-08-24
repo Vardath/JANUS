@@ -10,6 +10,8 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.util.Linkify;
 import android.view.Gravity;
 import android.view.View;
@@ -29,12 +31,21 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-/** App-wide native chrome/readability layer for JANUS Android v0.85. */
+/** App-wide native chrome/readability layer. v1.04 makes all decoration idempotent and debounced. */
 public final class JanusUiPolish {
     private static final Set<Activity> INSTALLED = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Set<View> BASE_POLISHED = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Set<LinearLayout> CHAT_ENHANCED = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Set<LinearLayout> CORE_MAP_HOSTS = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Set<LinearLayout> OBSERVE_GUIDE_HOSTS = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Map<Activity, Runnable> PENDING = new WeakHashMap<>();
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static final long POLISH_DEBOUNCE_MS = 180L;
+
     private JanusUiPolish() {}
 
     public static void install(Activity activity) {
@@ -55,10 +66,26 @@ public final class JanusUiPolish {
             ViewCompat.requestApplyInsets(content);
         }
         applySystemBarContrast(activity);
-        activity.getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-            View root = activity.findViewById(android.R.id.content);
-            if (root != null) polishTree(activity, root);
-        });
+        View decor = activity.getWindow().getDecorView();
+        decor.post(() -> runPolish(activity));
+        decor.getViewTreeObserver().addOnGlobalLayoutListener(() -> schedulePolish(activity));
+    }
+
+    private static synchronized void schedulePolish(Activity activity) {
+        Runnable old = PENDING.remove(activity);
+        if (old != null) MAIN.removeCallbacks(old);
+        Runnable next = () -> {
+            synchronized (JanusUiPolish.class) { PENDING.remove(activity); }
+            runPolish(activity);
+        };
+        PENDING.put(activity, next);
+        MAIN.postDelayed(next, POLISH_DEBOUNCE_MS);
+    }
+
+    private static void runPolish(Activity activity) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+        View root = activity.findViewById(android.R.id.content);
+        if (root != null) polishTree(activity, root);
     }
 
     private static void applySystemBarContrast(Activity activity) {
@@ -68,13 +95,16 @@ public final class JanusUiPolish {
     }
 
     private static void polishTree(Activity activity, View view) {
-        if (view instanceof Button) styleButton(activity, (Button) view);
-        else if (view instanceof EditText) styleInput(activity, (EditText) view);
-        else if (view instanceof TextView) styleText((TextView) view);
-        if (view instanceof ImageView) styleImage(activity, (ImageView) view);
+        boolean first = BASE_POLISHED.add(view);
+        if (first) {
+            if (view instanceof Button) styleButton(activity, (Button) view);
+            else if (view instanceof EditText) styleInput(activity, (EditText) view);
+            else if (view instanceof TextView) styleText((TextView) view);
+            if (view instanceof ImageView) styleImage(activity, (ImageView) view);
+            if (view instanceof LinearLayout) styleSurface(activity, (LinearLayout) view);
+        }
         if (view instanceof LinearLayout) {
             LinearLayout layout = (LinearLayout) view;
-            styleSurface(activity, layout);
             enhanceChatCard(activity, layout);
             enhanceRuntimeCard(activity, layout);
             enhanceObserveCard(activity, layout);
@@ -114,8 +144,6 @@ public final class JanusUiPolish {
     }
 
     private static void styleInput(Activity activity, EditText input) {
-        if ("janus-polished-input".equals(input.getTag())) return;
-        input.setTag("janus-polished-input");
         input.setMinHeight(dp(activity, 52));
         input.setTextColor(textColor(activity));
         input.setHintTextColor(mutedColor(activity));
@@ -129,10 +157,7 @@ public final class JanusUiPolish {
         CharSequence value = text.getText();
         if (value != null) {
             String s = value.toString();
-            if (s.contains("http")) {
-                text.setAutoLinkMask(Linkify.WEB_URLS);
-                text.setLinksClickable(true);
-            }
+            if (s.contains("http")) { text.setAutoLinkMask(Linkify.WEB_URLS); text.setLinksClickable(true); }
             if (s.startsWith("Fano direction d")) {
                 int d = parseFano(s);
                 if (d >= 0) text.setText(fanoName(d) + " · d" + d + " · processing orientation, not a truth score");
@@ -178,11 +203,11 @@ public final class JanusUiPolish {
     }
 
     private static void enhanceChatCard(Activity activity, LinearLayout layout) {
-        if ("janus-chat-enhanced".equals(layout.getTag()) || layout.getChildCount() < 2) return;
+        if (CHAT_ENHANCED.contains(layout) || layout.getChildCount() < 2) return;
         if (!(layout.getChildAt(0) instanceof TextView) || !(layout.getChildAt(1) instanceof TextView)) return;
         String who = String.valueOf(((TextView) layout.getChildAt(0)).getText());
         if (!("JANUS".equals(who) || "You".equals(who) || "System".equals(who))) return;
-        layout.setTag("janus-chat-enhanced");
+        CHAT_ENHANCED.add(layout);
         TextView body = (TextView) layout.getChildAt(1);
         body.setTextIsSelectable(true);
         body.setPadding(body.getPaddingLeft(), dp(activity,4), body.getPaddingRight(), dp(activity,8));
@@ -212,42 +237,34 @@ public final class JanusUiPolish {
     }
 
     private static void enhanceRuntimeCard(Activity activity, LinearLayout layout) {
-        if (layout.getChildCount() == 0 || !(layout.getChildAt(0) instanceof TextView)) return;
+        if (layout.getChildCount() == 0 || !(layout.getChildAt(0) instanceof TextView) || layout.getChildAt(0) instanceof Button) return;
         TextView title = (TextView) layout.getChildAt(0);
         String label = String.valueOf(title.getText());
         if (label.startsWith("THIS DEVICE · LOCAL JANUS")) {
-            title.setText("● THIS DEVICE · LOCAL JANUS");
-            title.setTextColor(accent(activity));
-            outline(layout, activity, accent(activity), 105);
+            title.setText("● THIS DEVICE · LOCAL JANUS"); title.setTextColor(accent(activity)); outline(layout, activity, accent(activity), 105);
         } else if (label.startsWith("ONLINE · GLOBAL JANUS")) {
-            title.setText("◆ ONLINE · GLOBAL JANUS");
-            title.setTextColor(textColor(activity));
-            outline(layout, activity, mutedColor(activity), 70);
+            title.setText("◆ ONLINE · GLOBAL JANUS"); title.setTextColor(textColor(activity)); outline(layout, activity, mutedColor(activity), 70);
         }
     }
 
     private static void enhanceObserveCard(Activity activity, LinearLayout layout) {
         if (layout.getChildCount() < 3) return;
         View metaView = layout.getChildAt(2);
-        if (!(metaView instanceof TextView)) return;
+        if (!(metaView instanceof TextView) || metaView instanceof Button) return;
         TextView meta = (TextView) metaView;
         String s = String.valueOf(meta.getText());
         if (s.contains(" · This device") && !s.contains("LOCAL ·")) {
-            meta.setText("LOCAL · " + s.replace(" · This device", ""));
-            meta.setTextColor(accent(activity));
-            outline(layout, activity, accent(activity), 80);
+            meta.setText("LOCAL · " + s.replace(" · This device", "")); meta.setTextColor(accent(activity)); outline(layout, activity, accent(activity), 80);
         } else if ((s.contains("Global JANUS") || s.contains("global")) && !s.contains("GLOBAL ·")) {
-            meta.setText("GLOBAL · " + s.replace(" · Global JANUS", ""));
-            meta.setTextColor(mutedColor(activity));
-            outline(layout, activity, mutedColor(activity), 55);
+            meta.setText("GLOBAL · " + s.replace(" · Global JANUS", "")); meta.setTextColor(mutedColor(activity)); outline(layout, activity, mutedColor(activity), 55);
         }
     }
 
     private static void injectArchitectureMap(Activity activity, LinearLayout layout) {
-        if ("janus-core-map-host".equals(layout.getTag())) return;
+        if (CORE_MAP_HOSTS.contains(layout)) return;
         int titleIndex = directTextIndex(layout, "Runtime Cores");
         if (titleIndex < 0) return;
-        layout.setTag("janus-core-map-host");
+        CORE_MAP_HOSTS.add(layout);
         LinearLayout panel = new LinearLayout(activity);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(activity,10),dp(activity,6),dp(activity,10),dp(activity,8));
@@ -257,15 +274,14 @@ public final class JanusUiPolish {
         panel.addView(hint, new LinearLayout.LayoutParams(-1,-2));
         JanusCoreMapView map = new JanusCoreMapView(activity);
         panel.addView(map, new LinearLayout.LayoutParams(-1, dp(activity,350)));
-        int insertAt = Math.min(titleIndex + 1, layout.getChildCount());
-        layout.addView(panel, insertAt, new LinearLayout.LayoutParams(-1,-2));
+        layout.addView(panel, Math.min(titleIndex + 1, layout.getChildCount()), new LinearLayout.LayoutParams(-1,-2));
     }
 
     private static void injectObserveGuide(Activity activity, LinearLayout layout) {
-        if ("janus-observe-guide-host".equals(layout.getTag())) return;
+        if (OBSERVE_GUIDE_HOSTS.contains(layout)) return;
         int titleIndex = directTextIndex(layout, "Observe");
         if (titleIndex < 0) return;
-        layout.setTag("janus-observe-guide-host");
+        OBSERVE_GUIDE_HOSTS.add(layout);
         TextView guide = new TextView(activity);
         guide.setText("Stable snapshot · LOCAL and GLOBAL activity stay visually distinct · Refresh only when you choose");
         guide.setTextColor(mutedColor(activity)); guide.setTextSize(12);
@@ -276,7 +292,7 @@ public final class JanusUiPolish {
     private static int directTextIndex(LinearLayout layout, String value) {
         for (int i=0;i<layout.getChildCount();i++) {
             View child = layout.getChildAt(i);
-            if (child instanceof TextView && value.equals(String.valueOf(((TextView) child).getText()))) return i;
+            if (child instanceof TextView && !(child instanceof Button) && value.equals(String.valueOf(((TextView) child).getText()))) return i;
         }
         return -1;
     }
@@ -297,8 +313,6 @@ public final class JanusUiPolish {
     }
 
     private static void styleImage(Activity activity, ImageView image) {
-        if ("janus-image-polished".equals(image.getTag())) return;
-        image.setTag("janus-image-polished");
         image.setPadding(dp(activity,4),dp(activity,4),dp(activity,4),dp(activity,4));
         GradientDrawable frame = rounded(activity, elevatedSurface(activity), 18);
         frame.setStroke(dp(activity,1),withAlpha(mutedColor(activity),60));
