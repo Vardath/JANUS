@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.99: authoritative structured Chat history with one-way legacy migration.
+// v1.00: structured Chat v2 is the visible surface authority; legacy v1 is migration/adapter only.
 // No WebView UI, no generated HTML, no composer/patch pipeline.
 android {
     namespace 'com.vardath.janus'
@@ -19,8 +19,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 99
-        versionName '0.99'
+        versionCode 100
+        versionName '1.00'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
