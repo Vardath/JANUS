@@ -8,15 +8,12 @@ exit=0
   "register_status": 200,
   "provider_status": 200,
   "provider": {
-    "ok": false,
+    "ok": true,
     "key_present": true,
     "text_provider": {
-      "ok": false,
-      "error_type": "RateLimitError",
-      "status_code": 429,
-      "code": "credit_balance_exhausted",
-      "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
-      "model": "gpt-5.6-luna"
+      "ok": true,
+      "model": "gpt-5.6-luna",
+      "response": "JANUS_PROVIDER_OK"
     },
     "image_model": "gpt-image-1",
     "image_quality": "medium",
@@ -24,7 +21,7 @@ exit=0
   },
   "chat_status": 200,
   "chat": {
-    "reply": "JANUS completed the 11-core integration, but the interface model call failed this turn (RateLimitError).",
+    "reply": "Hello! I\u2019m JANUS. How can I help you today?",
     "sources": [],
     "architecture": "7->2->1->1",
     "route_trace": [
@@ -75,7 +72,7 @@ exit=0
         "memory_count": 0
       }
     },
-    "profile": "diag-n6tb3o828",
+    "profile": "diag-clcw906xa",
     "client_message_id": "provider-diag-1",
     "attachments": [],
     "attachment_grounding": false,
@@ -98,7 +95,7 @@ exit=0
   "runtime_status": 200,
   "runtime": {
     "core_count": 11,
-    "phase": "wake",
+    "phase": "sleep",
     "registered_clients": 0
   },
   "cleanup_status": 200
