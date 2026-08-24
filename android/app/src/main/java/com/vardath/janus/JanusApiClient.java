@@ -24,11 +24,16 @@ public final class JanusApiClient {
     public String profile() { return prefs.getString(PROFILE, ""); }
     public void saveSession(String token, String profile) { prefs.edit().putString(TOKEN, token == null ? "" : token).putString(PROFILE, profile == null ? "" : profile).apply(); }
     public void clearSession() { prefs.edit().remove(TOKEN).remove(PROFILE).remove("last_notified_message").apply(); }
-    public Response get(String path, boolean auth) { return request("GET", path, null, auth); }
-    public Response post(String path, String body, boolean auth) { return request("POST", path, body, auth); }
-    public Response delete(String path, String body, boolean auth) { return request("DELETE", path, body, auth); }
+    public Response get(String path, boolean auth) { return request("GET", path, null, auth, true); }
+    public Response post(String path, String body, boolean auth) { return request("POST", path, body, auth, true); }
+    public Response delete(String path, String body, boolean auth) { return request("DELETE", path, body, auth, true); }
 
-    public Response request(String method, String path, String body, boolean auth) {
+    /** Raw transport primitive for higher-level controllers. It deliberately performs no Chat presentation side effects. */
+    Response postRaw(String path, String body, boolean auth) { return request("POST", path, body, auth, false); }
+
+    public Response request(String method, String path, String body, boolean auth) { return request(method, path, body, auth, true); }
+
+    private Response request(String method, String path, String body, boolean auth, boolean captureChat) {
         HttpURLConnection c = null;
         try {
             String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
@@ -44,7 +49,7 @@ public final class JanusApiClient {
             int code = c.getResponseCode();
             InputStream in = code >= 200 && code < 400 ? c.getInputStream() : c.getErrorStream();
             String responseBody = read(in);
-            if (code >= 200 && code < 300 && "POST".equals(method) && "/desktop/chat".equals(effectivePath)) {
+            if (captureChat && code >= 200 && code < 300 && "POST".equals(method) && "/desktop/chat".equals(effectivePath)) {
                 JanusChatResponseRegistry.capture(responseBody);
             }
             return new Response(code, responseBody, null);
