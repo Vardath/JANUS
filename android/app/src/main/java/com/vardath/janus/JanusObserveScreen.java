@@ -106,7 +106,7 @@ public final class JanusObserveScreen {
     }
 
     private static String prettyOrigin(String s) {
-        String x=s==null?"":s.replace('_',' ').replace(':',' · ');
+        String x=s==null?"":s.replace('_',' ').replace(":"," · ");
         return x.isBlank()?"unknown":x;
     }
 
