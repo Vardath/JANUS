@@ -6,6 +6,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -13,22 +15,41 @@ import android.widget.TextView;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
 /** Structured live Chat source renderer. Source metadata comes from the HTTP response registry, never text parsing. */
 public final class JanusSourcePolish {
     private static final Set<Activity> INSTALLED = Collections.newSetFromMap(new WeakHashMap<>());
-    private static final String TAG_DONE = "janus-structured-sources-v094";
+    private static final Set<LinearLayout> ENHANCED = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Map<Activity, Runnable> PENDING = new WeakHashMap<>();
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private JanusSourcePolish() {}
 
     public static void install(Activity activity) {
         if (activity == null || INSTALLED.contains(activity)) return;
         INSTALLED.add(activity);
-        activity.getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-            View root = activity.findViewById(android.R.id.content);
-            if (root != null) walk(activity, root);
-        });
+        View decor = activity.getWindow().getDecorView();
+        decor.post(() -> run(activity));
+        decor.getViewTreeObserver().addOnGlobalLayoutListener(() -> schedule(activity));
+    }
+
+    private static synchronized void schedule(Activity activity) {
+        Runnable old = PENDING.remove(activity);
+        if (old != null) MAIN.removeCallbacks(old);
+        Runnable next = () -> {
+            synchronized (JanusSourcePolish.class) { PENDING.remove(activity); }
+            run(activity);
+        };
+        PENDING.put(activity, next);
+        MAIN.postDelayed(next, 220L);
+    }
+
+    private static void run(Activity activity) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+        View root = activity.findViewById(android.R.id.content);
+        if (root != null) walk(activity, root);
     }
 
     private static void walk(Activity activity, View view) {
@@ -40,13 +61,13 @@ public final class JanusSourcePolish {
     }
 
     private static void enhance(Activity activity, LinearLayout card) {
-        if (TAG_DONE.equals(card.getTag()) || card.getChildCount() < 2) return;
+        if (ENHANCED.contains(card) || card.getChildCount() < 2) return;
         if (!(card.getChildAt(0) instanceof TextView) || !(card.getChildAt(1) instanceof TextView)) return;
         if (!"JANUS".contentEquals(((TextView)card.getChildAt(0)).getText())) return;
         TextView body = (TextView) card.getChildAt(1);
         JanusChatPresentation p = JanusChatResponseRegistry.consumeForReply(String.valueOf(body.getText()));
         if (p == null) return;
-        card.setTag(TAG_DONE);
+        ENHANCED.add(card);
         body.setText(p.reply);
         LinearLayout panel = buildPanel(activity,p.sources);
         if (panel != null) card.addView(panel, Math.min(2,card.getChildCount()), fullWithMargins(activity));

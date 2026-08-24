@@ -3,6 +3,8 @@ package com.vardath.janus;
 import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.MotionEvent;
@@ -13,31 +15,39 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 
-/**
- * v0.90 Messages -> Chat reply-context bridge.
- *
- * MainActivity historically pasted the surfaced JANUS message into the visible
- * composer so the context reached /desktop/chat. This layer preserves that
- * transport contract while presenting the quoted JANUS message as a separate
- * native context card. The user's composer therefore contains only their reply.
- * Immediately before Send is dispatched, the hidden context is restored to the
- * payload text; the existing Chat sender then transmits the same contextual
- * message as before. No server or cognition contract changes are required.
- */
+/** Messages -> Chat reply-context bridge. v1.04 avoids scanning the full UI on every keystroke. */
 public final class JanusReplyContextPolish {
     private static final String PREFIX = "Regarding your message:\n“";
     private static final String SUFFIX = "”\n\n";
     private static final WeakHashMap<EditText, ReplyState> STATES = new WeakHashMap<>();
+    private static final Set<Activity> INSTALLED = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Map<Activity, Runnable> PENDING = new WeakHashMap<>();
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private JanusReplyContextPolish() {}
 
     public static void install(Activity activity) {
-        if (activity == null || activity.getWindow() == null) return;
+        if (activity == null || activity.getWindow() == null || INSTALLED.contains(activity)) return;
+        INSTALLED.add(activity);
         View decor = activity.getWindow().getDecorView();
         decor.post(() -> scan(decor));
-        decor.getViewTreeObserver().addOnGlobalLayoutListener(() -> scan(decor));
+        decor.getViewTreeObserver().addOnGlobalLayoutListener(() -> schedule(activity, decor));
+    }
+
+    private static synchronized void schedule(Activity activity, View decor) {
+        Runnable old = PENDING.remove(activity);
+        if (old != null) MAIN.removeCallbacks(old);
+        Runnable next = () -> {
+            synchronized (JanusReplyContextPolish.class) { PENDING.remove(activity); }
+            if (!activity.isFinishing() && !activity.isDestroyed()) scan(decor);
+        };
+        PENDING.put(activity, next);
+        MAIN.postDelayed(next, 240L);
     }
 
     private static void scan(View view) {

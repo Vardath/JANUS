@@ -3,6 +3,8 @@ package com.vardath.janus;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,22 +15,41 @@ import android.widget.TextView;
 import org.json.JSONObject;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
 /** Restores generated-image cards from structured Chat metadata, including after process restart. */
 public final class JanusGeneratedImagePolish {
     private static final Set<Activity> INSTALLED = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final Map<Activity, Runnable> PENDING = new WeakHashMap<>();
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final String TAG_PREFIX = "janus-generated-image:";
     private JanusGeneratedImagePolish() {}
 
     public static void install(Activity activity) {
         if (activity == null || INSTALLED.contains(activity)) return;
         INSTALLED.add(activity);
-        activity.getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-            View root = activity.findViewById(android.R.id.content);
-            if (root != null) walk(activity, root);
-        });
+        View decor = activity.getWindow().getDecorView();
+        decor.post(() -> run(activity));
+        decor.getViewTreeObserver().addOnGlobalLayoutListener(() -> schedule(activity));
+    }
+
+    private static synchronized void schedule(Activity activity) {
+        Runnable old = PENDING.remove(activity);
+        if (old != null) MAIN.removeCallbacks(old);
+        Runnable next = () -> {
+            synchronized (JanusGeneratedImagePolish.class) { PENDING.remove(activity); }
+            run(activity);
+        };
+        PENDING.put(activity, next);
+        MAIN.postDelayed(next, 260L);
+    }
+
+    private static void run(Activity activity) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+        View root = activity.findViewById(android.R.id.content);
+        if (root != null) walk(activity, root);
     }
 
     private static void walk(Activity activity, View view) {
