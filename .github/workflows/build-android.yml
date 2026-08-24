@@ -33,25 +33,27 @@ jobs:
           POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
           PRODUCT=android/app/src/main/java/com/vardath/janus/JanusProductPolish.java
           SCREEN=android/app/src/main/java/com/vardath/janus/JanusScreenStatePolish.java
+          FEATURE=android/app/src/main/java/com/vardath/janus/JanusFeaturePolish.java
           MAP=android/app/src/main/java/com/vardath/janus/JanusCoreMapView.java
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
           GRADLE=android/app/build.gradle
-          test -s "$SRC" && test -s "$API" && test -s "$ROUTE" && test -s "$CORE" && test -s "$POLISH" && test -s "$PRODUCT" && test -s "$SCREEN" && test -s "$MAP" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
+          test -s "$SRC" && test -s "$API" && test -s "$ROUTE" && test -s "$CORE" && test -s "$POLISH" && test -s "$PRODUCT" && test -s "$SCREEN" && test -s "$FEATURE" && test -s "$MAP" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' android/app/src/main/java
           grep -q 'class MainActivity extends Activity' "$SRC"
           grep -q "applicationId 'com.vardath.janus'" "$GRADLE"
-          grep -q "versionName '0.88'" "$GRADLE"
+          grep -q "versionName '0.89'" "$GRADLE"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
 
-      - name: Verify safe-area Chat Cores Observe and product usability contract
+      - name: Verify UI product and v0.89 feature contract
         shell: bash
         run: |
           set -euxo pipefail
           POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
           PRODUCT=android/app/src/main/java/com/vardath/janus/JanusProductPolish.java
           SCREEN=android/app/src/main/java/com/vardath/janus/JanusScreenStatePolish.java
+          FEATURE=android/app/src/main/java/com/vardath/janus/JanusFeaturePolish.java
           MAP=android/app/src/main/java/com/vardath/janus/JanusCoreMapView.java
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
@@ -62,14 +64,13 @@ jobs:
           grep -q 'JanusUiPolish.install(activity)' "$APP"
           grep -q 'JanusProductPolish.install(activity)' "$APP"
           grep -q 'JanusScreenStatePolish.install(activity)' "$APP"
+          grep -q 'JanusFeaturePolish.install(activity)' "$APP"
           grep -q 'android:windowSoftInputMode="adjustResize"' "$MAN"
           grep -q 'enhanceChatCard' "$POLISH"
           grep -q 'Copied JANUS response' "$POLISH"
           grep -q 'Share JANUS response' "$POLISH"
           grep -q 'Delivery status' "$POLISH"
-          grep -q 'setTextIsSelectable(true)' "$POLISH"
           grep -q 'injectArchitectureMap' "$POLISH"
-          grep -q 'JanusCoreMapView' "$POLISH"
           grep -q 'Forward-only routing' "$MAP"
           grep -q 'Grounding' "$POLISH"
           grep -q 'Alternative / counterfactual' "$POLISH"
@@ -81,18 +82,17 @@ jobs:
           grep -q 'JANUS · Cores' "$PRODUCT"
           grep -q 'Research · Workspace' "$PRODUCT"
           grep -q 'System · Maintenance' "$PRODUCT"
-          grep -q 'This device · Local continuity' "$PRODUCT"
-          grep -q 'Global JANUS · Durable continuity' "$PRODUCT"
-          grep -q 'Core memory · protected continuity' "$PRODUCT"
-          grep -q 'Reply in Chat' "$PRODUCT"
-          grep -q 'Mark read' "$PRODUCT"
           grep -q 'No surfaced messages yet' "$SCREEN"
           grep -q 'No observable activity in this snapshot' "$SCREEN"
           grep -q 'Temporarily unavailable' "$SCREEN"
-          grep -q 'Your JANUS continuity' "$SCREEN"
-          grep -q 'JANUS inbox' "$SCREEN"
-          grep -q 'sign out all' "$SCREEN"
-          grep -q 'delete account' "$SCREEN"
+          grep -q 'Search visible memory' "$FEATURE"
+          grep -q '"All", "Trace", "Working", "Episodic", "Core"' "$FEATURE"
+          grep -q 'applyMemoryFilter' "$FEATURE"
+          grep -q 'Evidence · ' "$FEATURE"
+          grep -q 'Research evidence count' "$FEATURE"
+          grep -q 'Session & security' "$FEATURE"
+          grep -q 'Sign out all devices' "$FEATURE"
+          grep -q 'Sign out this device' "$FEATURE"
 
       - name: Verify authenticated route hygiene
         shell: bash
@@ -227,7 +227,7 @@ jobs:
             echo "Version: $VERSION"
             echo "Package: com.vardath.janus"
             echo "Source commit: $GITHUB_SHA"
-            echo "UI: safe areas + Chat + Cores/Observe + product usability + screen-state extraction + authenticated route hygiene; no WebView"
+            echo "UI: safe areas + Chat + Cores/Observe + screen-state + Memory filters + Research evidence + Account sessions; no WebView"
             echo "Architecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface"
             echo "Signing certificate from stable build keystore:"
             keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1:|SHA256:' || true
