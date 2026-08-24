@@ -3,9 +3,8 @@ package com.vardath.janus;
 import org.json.JSONObject;
 
 /**
- * v0.95 Chat controller boundary.
- * Encapsulates retry timing, structured response parsing and failure classification.
- * MainActivity migration onto this controller is intentionally incremental.
+ * Chat transport/controller boundary.
+ * Owns retry timing, structured response parsing, presentation capture and failure classification.
  */
 public final class JanusChatController {
     private static final long[] RETRY_DELAYS_MS = new long[]{0L, 1800L, 5000L};
@@ -18,16 +17,18 @@ public final class JanusChatController {
                 try { Thread.sleep(wait); }
                 catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
             }
-            response = api.post("/desktop/chat", preparedBody, true);
+            response = api.postRaw("/desktop/chat", preparedBody, true);
             if (response.ok() || !response.retryable()) break;
         }
         if (response == null) response = new JanusApiClient.Response(0, "", "No response");
         if (!response.ok()) return Result.failure(response);
         try {
             JanusChatPresentation presentation = JanusChatPresentation.fromResponse(new JSONObject(response.body), response.body);
+            JanusChatResponseRegistry.capture(response.body);
             return Result.success(response, presentation);
         } catch (Exception e) {
-            return Result.success(response, JanusChatPresentation.fromResponse(new JSONObject(), response.body));
+            JanusChatPresentation fallback = JanusChatPresentation.fromResponse(new JSONObject(), response.body);
+            return Result.success(response, fallback);
         }
     }
 
