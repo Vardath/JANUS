@@ -62,6 +62,13 @@ public final class JanusChatResponseRegistry {
     /** Backward-compatible alias retained for the source renderer. */
     public static synchronized JanusChatPresentation consumeForReply(String reply) { return findForReply(reply); }
 
+    /** Clear account-bound presentation metadata during sign-out/account transition. */
+    public static synchronized void clear(Context context) {
+        init(context);
+        RECENT.clear();
+        if (prefs != null) prefs.edit().remove(KEY).apply();
+    }
+
     private static void persist() {
         if (prefs == null) return;
         JSONArray a = new JSONArray(); for (JanusChatPresentation p : RECENT) a.put(p.toJson());
