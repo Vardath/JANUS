@@ -18,21 +18,23 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen; do test -s "$BASE/$f.java"; done
           test ! -e "$BASE/JanusChatV2Surface.java"
           test ! -e "$BASE/JanusChatHistoryBridge.java"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '1.02'" android/app/build.gradle
-          grep -q "versionCode 102" android/app/build.gradle
+          grep -q "versionName '1.03'" android/app/build.gradle
+          grep -q "versionCode 103" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
-      - name: Verify v1.02 structured Chat queue ownership
+      - name: Verify v1.03 structured Chat and extracted screen ownership
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
           MAIN="$BASE/MainActivity.java"
           QUEUE="$BASE/JanusOfflineQueue.java"
+          test -s "$BASE/JanusMessagesScreen.java"
+          test -s "$BASE/JanusObserveScreen.java"
           grep -q 'JanusChatController.send(api, prepared)' "$MAIN"
           ! grep -q 'long\[\] waits' "$MAIN"
           ! grep -q 'formatSources(' "$MAIN"
@@ -89,7 +91,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: direct foreground Chat + structured history and queued presentations + persistent sources/generated images; retired v1 bridges; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: direct foreground Chat + structured history and queued presentations + persistent sources/generated images + extracted Messages/Observe ownership; retired v1 bridges; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
