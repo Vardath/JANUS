@@ -19,17 +19,20 @@ jobs:
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
           for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue; do test -s "$BASE/$f.java"; done
+          test ! -e "$BASE/JanusChatV2Surface.java"
+          test ! -e "$BASE/JanusChatHistoryBridge.java"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '1.01'" android/app/build.gradle
-          grep -q "versionCode 101" android/app/build.gradle
+          grep -q "versionName '1.02'" android/app/build.gradle
+          grep -q "versionCode 102" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
-      - name: Verify v1.01 direct structured Chat ownership
+      - name: Verify v1.02 structured Chat queue ownership
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
           MAIN="$BASE/MainActivity.java"
+          QUEUE="$BASE/JanusOfflineQueue.java"
           grep -q 'JanusChatController.send(api, prepared)' "$MAIN"
           ! grep -q 'long\[\] waits' "$MAIN"
           ! grep -q 'formatSources(' "$MAIN"
@@ -38,12 +41,13 @@ jobs:
           grep -q 'JSONArray a = JanusChatHistoryStore.read(this)' "$MAIN"
           grep -q 'JanusChatResponseRegistry.remember(presentation)' "$MAIN"
           grep -q 'public static synchronized void remember' "$BASE/JanusChatResponseRegistry.java"
-          ! grep -q 'JanusChatV2Surface.install(activity)' "$BASE/JanusApplication.java"
-          ! grep -q 'JanusChatHistoryBridge.capture(activity)' "$BASE/JanusApplication.java"
           grep -q 'chat_history_native_v2' "$BASE/JanusChatHistoryStore.java"
           grep -q 'migrateLegacyOnce' "$BASE/JanusChatHistoryStore.java"
-          grep -q 'JanusChatController.sendOnce(api, body.toString())' "$BASE/JanusOfflineQueue.java"
-          ! grep -q 'HttpURLConnection' "$BASE/JanusOfflineQueue.java"
+          grep -q 'offline_chat_replies_v2' "$QUEUE"
+          grep -q 'presentation.toJson()' "$QUEUE"
+          grep -q 'JanusChatResponseRegistry.capture(context, rawResponse)' "$QUEUE"
+          grep -q 'JanusChatController.sendOnce(api, body.toString())' "$QUEUE"
+          ! grep -q 'HttpURLConnection' "$QUEUE"
           grep -q 'JanusGeneratedImagePolish.install(activity)' "$BASE/JanusApplication.java"
           grep -q 'buildPanel(activity,p.sources)' "$BASE/JanusSourcePolish.java"
           grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
@@ -85,7 +89,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: direct foreground Chat controller + authoritative structured history v2 + persistent sources/generated images + safe areas/accessibility; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: direct foreground Chat + structured history and queued presentations + persistent sources/generated images; retired v1 bridges; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
