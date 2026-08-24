@@ -49,13 +49,13 @@ public final class JanusLanguagePolish {
         card.setPadding(dp(activity, 14), dp(activity, 12), dp(activity, 14), dp(activity, 12));
 
         TextView title = new TextView(activity);
-        title.setText("Language");
+        title.setText(JanusUiTranslations.translate(activity, "Language"));
         title.setTextSize(16);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         card.addView(title, full());
 
         TextView info = new TextView(activity);
-        info.setText("Choose JANUS's conversation/research language and, separately, the language used for speech recognition and text-to-speech. The current native shell keeps English fallback for UI text that has not yet been translated.");
+        info.setText("Choose JANUS's conversation/research language and, separately, the language used for speech recognition and text-to-speech. Untranslated interface text falls back to English.");
         info.setTextSize(12);
         info.setPadding(0, dp(activity, 4), 0, dp(activity, 8));
         card.addView(info, full());
@@ -75,7 +75,7 @@ public final class JanusLanguagePolish {
         card.addView(speech, full());
 
         TextView coverage = new TextView(activity);
-        coverage.setText("Language list is generated from Android's installed locale catalogue, so availability scales with the device rather than a small JANUS-only list. Speech support still depends on the installed recognizer/TTS engine.");
+        coverage.setText("Conversation and speech languages come from Android's locale catalogue. Static JANUS interface translations cover major languages and safely fall back to English elsewhere. Speech support depends on the installed recognizer/TTS engine.");
         coverage.setTextSize(11);
         coverage.setPadding(0, dp(activity, 6), 0, 0);
         card.addView(coverage, full());
@@ -104,10 +104,12 @@ public final class JanusLanguagePolish {
                         updateSpeechLabel(activity, target);
                     } else {
                         JanusLanguageSettings.setLanguageTag(activity, choice.tag);
-                        updateResponseLabel(activity, target);
+                        // Rebuild from canonical English source text before applying the new
+                        // locale. This prevents mixed-language screens after switching twice.
+                        activity.recreate();
                     }
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(JanusUiTranslations.translate(activity, "Cancel"), null)
                 .create();
         dialog.setOnShowListener(x -> dialog.getListView().setFastScrollEnabled(true));
         dialog.show();

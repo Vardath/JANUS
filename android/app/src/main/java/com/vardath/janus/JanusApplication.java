@@ -41,6 +41,7 @@ public class JanusApplication extends Application {
                 JanusNavigationPolish.install(activity);
                 JanusMaintenanceSupervisorPolish.install(activity);
                 JanusVoiceUiPolish.install(activity);
+                JanusUiLocalizationPolish.install(activity);
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
