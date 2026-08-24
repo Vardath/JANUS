@@ -18,50 +18,38 @@ Updated: 2026-08-24
 - v1.02: queued/offline replay retained structured sources/generated-image metadata; obsolete v1 bridge classes retired.
 - v1.03: Messages and read-only Observe gained dedicated native screen owners.
 - v1.04: client-side Copy/Share duplication, full-tree typing lag and stray Observe-guide regression fixed with idempotent/debounced decorators; published APK verified.
-- v1.05: Android system Back now traverses JANUS subpages/top-level pages before exit; persisted device background activity is injected at the hidden authenticated Chat transport boundary; published APK verified.
+- v1.05: Android system Back navigation adapter + hidden device background-activity bridge introduced; published APK verified, but Back still failed on the real Samsung device because predictive-back callback enablement was not explicit.
+- v1.06: natural background-thought questions now surface real persisted local processing; seven persistent Fano directions became active computational attention orientations; published APK verified and Chat behavior validated on-device.
 
-## v1.06 — natural thought queries + active persistent Fano attention
-### Device-observed failure after v1.05
-Natural prompts such as `what have you been thinking about?` and `any thoughts between messages yet` still received the server's generic no-background-thinking response. The bridge itself was working, but its trigger required explicit away/background wording, so these natural forms bypassed the local activity context.
+## v1.07 — system chrome, Back reliability and Runtime Cores stability
+### Device-observed failures after v1.06
+1. The status-bar and navigation-bar inset areas remained white even when JANUS used the dark theme.
+2. Android system Back still exited the Activity instead of following JANUS' internal page/subpage hierarchy.
+3. Opening `Options -> Cores` showed a loading/working state and Android reported an app bug before JANUS closed. The high-risk component on that surface was the dynamically injected custom architecture canvas, which forced software rendering and used shadow/path drawing.
 
-### v1.06 thought-bridge remediation
-- Natural direct questions about what JANUS has been thinking now activate the local activity bridge without requiring the exact phrase `while I was away`.
-- Explicit `between messages`, `between chats`, `since we spoke`, `background`, `while idle`, and similar forms are recognized.
-- Ordinary topical questions such as `what do you think about X?` are intentionally not treated as requests for background history.
-- The bridge states that persisted local cycles are real app-side deterministic JANUS processing with zero model/API calls, while preserving the no-phenomenal-consciousness boundary.
-- Current per-core Fano direction/orientation/salience is included in the hidden device context so the conversational response can accurately explain which computational lenses dominated recent processing.
+### v1.07 implementation
+- Added `JanusSystemChrome`, reusing the existing `theme_mode` and `accent` SharedPreferences rather than creating a second appearance system.
+- Default/slate chrome is dark neutral grey in dark mode and neutral grey in light mode; indigo/teal/amber/violet accents generate intentionally muted system-bar variants.
+- System chrome listens for `theme_mode`/`accent` preference changes and updates live from Settings.
+- Android manifest now explicitly enables `android:enableOnBackInvokedCallback="true"` at application and MainActivity level so the existing JANUS predictive-Back handler is not allowed to fall through silently on supported Android versions.
+- Existing Back semantics remain: detail/subpage -> its explicit `← Options` parent; Messages/Observe/Options -> Chat; Chat -> Activity exit.
+- Replaced the Runtime Cores map renderer with a hardware-safe implementation: no forced software layer, no shadows, simple lines/rounded boxes, dimension guards, and a catch/fallback renderer so a drawing failure cannot take down the Activity.
+- v1.06 thought bridge and active Fano attention remain untouched.
+- Android advances to versionName 1.07 / versionCode 107.
 
-### v1.06 Fano-policy deepening
-The previous runtime persisted eight Fano weights and selected one of seven directions each cycle, but the direction mainly appeared as metadata in the core summary. v1.06 makes it an active attention policy.
-
-Seven directions now map to seven computational orientations:
-1. grounding/support;
-2. structure/causality;
-3. counterexample/falsification;
-4. context/relationships;
-5. continuity/memory;
-6. boundary/risk;
-7. novelty/adjacent possibility.
-
-For every specialist, hemisphere, Consensus and Interface cycle:
-- the persistent Fano state selects an active direction;
-- the direction supplies an explicit attention directive that changes what that core prioritizes in its externalizable processing result;
-- accumulated weights produce a directional salience percentage;
-- the existing 1|3|4 projection remains visible as origin / line / off-line state;
-- the orientation, salience, directive and projection propagate forward with the core output through the existing 7 -> 2 -> 1 -> 1 topology;
-- Observe/status exposes `active_orientation` and `active_salience_percent` for each core;
-- Chat receives these orientations only as bounded hidden device context when background activity is relevant.
-
-Important interpretation boundary: this makes the Fano state computationally consequential inside JANUS, but does not treat the Fano plane or JANUS mathematics as evidence that any external factual claim is true.
-
-## v1.06 release rule
+## v1.07 release rule
 Do not merge until:
-1. v1.06 natural-query and active-Fano regression gate passes;
-2. v1.04 Chat performance regression gate remains green;
-3. navigation, structured Chat, maintenance/auth/protocol checks remain green;
-4. authoritative Java compilation succeeds;
-5. APK assembly succeeds;
-6. after merge, `apk-download` records `Publish JANUS Android native v1.06`.
+1. system-chrome, manifest Back enablement and CoreMap hardening regression gate passes;
+2. v1.06 thought/Fano regression gate remains green;
+3. v1.04 Chat performance regression gate remains green;
+4. maintenance/auth/protocol/UI hardening checks remain green;
+5. authoritative Java compilation succeeds;
+6. APK assembly succeeds;
+7. after merge, verify `apk-download` records `Publish JANUS Android native v1.07`.
 
-## After v1.06
-Real-device validation should ask both `what have you been thinking about?` and `any thoughts between messages yet`, confirm that JANUS summarizes actual persisted local activity instead of denying it, inspect Observe for changing Fano orientations/salience, and confirm Android Back plus v1.04 typing responsiveness remain stable. After that, resume reducing `MainActivity` responsibilities and improve wider-screen/tablet layouts.
+## Required v1.07 real-device validation
+- Dark/default theme: status and Android navigation-bar unused areas should be grey rather than white.
+- Change accent in Settings: system chrome should update to a muted matching colour without requiring a reinstall.
+- On a detail screen such as Activity or Cores, Android Back should return to Options; Back from Options should return to Chat; Back from Chat should exit.
+- Open Runtime Cores repeatedly, background/foreground JANUS, and verify no Android app-bug report or Activity termination occurs.
+- Reconfirm Chat can report actual between-message local processing and that typing remains responsive.
