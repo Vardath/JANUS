@@ -1,0 +1,105 @@
+JANUS V2 LIVE PROVIDER DIAGNOSTIC
+exit=0
+
+{
+  "target": "48ab80ccb752ae200a6ee47b49191d3bc231c7ed",
+  "seen": "48ab80ccb752ae200a6ee47b49191d3bc231c7ed",
+  "ready": true,
+  "register_status": 200,
+  "provider_status": 200,
+  "provider": {
+    "ok": false,
+    "key_present": true,
+    "text_provider": {
+      "ok": false,
+      "error_type": "RateLimitError",
+      "status_code": 429,
+      "code": "credit_balance_exhausted",
+      "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "model": "gpt-5.6-luna"
+    },
+    "image_model": "gpt-image-1",
+    "image_quality": "medium",
+    "note": "This endpoint exposes provider health/error classification only; it never returns credentials."
+  },
+  "chat_status": 200,
+  "chat": {
+    "reply": "JANUS completed the 11-core integration, but the interface model call failed this turn (RateLimitError).",
+    "sources": [],
+    "architecture": "7->2->1->1",
+    "route_trace": [
+      "evidence",
+      "logic",
+      "counterpoint",
+      "context",
+      "memory",
+      "safety",
+      "novelty",
+      "left_hemisphere",
+      "right_hemisphere",
+      "consensus",
+      "interface"
+    ],
+    "web": false,
+    "retrieved": false,
+    "bridge_authority": {
+      "left": {
+        "evidence": 0.72,
+        "logic": 0.72,
+        "counterpoint": 0.68,
+        "safety": 0.5,
+        "memory": 0.35,
+        "context": 0.32,
+        "novelty": 0.3
+      },
+      "right": {
+        "novelty": 0.7,
+        "context": 0.68,
+        "memory": 0.65,
+        "safety": 0.5,
+        "counterpoint": 0.32,
+        "evidence": 0.28,
+        "logic": 0.28
+      }
+    },
+    "model_policy": {
+      "selected_model": "gpt-5.6-luna",
+      "preflight": {
+        "score": 0.012,
+        "uncertainty": 0,
+        "conflict": 0,
+        "salience": 0,
+        "novelty_terms": 2,
+        "evidence": false,
+        "web": false,
+        "memory_count": 0
+      }
+    },
+    "profile": "diag-n6tb3o828",
+    "client_message_id": "provider-diag-1",
+    "attachments": [],
+    "attachment_grounding": false,
+    "research_grounding": false
+  },
+  "observe_status": 200,
+  "observe_cores": [
+    "consensus",
+    "context",
+    "counterpoint",
+    "evidence",
+    "interface",
+    "left_hemisphere",
+    "logic",
+    "memory",
+    "novelty",
+    "right_hemisphere",
+    "safety"
+  ],
+  "runtime_status": 200,
+  "runtime": {
+    "core_count": 11,
+    "phase": "wake",
+    "registered_clients": 0
+  },
+  "cleanup_status": 200
+}
