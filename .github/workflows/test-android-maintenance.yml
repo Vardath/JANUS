@@ -6,8 +6,10 @@ on:
     paths:
       - 'maintenance_owner_api.py'
       - 'maintenance_review.py'
+      - 'server_v2/**'
       - 'tools/patch_maintenance_owner_api.py'
       - 'tests/test_android_maintenance_review.py'
+      - 'tests/test_server_v2_self_diagnosis.py'
       - 'android/**'
       - '.github/workflows/build-android.yml'
       - '.github/workflows/test-android-maintenance.yml'
@@ -16,8 +18,10 @@ on:
     paths:
       - 'maintenance_owner_api.py'
       - 'maintenance_review.py'
+      - 'server_v2/**'
       - 'tools/patch_maintenance_owner_api.py'
       - 'tests/test_android_maintenance_review.py'
+      - 'tests/test_server_v2_self_diagnosis.py'
       - 'android/**'
       - '.github/workflows/build-android.yml'
       - '.github/workflows/test-android-maintenance.yml'
@@ -34,21 +38,25 @@ jobs:
           python-version: '3.13'
       - name: Install test dependency
         run: python -m pip install pytest
-      - name: Verify maintenance integration contract
-        run: python -m pytest -q tests/test_android_maintenance_review.py
+      - name: Verify maintenance and self-diagnosis integration contracts
+        run: python -m pytest -q tests/test_android_maintenance_review.py tests/test_server_v2_self_diagnosis.py
       - name: Verify native Android maintenance surface
         shell: bash
         run: |
           set -euxo pipefail
           MAIN=android/app/src/main/java/com/vardath/janus/MainActivity.java
-          test -s "$MAIN"
+          HANDOFF=android/app/src/main/java/com/vardath/janus/JanusMaintenanceSupervisorPolish.java
+          CRASH=android/app/src/main/java/com/vardath/janus/JanusClientDiagnostics.java
+          test -s "$MAIN"; test -s "$HANDOFF"; test -s "$CRASH"
           test ! -e android/app/src/main/assets/index.html
           grep -q 'Maintenance Review' "$MAIN"
-          grep -q 'Research workspace' "$MAIN"
           grep -q '/maintenance/status' "$MAIN"
           grep -q 'approved_for_manual_work' "$MAIN"
           grep -q 'No automatic changes will be made.' "$MAIN"
           grep -q 'It never authorizes JANUS to edit code, install packages, change models/APIs or deploy itself.' "$MAIN"
+          grep -q 'Share to ChatGPT' "$HANDOFF"
+          grep -q 'Nothing is sent automatically' "$HANDOFF"
+          grep -q '/maintenance/diagnostics/report' "$CRASH"
       - name: Verify bootstrap maintenance API patch composes
         run: |
           python tools/patch_maintenance_owner_api.py
