@@ -9,7 +9,7 @@ def youtube_video_id(text: str) -> str:
     urls = re.findall(r"https?://[^\s]+", value)
     for raw in urls:
         try:
-            u = urlparse(raw.rstrip(".,;)\]"))
+            u = urlparse(raw.rstrip(".,;)]"))
             host = u.netloc.lower().split(":")[0]
             if host in {"youtu.be", "www.youtu.be"}:
                 vid = u.path.strip("/").split("/")[0]
