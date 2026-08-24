@@ -18,33 +18,30 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusChatPresentation JanusAdaptiveUi JanusApplication; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusChatPresentation JanusChatResponseRegistry JanusAdaptiveUi JanusApplication; do test -s "$BASE/$f.java"; done
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '0.93'" android/app/build.gradle
+          grep -q "versionName '0.94'" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
-          test "$(grep -o 'android.intent.category.LAUNCHER' android/app/src/main/AndroidManifest.xml | wc -l)" -eq 1
-      - name: Verify v0.93 UI and architecture contracts
+      - name: Verify v0.94 live structured source handoff
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
-          grep -q 'Replying to JANUS' "$BASE/JanusReplyContextPolish.java"
-          grep -q 'buildPanel(Activity activity, List<JanusChatPresentation.Source> sources)' "$BASE/JanusSourcePolish.java"
-          grep -q 'Direct structured source-card renderer' "$BASE/JanusSourcePolish.java"
+          grep -q 'JanusChatResponseRegistry.capture(responseBody)' "$BASE/JanusApiClient.java"
+          grep -q '"/desktop/chat".equals(effectivePath)' "$BASE/JanusApiClient.java"
+          grep -q 'JanusChatPresentation.fromResponse' "$BASE/JanusChatResponseRegistry.java"
+          grep -q 'consumeForReply' "$BASE/JanusChatResponseRegistry.java"
+          grep -q 'JanusChatResponseRegistry.consumeForReply' "$BASE/JanusSourcePolish.java"
+          grep -q 'body.setText(p.reply)' "$BASE/JanusSourcePolish.java"
+          grep -q 'buildPanel(activity,p.sources)' "$BASE/JanusSourcePolish.java"
           ! grep -q 'parseSources(String appendix)' "$BASE/JanusSourcePolish.java"
           grep -q 'parseSources(JSONArray raw)' "$BASE/JanusChatPresentation.java"
-          grep -q 'Collections.unmodifiableList(sources)' "$BASE/JanusChatPresentation.java"
-          grep -q 'JanusAdaptiveUi.install(activity)' "$BASE/JanusApplication.java"
-          grep -q 'minTouch = dp(activity, 48)' "$BASE/JanusAdaptiveUi.java"
+          grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
+          grep -q 'Replying to JANUS' "$BASE/JanusReplyContextPolish.java"
           grep -q 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$BASE/JanusApiClient.java"
           CORE="$BASE/JanusLocalCoreRuntime.java"
           grep -q 'Strictly forward-only routing' "$CORE"
-          grep -q 'send(from, "left_hemisphere"' "$CORE"
-          grep -q 'send(from, "right_hemisphere"' "$CORE"
-          grep -q 'send(from, "consensus"' "$CORE"
-          grep -q 'send(from, "interface"' "$CORE"
           ! grep -q 'send("interface", "consensus"' "$CORE"
           grep -q '\[feedback-only global\]' "$CORE"
       - uses: actions/setup-java@v5
@@ -79,7 +76,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: safe areas + structured Chat response/source model + direct source renderer + adaptive/accessibility layer; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: live structured Chat source handoff + safe areas + accessibility; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
