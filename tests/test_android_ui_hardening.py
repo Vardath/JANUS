@@ -8,15 +8,15 @@ def test_authoritative_build_is_native_and_patch_free():
     assert 'python tools/compose_android_phase3.py' not in workflow
     assert 'python tools/patch_android_' not in workflow
     assert 'Verify authoritative native Android boundary' in workflow
-    assert 'Verify v1.02 structured Chat queue ownership' in workflow
+    assert 'Verify v1.03 structured Chat and extracted screen ownership' in workflow
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
-def test_android_v102_is_direct_native_product():
+def test_android_v103_is_direct_native_product():
     text = Path('android/app/build.gradle').read_text(encoding='utf-8')
-    assert "versionCode 102" in text
-    assert "versionName '1.02'" in text
-    assert 'structured queued Chat replay' in text
+    assert "versionCode 103" in text
+    assert "versionName '1.03'" in text
+    assert 'extracted native Messages + read-only Observe screen ownership' in text
     main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
     assert 'android.webkit.WebView' not in main
     assert 'JavascriptInterface' not in main
@@ -41,6 +41,20 @@ def test_structured_chat_history_is_authoritative():
     assert 'JanusChatHistoryBridge' not in app
     assert not (BASE / 'JanusChatV2Surface.java').exists()
     assert not (BASE / 'JanusChatHistoryBridge.java').exists()
+
+
+def test_messages_and_observe_have_dedicated_native_owners():
+    messages = BASE / 'JanusMessagesScreen.java'
+    observe = BASE / 'JanusObserveScreen.java'
+    assert messages.exists() and observe.exists()
+    mt = messages.read_text(encoding='utf-8')
+    ot = observe.read_text(encoding='utf-8')
+    assert 'Owns native Messages presentation and message-state actions' in mt
+    assert '/desktop/messages?username=' in mt
+    assert 'Answer in Chat' in mt
+    assert 'Read-only native Observe surface' in ot
+    assert '/desktop/core-observe?username=' in ot
+    assert 'Refresh snapshot' in ot
 
 
 def test_fast_offline_chat_retry_is_complete_and_structured():
