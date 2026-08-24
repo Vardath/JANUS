@@ -30,23 +30,25 @@ jobs:
           API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
           CORE=android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
           POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
+          PRODUCT=android/app/src/main/java/com/vardath/janus/JanusProductPolish.java
           MAP=android/app/src/main/java/com/vardath/janus/JanusCoreMapView.java
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
           GRADLE=android/app/build.gradle
-          test -s "$SRC" && test -s "$API" && test -s "$CORE" && test -s "$POLISH" && test -s "$MAP" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
+          test -s "$SRC" && test -s "$API" && test -s "$CORE" && test -s "$POLISH" && test -s "$PRODUCT" && test -s "$MAP" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' android/app/src/main/java
           grep -q 'class MainActivity extends Activity' "$SRC"
           grep -q "applicationId 'com.vardath.janus'" "$GRADLE"
-          grep -q "versionName '0.85'" "$GRADLE"
+          grep -q "versionName '0.86'" "$GRADLE"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
 
-      - name: Verify safe-area Chat Cores and Observe presentation contract
+      - name: Verify safe-area Chat Cores Observe and product readability contract
         shell: bash
         run: |
           set -euxo pipefail
           POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
+          PRODUCT=android/app/src/main/java/com/vardath/janus/JanusProductPolish.java
           MAP=android/app/src/main/java/com/vardath/janus/JanusCoreMapView.java
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
@@ -55,6 +57,7 @@ jobs:
           grep -q 'WindowInsetsCompat.Type.ime()' "$POLISH"
           grep -q 'Math.max(bars.bottom, ime.bottom)' "$POLISH"
           grep -q 'JanusUiPolish.install(activity)' "$APP"
+          grep -q 'JanusProductPolish.install(activity)' "$APP"
           grep -q 'android:windowSoftInputMode="adjustResize"' "$MAN"
           grep -q 'enhanceChatCard' "$POLISH"
           grep -q 'Copied JANUS response' "$POLISH"
@@ -64,10 +67,6 @@ jobs:
           grep -q 'injectArchitectureMap' "$POLISH"
           grep -q 'JanusCoreMapView' "$POLISH"
           grep -q 'Forward-only routing' "$MAP"
-          grep -q 'Evidence' "$MAP"
-          grep -q 'Left hemisphere' "$MAP"
-          grep -q 'Consensus' "$MAP"
-          grep -q 'Interface' "$MAP"
           grep -q 'Grounding' "$POLISH"
           grep -q 'Alternative / counterfactual' "$POLISH"
           grep -q 'Boundary / uncertainty' "$POLISH"
@@ -75,6 +74,19 @@ jobs:
           grep -q 'ONLINE · GLOBAL JANUS' "$POLISH"
           grep -q 'Stable snapshot' "$POLISH"
           grep -q 'Refresh only when you choose' "$POLISH"
+          grep -q 'JANUS · Cores' "$PRODUCT"
+          grep -q 'Research · Workspace' "$PRODUCT"
+          grep -q 'System · Maintenance' "$PRODUCT"
+          grep -q 'This device · Local continuity' "$PRODUCT"
+          grep -q 'Global JANUS · Durable continuity' "$PRODUCT"
+          grep -q 'Core memory · protected continuity' "$PRODUCT"
+          grep -q 'Active · 30s' "$PRODUCT"
+          grep -q 'Balanced · 1m' "$PRODUCT"
+          grep -q 'Battery saver · 2m' "$PRODUCT"
+          grep -q 'Healthy' "$PRODUCT"
+          grep -q 'Reduced capability' "$PRODUCT"
+          grep -q 'Needs attention' "$PRODUCT"
+          grep -q 'JANUS cannot edit its own source' "$PRODUCT"
 
       - name: Verify complete product surface
         shell: bash
@@ -192,7 +204,7 @@ jobs:
             echo "Version: $VERSION"
             echo "Package: com.vardath.janus"
             echo "Source commit: $GITHUB_SHA"
-            echo "UI: native Android safe areas + Chat + Cores/Observe architecture presentation; no WebView"
+            echo "UI: native Android safe areas + Chat + Cores/Observe + product-surface readability; no WebView"
             echo "Architecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface"
             echo "Signing certificate from stable build keystore:"
             keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1:|SHA256:' || true
