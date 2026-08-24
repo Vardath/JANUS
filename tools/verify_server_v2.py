@@ -37,7 +37,7 @@ from server_v2.mind import mind
 from server_v2.runtime_persistence import runtime_persistence
 
 # Keep verification offline while still exercising the complete 7->2->1->1 route.
-mind._model_reply = lambda account_id, message, consensus, memories, evidence, web_context="": "Verified JANUS interface response."
+mind._model_reply = lambda *args, **kwargs: "Verified JANUS interface response."
 mind.web_research = lambda query, account_id=None, governed=True: ("", [])
 
 from fastapi.testclient import TestClient
@@ -81,6 +81,7 @@ with TestClient(app) as client:
     assert body["route_trace"] == ["evidence","logic","counterpoint","context","memory","safety","novelty","left_hemisphere","right_hemisphere","consensus","interface"]
     assert body["reply"] == "Verified JANUS interface response."
     assert set(body["bridge_authority"].keys()) == {"left","right"}
+    assert body["model_policy"]["selected_model"].startswith("gpt-5.6-")
 
     again = client.post("/desktop/chat", headers=headers, json={"message":"different text", "client_message_id":"verify-1"})
     assert again.status_code == 200 and again.json()["reply"] == body["reply"]
@@ -170,6 +171,7 @@ with TestClient(app) as client:
     r2=client.get("/desktop/runtime-cores?username=owner",headers=h2).json()["runtime"]
     assert r2["registered_clients"] == 0
     assert r2["cores"]["consensus"]["summary"] == ""
+
     # Only the owner account can make maintenance decisions.
     with sqlite3.connect(db_path) as c:
         c.execute("INSERT INTO v2_maintenance(account_id,report_json,review_state,created_at) VALUES(1,'{}','awaiting_owner_review',1700000000)")
@@ -179,4 +181,4 @@ with TestClient(app) as client:
     allowed=client.post(f"/maintenance/reviews/{review_id}/decision",headers=headers,json={"decision":"deferred"})
     assert allowed.status_code == 200
 
-print("JANUS server v2 verification passed: independent code, data migration, private durable 11-core routing, protected identity, calibration, federation, files, continuity, research, artifacts and owner-gated maintenance.")
+print("JANUS server v2 verification passed: independent code, data migration, private durable 11-core routing, protected identity, adaptive calibration, model escalation, federation, files, continuity, research, artifacts and owner-gated maintenance.")
