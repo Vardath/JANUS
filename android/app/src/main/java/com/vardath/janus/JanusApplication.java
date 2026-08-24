@@ -33,6 +33,7 @@ public class JanusApplication extends Application {
                 JanusProductPolish.install(activity);
                 JanusScreenStatePolish.install(activity);
                 JanusFeaturePolish.install(activity);
+                JanusLanguagePolish.install(activity);
                 JanusReplyContextPolish.install(activity);
                 JanusSourcePolish.install(activity);
                 JanusGeneratedImagePolish.install(activity);
