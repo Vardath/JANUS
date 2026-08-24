@@ -32,7 +32,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-/** App-wide native chrome/readability layer for JANUS Android v0.84. */
+/** App-wide native chrome/readability layer for JANUS Android v0.85. */
 public final class JanusUiPolish {
     private static final Set<Activity> INSTALLED = Collections.newSetFromMap(new WeakHashMap<>());
     private JanusUiPolish() {}
@@ -76,6 +76,10 @@ public final class JanusUiPolish {
             LinearLayout layout = (LinearLayout) view;
             styleSurface(activity, layout);
             enhanceChatCard(activity, layout);
+            enhanceRuntimeCard(activity, layout);
+            enhanceObserveCard(activity, layout);
+            injectArchitectureMap(activity, layout);
+            injectObserveGuide(activity, layout);
         }
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
@@ -123,11 +127,41 @@ public final class JanusUiPolish {
 
     private static void styleText(TextView text) {
         CharSequence value = text.getText();
-        if (value != null && value.toString().contains("http")) {
-            text.setAutoLinkMask(Linkify.WEB_URLS);
-            text.setLinksClickable(true);
+        if (value != null) {
+            String s = value.toString();
+            if (s.contains("http")) {
+                text.setAutoLinkMask(Linkify.WEB_URLS);
+                text.setLinksClickable(true);
+            }
+            if (s.startsWith("Fano direction d")) {
+                int d = parseFano(s);
+                if (d >= 0) text.setText(fanoName(d) + " · d" + d + " · processing orientation, not a truth score");
+            }
         }
         text.setLineSpacing(0f, 1.10f);
+    }
+
+    private static int parseFano(String s) {
+        try {
+            int start = s.indexOf('d') + 1;
+            int end = start;
+            while (end < s.length() && Character.isDigit(s.charAt(end))) end++;
+            return Integer.parseInt(s.substring(start, end));
+        } catch (Exception ignored) { return -1; }
+    }
+
+    private static String fanoName(int d) {
+        switch (d) {
+            case 0: return "Neutral / conservative";
+            case 1: return "Grounding";
+            case 2: return "Structure";
+            case 3: return "Synthesis";
+            case 4: return "Alternative / counterfactual";
+            case 5: return "Continuity / memory";
+            case 6: return "Novelty / exploration";
+            case 7: return "Boundary / uncertainty";
+            default: return "Fano orientation";
+        }
     }
 
     private static void styleSurface(Activity activity, LinearLayout layout) {
@@ -174,6 +208,82 @@ public final class JanusUiPolish {
             layout.setAlpha(.88f);
             ((TextView) layout.getChildAt(0)).setText("Delivery status");
         }
+    }
+
+    private static void enhanceRuntimeCard(Activity activity, LinearLayout layout) {
+        if (layout.getChildCount() == 0 || !(layout.getChildAt(0) instanceof TextView)) return;
+        TextView title = (TextView) layout.getChildAt(0);
+        String label = String.valueOf(title.getText());
+        if (label.startsWith("THIS DEVICE · LOCAL JANUS")) {
+            title.setText("● THIS DEVICE · LOCAL JANUS");
+            title.setTextColor(accent(activity));
+            outline(layout, activity, accent(activity), 105);
+        } else if (label.startsWith("ONLINE · GLOBAL JANUS")) {
+            title.setText("◆ ONLINE · GLOBAL JANUS");
+            title.setTextColor(textColor(activity));
+            outline(layout, activity, mutedColor(activity), 70);
+        }
+    }
+
+    private static void enhanceObserveCard(Activity activity, LinearLayout layout) {
+        if (layout.getChildCount() < 3) return;
+        View metaView = layout.getChildAt(2);
+        if (!(metaView instanceof TextView)) return;
+        TextView meta = (TextView) metaView;
+        String s = String.valueOf(meta.getText());
+        if (s.contains(" · This device") && !s.contains("LOCAL ·")) {
+            meta.setText("LOCAL · " + s.replace(" · This device", ""));
+            meta.setTextColor(accent(activity));
+            outline(layout, activity, accent(activity), 80);
+        } else if ((s.contains("Global JANUS") || s.contains("global")) && !s.contains("GLOBAL ·")) {
+            meta.setText("GLOBAL · " + s.replace(" · Global JANUS", ""));
+            meta.setTextColor(mutedColor(activity));
+            outline(layout, activity, mutedColor(activity), 55);
+        }
+    }
+
+    private static void injectArchitectureMap(Activity activity, LinearLayout layout) {
+        if ("janus-core-map-host".equals(layout.getTag())) return;
+        int titleIndex = directTextIndex(layout, "Runtime Cores");
+        if (titleIndex < 0) return;
+        layout.setTag("janus-core-map-host");
+        LinearLayout panel = new LinearLayout(activity);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(activity,10),dp(activity,6),dp(activity,10),dp(activity,8));
+        TextView hint = new TextView(activity);
+        hint.setText("Architecture map · local and global JANUS share the same permitted forward topology");
+        hint.setTextColor(mutedColor(activity)); hint.setTextSize(12); hint.setPadding(dp(activity,4),0,dp(activity,4),dp(activity,4));
+        panel.addView(hint, new LinearLayout.LayoutParams(-1,-2));
+        JanusCoreMapView map = new JanusCoreMapView(activity);
+        panel.addView(map, new LinearLayout.LayoutParams(-1, dp(activity,350)));
+        int insertAt = Math.min(titleIndex + 1, layout.getChildCount());
+        layout.addView(panel, insertAt, new LinearLayout.LayoutParams(-1,-2));
+    }
+
+    private static void injectObserveGuide(Activity activity, LinearLayout layout) {
+        if ("janus-observe-guide-host".equals(layout.getTag())) return;
+        int titleIndex = directTextIndex(layout, "Observe");
+        if (titleIndex < 0) return;
+        layout.setTag("janus-observe-guide-host");
+        TextView guide = new TextView(activity);
+        guide.setText("Stable snapshot · LOCAL and GLOBAL activity stay visually distinct · Refresh only when you choose");
+        guide.setTextColor(mutedColor(activity)); guide.setTextSize(12);
+        guide.setPadding(dp(activity,6),dp(activity,2),dp(activity,6),dp(activity,5));
+        layout.addView(guide, Math.min(titleIndex + 2, layout.getChildCount()), new LinearLayout.LayoutParams(-1,-2));
+    }
+
+    private static int directTextIndex(LinearLayout layout, String value) {
+        for (int i=0;i<layout.getChildCount();i++) {
+            View child = layout.getChildAt(i);
+            if (child instanceof TextView && value.equals(String.valueOf(((TextView) child).getText()))) return i;
+        }
+        return -1;
+    }
+
+    private static void outline(LinearLayout layout, Activity activity, int color, int alpha) {
+        GradientDrawable d = rounded(activity, elevatedSurface(activity), 18);
+        d.setStroke(dp(activity,1), withAlpha(color,alpha));
+        layout.setBackground(d); layout.setElevation(dp(activity,1));
     }
 
     private static Button compactButton(Activity activity, String label) {
