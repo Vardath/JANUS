@@ -23,6 +23,7 @@ from .desktop import router as desktop_router  # noqa: E402
 from .identity_api import router as identity_router  # noqa: E402
 from .images import router as image_router  # noqa: E402
 from .maintenance import router as maintenance_router  # noqa: E402
+from .protocol import router as protocol_router  # noqa: E402
 from .sync_contract import router as sync_router  # noqa: E402
 
 # Route ownership is explicit. Provisional routes in app.py are removed and each
@@ -32,6 +33,7 @@ _FINAL_REPLACEMENTS = {
     ("/desktop/runtime-cores","GET"), ("/desktop/cores","GET"), ("/desktop/memory","GET"),
     ("/desktop/activity","GET"), ("/desktop/core-observe","GET"), ("/desktop/observe","GET"),
     ("/desktop/home","GET"), ("/desktop/settings","GET"),
+    ("/protocol/capabilities","GET"),
     ("/images/generate","POST"), ("/images/usage","GET"),
     ("/maintenance/status","GET"), ("/maintenance/reviews/{review_id}/decision","POST"),
 }
@@ -42,6 +44,7 @@ app.router.routes[:] = [
 app.include_router(chat_router)
 app.include_router(sync_router)
 app.include_router(desktop_router)
+app.include_router(protocol_router)
 app.include_router(image_router)
 app.include_router(maintenance_router)
 app.include_router(identity_router)
