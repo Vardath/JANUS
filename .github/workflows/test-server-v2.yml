@@ -7,6 +7,9 @@ on:
       - 'server_v2/**'
       - 'tools/verify_server_v2.py'
       - 'tests/test_sensory_capability_wiring.py'
+      - 'tests/test_audio_attachment_sense.py'
+      - 'android/app/src/main/AndroidManifest.xml'
+      - 'android/app/src/main/java/com/vardath/janus/MainActivity.java'
       - '.github/workflows/test-server-v2.yml'
       - 'requirements.txt'
   pull_request:
@@ -15,6 +18,9 @@ on:
       - 'server_v2/**'
       - 'tools/verify_server_v2.py'
       - 'tests/test_sensory_capability_wiring.py'
+      - 'tests/test_audio_attachment_sense.py'
+      - 'android/app/src/main/AndroidManifest.xml'
+      - 'android/app/src/main/java/com/vardath/janus/MainActivity.java'
       - '.github/workflows/test-server-v2.yml'
       - 'requirements.txt'
   workflow_dispatch:
@@ -31,10 +37,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
-      - name: Compile clean server
-        run: python -m py_compile server_v2/*.py tools/verify_server_v2.py tests/test_sensory_capability_wiring.py
-      - name: Verify typed capability sensory wiring
-        run: python -m pytest -q tests/test_sensory_capability_wiring.py
+      - name: Compile clean server and sensory regressions
+        run: python -m py_compile server_v2/*.py tools/verify_server_v2.py tests/test_sensory_capability_wiring.py tests/test_audio_attachment_sense.py
+      - name: Verify typed capability and audio sensory wiring
+        run: python -m pytest -q tests/test_sensory_capability_wiring.py tests/test_audio_attachment_sense.py
       - name: Verify clean server end to end
         run: python tools/verify_server_v2.py
       - name: Prove v2 orchestration does not import legacy server modules
