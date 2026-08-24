@@ -3,7 +3,7 @@ package com.vardath.janus;
 import org.json.JSONObject;
 
 /**
- * Chat transport/controller boundary.
+ * Shared Chat transport/controller boundary.
  * Owns retry timing, structured response parsing, presentation capture and failure classification.
  */
 public final class JanusChatController {
@@ -20,6 +20,15 @@ public final class JanusChatController {
             response = api.postRaw("/desktop/chat", preparedBody, true);
             if (response.ok() || !response.retryable()) break;
         }
+        return parse(response);
+    }
+
+    /** One network attempt for WorkManager/offline queue delivery; the worker schedule owns later retries. */
+    public static Result sendOnce(JanusApiClient api, String preparedBody) {
+        return parse(api.postRaw("/desktop/chat", preparedBody, true));
+    }
+
+    private static Result parse(JanusApiClient.Response response) {
         if (response == null) response = new JanusApiClient.Response(0, "", "No response");
         if (!response.ok()) return Result.failure(response);
         try {
