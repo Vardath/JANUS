@@ -1,0 +1,8 @@
+{
+  "seed_key": "maintenance-isolation-and-supervisor-continuity-v1",
+  "capability": "maintenance_governance",
+  "title": "Isolate JANUS maintenance requests from source-code access",
+  "severity": "normal",
+  "detail": "Improve the maintenance architecture so JANUS can persist and submit diagnostic/maintenance requests through its own narrowly validated storage channel without receiving credentials that permit arbitrary access to or modification of its base source code. Prefer a restricted maintenance API and, if needed for a strong GitHub permission boundary, a separate private maintenance repository. The owner remains the authorization bridge. Each Supervisor maintenance pass must finish by updating the private repository with the latest relevant interactions, approvals/disapprovals/deferred items, actions taken, audit/test results, implementation/version results, unresolved requests, and the current stopping state so future repo reviews can reconstruct continuity.",
+  "evidence": "Owner maintenance-design discussion after v1.08 deployment. This is an architecture/governance request, not evidence of a current exploit or source-access incident."
+}
