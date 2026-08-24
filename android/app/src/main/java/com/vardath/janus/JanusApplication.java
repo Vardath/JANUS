@@ -18,6 +18,7 @@ public class JanusApplication extends Application {
             getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE).edit().clear().commit();
             boot.edit().putBoolean(CLEAN_MARKER, true).commit();
         }
+        JanusChatResponseRegistry.init(this);
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private void install(Activity activity) {
