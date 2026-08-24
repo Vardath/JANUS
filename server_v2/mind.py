@@ -9,7 +9,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import governance, identity, storage
+from . import governance, identity, model_policy, storage
 
 SPECIALISTS = ("evidence", "logic", "counterpoint", "context", "memory", "safety", "novelty")
 HEMISPHERES = ("left_hemisphere", "right_hemisphere")
@@ -135,7 +135,7 @@ class JanusMind:
         elif name == "counterpoint":
             summary = "Counterpoint focus: test alternative explanations, likely failure modes and assumptions before accepting the first interpretation."
         elif name == "context":
-            summary = "Context focus: interpret the request in the active conversation/project context without inventing missing facts."
+            summary = "Context focus: interpret the request in active conversation/project context without inventing missing facts."
         elif name == "memory":
             summary = "Memory focus: relevant durable context: " + (" | ".join(mem) if mem else "no strong stored match this turn")
         elif name == "safety":
@@ -164,7 +164,7 @@ class JanusMind:
             "intent":_clip(message,1200),
         }
 
-    def _model_reply(self, account_id: int, message: str, consensus: dict[str, Any], memories: list[dict[str, Any]], evidence: str, web_context: str = "") -> str:
+    def _model_reply(self, account_id: int, message: str, consensus: dict[str, Any], memories: list[dict[str, Any]], evidence: str, web_context: str, selected_model: str) -> str:
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         if not api_key:
             return "JANUS's server mind completed the 7 → 2 → 1 → 1 integration, but the external language model is not configured on the server."
@@ -173,7 +173,6 @@ class JanusMind:
         try:
             from openai import OpenAI
             client = OpenAI(api_key=api_key)
-            model = os.getenv("JANUS_MODEL", "gpt-5.6").strip() or "gpt-5.6"
             memory_text = "\n".join(f"- {m.get('content','')[:700]}" for m in memories[:8])
             prompt = (
                 identity.prompt_fragment(account_id) + "\n\n"
@@ -184,7 +183,7 @@ class JanusMind:
                 f"ATTACHMENT/EXTERNAL EVIDENCE:\n{evidence or '(none)'}\n\n"
                 f"LIVE RESEARCH CONTEXT:\n{web_context or '(none)'}"
             )
-            result = client.responses.create(model=model,input=prompt)
+            result = client.responses.create(model=selected_model,input=prompt)
             text = getattr(result,"output_text","") or ""
             return text.strip() or "JANUS completed integration but produced no interface text."
         except Exception as exc:
@@ -199,7 +198,7 @@ class JanusMind:
         try:
             from openai import OpenAI
             client = OpenAI(api_key=api_key)
-            model = os.getenv("JANUS_CORE_FOREGROUND_MODEL",os.getenv("JANUS_MODEL","gpt-5.6"))
+            model = os.getenv("JANUS_CORE_FOREGROUND_MODEL",os.getenv("JANUS_MODEL_LUNA","gpt-5.6-luna"))
             result = client.responses.create(
                 model=model,
                 tools=[{"type":"web_search_preview"}],
@@ -236,7 +235,10 @@ class JanusMind:
         self._record_core(account_id,"right_hemisphere","integration",right["summary"],"foreground")
         consensus = self._consensus(left,right,message)
         self._record_core(account_id,"consensus","consensus",consensus["summary"],"foreground")
-        reply = self._model_reply(account_id,message,consensus,memories,evidence,web_text)
+        preflight = model_policy.escalation_score(message,evidence=bool(evidence),web=bool(web_text),memory_count=len(memories))
+        selected_model = model_policy.choose_model(float(preflight["score"]))
+        storage.add_event(account_id,"consensus","model_escalation",f"Model tier selected {selected_model}; escalation score {preflight['score']}",f"Model tier {selected_model}; escalation {preflight['score']}","foreground")
+        reply = self._model_reply(account_id,message,consensus,memories,evidence,web_text,selected_model)
         self._record_core(account_id,"interface","response",_clip(reply,2000),"foreground")
         storage.add_memory(account_id,f"User: {message}\nJANUS: {reply}","working","conversation",0.55)
         consistent = "failed this turn" not in reply.lower() and "budget has been reached" not in reply.lower()
@@ -246,6 +248,7 @@ class JanusMind:
         return {
             "reply":reply,"sources":sources,"architecture":"7->2->1->1","route_trace":list(CORE_NAMES),
             "web":bool(web_text),"retrieved":bool(web_text),"bridge_authority":{"left":left["weights"],"right":right["weights"]},
+            "model_policy":{"selected_model":selected_model,"preflight":preflight},
         }
 
     def _record_core(self, account_id: int, core: str, event_type: str, public_summary: str, mode: str):
