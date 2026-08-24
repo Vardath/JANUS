@@ -23,10 +23,12 @@ def capabilities():
             "image_generation":True,"medium_quality_images":True,"rare_explanatory_images":True,"background_multi_core_image_generation":False,
             "background_cognition":True,"proactive_messages":True,"cost_governor":True,"adaptive_bridge_authority":True,"core_reliability_calibration":True,
             "luna_terra_sol_escalation":True,"maintenance":True,"quarterly_maintenance":True,"owner_gated_maintenance":True,"maintenance_email_notice":True,
+            "self_diagnosis":True,"capability_request_ledger":True,"complete_chat_handoff_from_v108":True,"chatgpt_supervisor_handoff":True,"supervisor_decision_sync":True,
         },
         "invariants":{
             "specialists":7,"hemispheres":2,"consensus":1,"interface":1,
             "bridge_authority_min":0.2,"bridge_authority_max":0.8,
             "background_core_model_calls":0,"identity_overwrite_by_chat":False,"sync_overwrites_peer_state":False,
+            "janus_can_self_modify":False,"janus_can_self_approve_maintenance":False,"janus_can_self_deploy":False,"automatic_chatgpt_injection":False,
         },
     }
