@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-      - name: Verify RC1 upgrade, identity, retry, voice and signing invariants
+      - name: Verify RC1 upgrade, identity, retry, privacy, voice and signing invariants
         shell: bash
         run: |
           set -euxo pipefail
@@ -31,7 +31,7 @@ jobs:
           test -s "$ACCOUNT"
           grep -q 'JanusAccountIsolation.beforeSaveSession' "$API"
           grep -q 'JanusAccountIsolation.clearForSignOut' "$API"
-          grep -q '"/auth/me".equals(effectivePath).*isTransient' "$API" || grep -q 'offline_cached' "$API"
+          grep -q 'offline_cached' "$API"
           grep -q 'stopAndDetachLocalRuntime' "$ACCOUNT"
           grep -q 'shutdownNow' "$ACCOUNT"
           grep -q 'prefs.edit().clear().commit()' "$ACCOUNT"
@@ -44,10 +44,14 @@ jobs:
           grep -q 'c.disconnect()' "$MSG"
           grep -q 'code == 408 || code == 425 || code == 429 || code >= 500' "$MSG"
 
+          grep -q 'android:allowBackup="false"' "$MANIFEST"
+          grep -q 'android:fullBackupContent="false"' "$MANIFEST"
+          grep -q 'android:usesCleartextTraffic="false"' "$MANIFEST"
           grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST"
           ! grep -q 'android.permission.CAMERA' "$MANIFEST"
           grep -q 'createOnDeviceSpeechRecognizer' "$VOICE"
           grep -q 'startPushToTalk' "$VOICE_UI"
+          grep -q 'originalDraft' "$VOICE_UI"
           ! grep -R -q 'MediaRecorder\|AudioRecord' "$BASE"
 
           grep -q 'JANUS_RELEASE_STORE_FILE' "$GRADLE"
