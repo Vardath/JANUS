@@ -1,5 +1,6 @@
 package com.vardath.janus;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
@@ -51,18 +52,24 @@ final class JanusSensePolicy {
 
         JSONObject toJson() {
             bounded();
-            return new JSONObject()
-                    .put("confidence", confidence)
-                    .put("valence", valence)
-                    .put("salience", salience)
-                    .put("uncertainty", uncertainty)
-                    .put("novelty", novelty)
-                    .put("urgency", urgency)
-                    .put("familiarity", familiarity)
-                    .put("risk", risk)
-                    .put("opportunity", opportunity)
-                    .put("conflict", conflict)
-                    .put("action_posture", actionPosture());
+            JSONObject out = new JSONObject();
+            try {
+                out.put("confidence", confidence);
+                out.put("valence", valence);
+                out.put("salience", salience);
+                out.put("uncertainty", uncertainty);
+                out.put("novelty", novelty);
+                out.put("urgency", urgency);
+                out.put("familiarity", familiarity);
+                out.put("risk", risk);
+                out.put("opportunity", opportunity);
+                out.put("conflict", conflict);
+                out.put("action_posture", actionPosture());
+            } catch (JSONException ignored) {
+                // Primitive bounded values are JSON-safe; retain a partial object if a
+                // platform implementation nevertheless rejects a field.
+            }
+            return out;
         }
     }
 
