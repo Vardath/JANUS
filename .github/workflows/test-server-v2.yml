@@ -1,0 +1,32 @@
+name: Test clean JANUS server v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server_v2/**'
+      - 'tools/verify_server_v2.py'
+      - '.github/workflows/test-server-v2.yml'
+      - 'requirements.txt'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile clean server
+        run: python -m py_compile server_v2/*.py tools/verify_server_v2.py
+      - name: Verify clean server end to end
+        run: python tools/verify_server_v2.py
+      - name: Prove v2 orchestration does not import legacy server modules
+        run: |
+          ! grep -R "^from \(bootstrap\|janus_dashboard\|dashboard_api\|interface_chat\|secure_desktop\|attachment_chat\|image_response_compat\|src\.janus_sleep_cycle\)" server_v2
+          ! grep -R "^import \(bootstrap\|janus_dashboard\|dashboard_api\|interface_chat\|secure_desktop\|attachment_chat\|image_response_compat\)" server_v2
