@@ -16,8 +16,8 @@ os.environ["JANUS_FILE_ROOT"] = str(file_root)
 os.environ["JANUS_EMAIL_MODE"] = "development"
 os.environ.pop("OPENAI_API_KEY", None)
 
-# Build a tiny legacy-data fixture. The new code may read persisted records but
-# must not import or execute legacy server modules.
+# Tiny persistence fixture. The reconstructed server may copy durable records but
+# never imports or executes the old application implementation.
 salt = secrets.token_bytes(16)
 iterations = 600_000
 password = "TestPassword12345"
@@ -29,11 +29,12 @@ with sqlite3.connect(db_path) as c:
     c.execute("CREATE TABLE desktop_memory(id INTEGER PRIMARY KEY,profile_id TEXT,role TEXT,content TEXT,level TEXT,created_at TEXT)")
     c.execute("INSERT INTO desktop_memory VALUES(1,'owner','user','Preserve JANUS 7 -> 2 -> 1 -> 1 continuity.','core','2026-08-20T00:00:00+00:00')")
     c.execute("CREATE TABLE desktop_events(id INTEGER PRIMARY KEY,profile_id TEXT,event_type TEXT,detail TEXT,created_at TEXT)")
-    c.execute("INSERT INTO desktop_events VALUES(1,'owner','checkpoint','Legacy persistence fixture','2026-08-20T00:00:00+00:00')")
+    c.execute("INSERT INTO desktop_events VALUES(1,'owner','checkpoint','Persistence fixture','2026-08-20T00:00:00+00:00')")
 
 entry = importlib.import_module("server_v2.entrypoint")
 app = entry.app
 from server_v2.mind import mind
+from server_v2.runtime_persistence import runtime_persistence
 
 # Keep verification offline while still exercising the complete 7->2->1->1 route.
 mind._model_reply = lambda account_id, message, consensus, memories, evidence, web_context="": "Verified JANUS interface response."
@@ -52,8 +53,6 @@ with TestClient(app) as client:
     for key in ("chat", "messages", "observe", "memory", "local_global_sync", "attachments", "visual_analysis", "foreground_web", "research_workspace", "artifacts", "image_generation", "maintenance"):
         assert caps.json()["features"].get(key) is True, key
 
-    # Legacy account data has been copied into the new schema. The first successful
-    # login upgrades the password hash without running legacy authentication code.
     login = client.post("/auth/login", json={"identifier":"owner", "password":password})
     assert login.status_code == 200, login.text
     token = login.json()["access_token"]
@@ -74,10 +73,7 @@ with TestClient(app) as client:
     assert any("7 -> 2 -> 1 -> 1" in x["content"] for x in memory.json()["items"])
 
     chat = client.post("/desktop/chat", headers=headers, json={
-        "profile_id":"forged",
-        "username":"forged",
-        "message":"Explain the active architecture.",
-        "client_message_id":"verify-1",
+        "profile_id":"forged", "username":"forged", "message":"Explain the active architecture.", "client_message_id":"verify-1",
     })
     assert chat.status_code == 200, chat.text
     body = chat.json()
@@ -86,7 +82,6 @@ with TestClient(app) as client:
     assert body["reply"] == "Verified JANUS interface response."
     assert set(body["bridge_authority"].keys()) == {"left","right"}
 
-    # Idempotent receipt.
     again = client.post("/desktop/chat", headers=headers, json={"message":"different text", "client_message_id":"verify-1"})
     assert again.status_code == 200 and again.json()["reply"] == body["reply"]
 
@@ -141,14 +136,47 @@ with TestClient(app) as client:
 
     artifact = client.post("/artifacts", headers=headers, json={"kind":"continuity_report"})
     assert artifact.status_code == 200, artifact.text
-    aid = artifact.json()["artifact"]["id"]
-    info = client.get(f"/artifacts/{aid}", headers=headers)
+    artifact_id = artifact.json()["artifact"]["id"]
+    info = client.get(f"/artifacts/{artifact_id}", headers=headers)
     assert info.status_code == 200 and info.json()["artifact"]["available"] is True
 
     observe = client.get("/desktop/core-observe?username=forged&limit=200", headers=headers)
-    assert observe.status_code == 200
-    assert observe.json()["profile"] == "owner"
+    assert observe.status_code == 200 and observe.json()["profile"] == "owner"
     names = {x["core_name"] for x in observe.json()["items"]}
     assert set(("evidence","logic","counterpoint","context","memory","safety","novelty","left_hemisphere","right_hemisphere","consensus","interface")).issubset(names)
 
-print("JANUS server v2 verification passed: clean auth, migration, protected identity, 11-core routing, calibration, sync, files, continuity, research and artifacts.")
+    # Private 11-core runtime checkpoint survives a process-memory reset.
+    checkpoint_before = mind.status(1)["cores"]["consensus"]["summary"]
+    assert checkpoint_before
+    assert runtime_persistence.checkpoint_account(1) == 11
+    mind._profiles.pop(1, None)
+    assert mind.status(1)["cores"]["consensus"]["summary"] == ""
+    restored = runtime_persistence.restore_all()
+    assert restored["profiles"] >= 1 and restored["cores"] >= 11
+    assert mind.status(1)["cores"]["consensus"]["summary"] == checkpoint_before
+
+    # A second account cannot select, read, download or observe the owner's state.
+    second = client.post("/auth/register", json={"username":"second-user","email":"second@example.com","password":"AnotherPassword12345"})
+    assert second.status_code == 200, second.text
+    h2={"Authorization":"Bearer "+second.json()["access_token"]}
+    m2=client.get("/desktop/memory?username=owner",headers=h2)
+    assert m2.status_code == 200 and m2.json()["profile"] == "second-user"
+    assert not any("Preserve JANUS" in x["content"] for x in m2.json()["items"])
+    o2=client.get("/desktop/core-observe?username=owner&limit=200",headers=h2)
+    assert o2.status_code == 200 and o2.json()["profile"] == "second-user"
+    assert all("local specialist summary" not in x["detail"] for x in o2.json()["items"])
+    forbidden=client.get(f"/files/{fid}/download",headers=h2)
+    assert forbidden.status_code == 404
+    r2=client.get("/desktop/runtime-cores?username=owner",headers=h2).json()["runtime"]
+    assert r2["registered_clients"] == 0
+    assert r2["cores"]["consensus"]["summary"] == ""
+    # Only the owner account can make maintenance decisions.
+    with sqlite3.connect(db_path) as c:
+        c.execute("INSERT INTO v2_maintenance(account_id,report_json,review_state,created_at) VALUES(1,'{}','awaiting_owner_review',1700000000)")
+    review_id=client.get("/maintenance/status",headers=headers).json()["reviews"][0]["id"]
+    denied=client.post(f"/maintenance/reviews/{review_id}/decision",headers=h2,json={"decision":"deferred"})
+    assert denied.status_code == 403
+    allowed=client.post(f"/maintenance/reviews/{review_id}/decision",headers=headers,json={"decision":"deferred"})
+    assert allowed.status_code == 200
+
+print("JANUS server v2 verification passed: independent code, data migration, private durable 11-core routing, protected identity, calibration, federation, files, continuity, research, artifacts and owner-gated maintenance.")
