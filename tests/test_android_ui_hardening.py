@@ -8,7 +8,7 @@ def test_authoritative_build_is_native_and_patch_free():
     assert 'python tools/compose_android_phase3.py' not in workflow
     assert 'python tools/patch_android_' not in workflow
     assert 'Verify authoritative native Android boundary' in workflow
-    assert 'Verify v1.02 structured queued Chat + direct foreground ownership' in workflow
+    assert 'Verify v1.02 structured Chat queue ownership' in workflow
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
