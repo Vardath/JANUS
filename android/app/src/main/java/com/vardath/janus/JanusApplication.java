@@ -13,6 +13,7 @@ public class JanusApplication extends Application {
 
     @Override public void onCreate() {
         super.onCreate();
+        JanusClientDiagnostics.install(this);
         SharedPreferences boot = getSharedPreferences(BOOT_PREFS, Context.MODE_PRIVATE);
         if (!boot.getBoolean(CLEAN_MARKER, false)) {
             getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE).edit().clear().commit();
@@ -33,10 +34,15 @@ public class JanusApplication extends Application {
                 JanusGeneratedImagePolish.install(activity);
                 JanusAdaptiveUi.install(activity);
                 JanusNavigationPolish.install(activity);
+                JanusMaintenanceSupervisorPolish.install(activity);
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
-            @Override public void onActivityResumed(Activity activity) { install(activity); JanusSystemChrome.apply(activity); }
+            @Override public void onActivityResumed(Activity activity) {
+                install(activity);
+                JanusSystemChrome.apply(activity);
+                JanusClientDiagnostics.flushPending(activity);
+            }
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}

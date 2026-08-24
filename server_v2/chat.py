@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 
-from . import auth, governance, images, media, storage, visual_memory
+from . import auth, diagnostics, governance, images, media, storage, visual_memory
 from .mind import mind
 
 router = APIRouter()
@@ -80,28 +80,39 @@ def _youtube_research(account_id: int, message: str) -> tuple[str,list[dict[str,
 def chat(payload: dict[str,Any], authorization: Optional[str]=Header(default=None)):
     account=auth.require_account(authorization); aid=int(account["id"])
     message=str(payload.get("message") or payload.get("text") or "").strip()
+    visible_message=str(payload.get("user_visible_message") or message).strip()
     ids=[str(x) for x in (payload.get("attachment_ids") or []) if str(x).strip()][:4]
     if not message and not ids: raise HTTPException(400,"message required")
     client_id=str(payload.get("client_message_id") or "")[:128]
     if client_id:
         receipt=storage.one("SELECT response_json FROM v2_chat_receipts WHERE account_id=? AND client_message_id=?",(aid,client_id))
         if receipt: return json.loads(receipt["response_json"])
-    evidence,files=_evidence(aid,ids,message)
-    youtube,sources=_youtube_research(aid,message)
+    evidence,files=_evidence(aid,ids,visible_message)
+    youtube,sources=_youtube_research(aid,visible_message)
     combined="\n\n---\n\n".join(x for x in (evidence,youtube) if x)[:30000]
     mind_message=("Use the supplied transcript/evidence to answer the user's request: "+message) if youtube else (message or "Please assess the attached material.")
     result=mind.process(aid,mind_message,combined)
     if result.get("web"):
         storage.execute(
             "INSERT INTO v2_research(account_id,mode,query,result,sources_json,useful,created_at) VALUES(?,?,?,?,?,?,?)",
-            (aid,"foreground",message,str(result.get("reply") or "")[:20000],storage.jdump(result.get("sources") or []),None,storage.now()),
+            (aid,"foreground",visible_message,str(result.get("reply") or "")[:20000],storage.jdump(result.get("sources") or []),None,storage.now()),
         )
     if sources and not result.get("sources"): result["sources"]=sources
-    generated=images.maybe_explanatory_image(aid,message,str(result.get("reply") or ""))
+    generated=images.maybe_explanatory_image(aid,visible_message,str(result.get("reply") or ""))
     if generated:
         result["generated_image"]=generated
         result["image"]=generated
     result.update({"profile":account["username"],"client_message_id":client_id,"attachments":files,"attachment_grounding":bool(evidence),"research_grounding":bool(youtube or result.get("web"))})
+
+    # Externalizable self-diagnosis: preserve the visible user turn, inspect only the
+    # returned/interface result and explicit capability-request metadata. This is not
+    # private chain-of-thought and never authorizes JANUS to modify itself.
+    diagnostics.record_chat_turn(aid, visible_message, str(result.get("reply") or ""), client_id)
+    findings = diagnostics.inspect_chat(aid, visible_message, result)
+    if findings:
+        result["diagnostic_requests_recorded"] = [int(x.get("id") or 0) for x in findings]
+        result["supervisor_review_queued"] = True
+
     if client_id:
         storage.execute("INSERT OR REPLACE INTO v2_chat_receipts(account_id,client_message_id,response_json,created_at) VALUES(?,?,?,?)",(aid,client_id,json.dumps(result,ensure_ascii=False),storage.now()))
     return result

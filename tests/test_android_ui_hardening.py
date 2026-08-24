@@ -8,18 +8,35 @@ def test_authoritative_build_is_native_and_patch_free():
     assert 'python tools/compose_android_phase3.py' not in workflow
     assert 'python tools/patch_android_' not in workflow
     assert 'Verify authoritative native Android boundary' in workflow
-    assert 'Verify v1.07 system chrome, Back and Runtime Cores hardening' in workflow
+    assert 'Verify v1.08 governed self-diagnosis and Supervisor handoff' in workflow
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
-def test_android_v107_is_direct_native_product():
+def test_android_v108_is_direct_native_product():
     text = Path('android/app/build.gradle').read_text(encoding='utf-8')
-    assert "versionCode 107" in text
-    assert "versionName '1.07'" in text
-    assert 'system-bar theming, predictive Back reliability and Runtime Cores crash hardening' in text
+    assert "versionCode 108" in text
+    assert "versionName '1.08'" in text
+    assert 'governed self-diagnosis, capability-request ledger and ChatGPT Supervisor handoff' in text
     main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
     assert 'android.webkit.WebView' not in main
     assert 'JavascriptInterface' not in main
+
+
+def test_governed_supervisor_handoff_and_client_crash_replay_are_present():
+    app = (BASE / 'JanusApplication.java').read_text(encoding='utf-8')
+    api = (BASE / 'JanusApiClient.java').read_text(encoding='utf-8')
+    crash = (BASE / 'JanusClientDiagnostics.java').read_text(encoding='utf-8')
+    handoff = (BASE / 'JanusMaintenanceSupervisorPolish.java').read_text(encoding='utf-8')
+    assert 'JanusClientDiagnostics.install(this)' in app
+    assert 'JanusClientDiagnostics.flushPending(activity)' in app
+    assert 'JanusMaintenanceSupervisorPolish.install(activity)' in app
+    assert 'j.put("user_visible_message", message)' in api
+    assert 'Thread.UncaughtExceptionHandler' in crash
+    assert '/maintenance/diagnostics/report' in crash
+    assert 'Copy handoff' in handoff
+    assert 'Share to ChatGPT' in handoff
+    assert '/maintenance/supervisor-handoff' in handoff
+    assert 'Nothing is sent automatically' in handoff
 
 
 def test_navigation_system_chrome_and_core_map_are_hardened():
