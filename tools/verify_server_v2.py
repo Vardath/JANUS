@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import hmac
 import importlib
 import os
 import secrets
@@ -37,8 +36,8 @@ app = entry.app
 from server_v2.mind import mind
 
 # Keep verification offline while still exercising the complete 7->2->1->1 route.
-mind._model_reply = lambda message, consensus, memories, evidence, web_context="": "Verified JANUS interface response."
-mind.web_research = lambda query: ("", [])
+mind._model_reply = lambda account_id, message, consensus, memories, evidence, web_context="": "Verified JANUS interface response."
+mind.web_research = lambda query, account_id=None, governed=True: ("", [])
 
 from fastapi.testclient import TestClient
 
@@ -63,6 +62,12 @@ with TestClient(app) as client:
     me = client.get("/auth/me", headers=headers)
     assert me.status_code == 200 and me.json()["account"]["username"] == "owner"
 
+    identity = client.get("/desktop/identity-core", headers=headers)
+    assert identity.status_code == 200, identity.text
+    assert identity.json()["protected"] is True
+    assert identity.json()["ordinary_conversation_can_overwrite"] is False
+    assert "7 specialists" in identity.json()["identity_core"]["architecture"]
+
     memory = client.get("/desktop/memory?username=forged", headers=headers)
     assert memory.status_code == 200
     assert memory.json()["profile"] == "owner"
@@ -79,6 +84,7 @@ with TestClient(app) as client:
     assert body["profile"] == "owner"
     assert body["route_trace"] == ["evidence","logic","counterpoint","context","memory","safety","novelty","left_hemisphere","right_hemisphere","consensus","interface"]
     assert body["reply"] == "Verified JANUS interface response."
+    assert set(body["bridge_authority"].keys()) == {"left","right"}
 
     # Idempotent receipt.
     again = client.post("/desktop/chat", headers=headers, json={"message":"different text", "client_message_id":"verify-1"})
@@ -86,15 +92,24 @@ with TestClient(app) as client:
 
     sync = client.post("/core-sync/exchange", headers=headers, json={
         "device_id":"verify-device", "client_version":"v0.82", "phase":"wake",
+        "consensus":"local consensus", "interface":"local interface",
         "observe_events":[{"detail":"local specialist summary"}],
     })
-    assert sync.status_code == 200
+    assert sync.status_code == 200, sync.text
     assert sync.json()["guidance"]["sync_policy"] == "selective-no-overwrite"
+    assert sync.json()["server"]["architecture"] == "7->2->1->1"
+    assert "consensus" in sync.json()["server"] and "interface" in sync.json()["server"]
 
     runtime = client.get("/desktop/runtime-cores?username=forged", headers=headers)
     assert runtime.status_code == 200
     rt = runtime.json()["runtime"]
     assert rt["core_count"] == 11 and rt["registered_clients"] == 1
+    assert len(rt["core_reliability"]) == 11
+    assert rt["bridge_authority"]
+
+    reliability = client.get("/reliability/status", headers=headers)
+    assert reliability.status_code == 200
+    assert reliability.json()["authority_bounds"] == [0.2, 0.8]
 
     import base64
     upload = client.post("/files/upload", headers=headers, json={
@@ -108,10 +123,21 @@ with TestClient(app) as client:
     })
     assert grounded.status_code == 200 and grounded.json()["attachment_grounding"] is True
 
+    continuity = client.post("/desktop/continuity", headers=headers, json={"title":"Verify federated runtime", "detail":"Keep local/global sync selective", "priority":90})
+    assert continuity.status_code == 200, continuity.text
+    cid = continuity.json()["item"]["id"]
+    moved = client.post(f"/desktop/continuity/{cid}/state", headers=headers, json={"state":"active", "note":"verification"})
+    assert moved.status_code == 200 and moved.json()["item"]["state"] == "active"
+
     seed = client.post("/research/workspace/seed", headers=headers)
     assert seed.status_code == 200
     ws = client.get("/research/workspace", headers=headers)
     assert ws.status_code == 200 and ws.json()["count"] >= 3
+    claim = client.post("/claims", headers=headers, json={"title":"Test claim", "statement":"Clean v2 route exists"})
+    assert claim.status_code == 200
+    claim_id = claim.json()["claim"]["id"]
+    ev = client.post(f"/claims/{claim_id}/evidence", headers=headers, json={"summary":"Verified by integration test"})
+    assert ev.status_code == 200
 
     artifact = client.post("/artifacts", headers=headers, json={"kind":"continuity_report"})
     assert artifact.status_code == 200, artifact.text
@@ -125,4 +151,4 @@ with TestClient(app) as client:
     names = {x["core_name"] for x in observe.json()["items"]}
     assert set(("evidence","logic","counterpoint","context","memory","safety","novelty","left_hemisphere","right_hemisphere","consensus","interface")).issubset(names)
 
-print("JANUS server v2 verification passed: clean auth, persistence migration, 11-core routing, sync, files, research and artifacts.")
+print("JANUS server v2 verification passed: clean auth, migration, protected identity, 11-core routing, calibration, sync, files, continuity, research and artifacts.")
