@@ -8,21 +8,19 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.view.View;
 
-/** Hardware-safe architecture map for JANUS' forward-only 7 -> 2 -> 1 -> 1 runtime. */
+/** Hardware-safe architecture map for JANUS' forward-only 1-3-7 / 7 -> 2 -> 1 -> 1 runtime. */
 public final class JanusCoreMapView extends View {
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF box = new RectF();
-    private static final String[] SPECIALISTS = {"Evidence","Logic","Counter","Context","Memory","Safety","Novelty"};
+    private static final String[] SPECIALISTS = {"1 Evidence","2 Safety","3 Counter","4 Context","5 Logic","6 Novelty","7 Memory"};
 
     public JanusCoreMapView(Context context) {
         super(context);
         setMinimumHeight(dp(350));
-        setContentDescription("JANUS architecture: seven specialists feed two hemispheres, then Consensus, then Interface. Forward-only routing.");
+        setContentDescription("JANUS 1-3-7 architecture: seven subconscious Fano cores all feed both logic and imagination hemispheres, then Front appraisal, then Interface. Forward-only routing.");
         setPadding(dp(10), dp(10), dp(10), dp(10));
-        // Do not force software rendering here. Some Android GPU/driver combinations were unstable
-        // with the previous shadow/path implementation when this view was injected dynamically.
     }
 
     @Override protected void onDraw(Canvas canvas) {
@@ -41,13 +39,13 @@ public final class JanusCoreMapView extends View {
         int surface = dark ? Color.rgb(43,44,47) : Color.rgb(246,247,249);
         int accent = accent();
 
-        text.setTextAlign(Paint.Align.CENTER); text.setTextSize(sp(10.5f)); text.setColor(fg);
+        text.setTextAlign(Paint.Align.CENTER); text.setTextSize(sp(10.0f)); text.setColor(fg);
         fill.setStyle(Paint.Style.FILL);
         stroke.setStyle(Paint.Style.STROKE); stroke.setStrokeWidth(dp(1.2f)); stroke.setColor(muted);
 
         float left = getPaddingLeft();
         float top = getPaddingTop();
-        float nodeW = Math.max(dp(58), Math.min(dp(92), (w - dp(18)) / 4f));
+        float nodeW = Math.max(dp(62), Math.min(dp(96), (w - dp(18)) / 4f));
         float nodeH = dp(38); float gap = dp(6);
         float[][] centers = new float[7][2];
         for (int i=0;i<7;i++) {
@@ -63,26 +61,25 @@ public final class JanusCoreMapView extends View {
         }
 
         float leftH = left+w*.28f, rightH = left+w*.72f;
-        float hemiY = top+dp(142), consensusY=top+dp(225), interfaceY=top+dp(292);
+        float hemiY = top+dp(142), frontY=top+dp(225), interfaceY=top+dp(292);
         for (int i=0;i<7;i++) {
-            float target = i <= 2 ? leftH : rightH;
-            if (i==5) { line(c,centers[i][0],centers[i][1]+nodeH/2f,leftH,hemiY-dp(22)); line(c,centers[i][0],centers[i][1]+nodeH/2f,rightH,hemiY-dp(22)); }
-            else line(c,centers[i][0],centers[i][1]+nodeH/2f,target,hemiY-dp(22));
+            line(c,centers[i][0],centers[i][1]+nodeH/2f,leftH,hemiY-dp(22));
+            line(c,centers[i][0],centers[i][1]+nodeH/2f,rightH,hemiY-dp(22));
         }
-        roundedCentered(c,leftH,hemiY,Math.min(dp(130),w*.38f),dp(44),surface,dp(12));
-        roundedCentered(c,rightH,hemiY,Math.min(dp(130),w*.38f),dp(44),surface,dp(12));
-        c.drawText("Left hemisphere",leftH,hemiY+dp(4),text); c.drawText("Right hemisphere",rightH,hemiY+dp(4),text);
-        line(c,leftH,hemiY+dp(22),left+w*.5f,consensusY-dp(22)); line(c,rightH,hemiY+dp(22),left+w*.5f,consensusY-dp(22));
-        roundedCentered(c,left+w*.5f,consensusY,Math.min(dp(170),w*.56f),dp(44),accent,dp(13));
-        Paint inverse = new Paint(text); inverse.setColor(Color.WHITE); c.drawText("Consensus",left+w*.5f,consensusY+dp(4),inverse);
-        line(c,left+w*.5f,consensusY+dp(22),left+w*.5f,interfaceY-dp(21));
-        roundedCentered(c,left+w*.5f,interfaceY,Math.min(dp(170),w*.56f),dp(42),surface,dp(13));
-        c.drawText("Interface",left+w*.5f,interfaceY+dp(4),text);
+        roundedCentered(c,leftH,hemiY,Math.min(dp(132),w*.39f),dp(44),surface,dp(12));
+        roundedCentered(c,rightH,hemiY,Math.min(dp(132),w*.39f),dp(44),surface,dp(12));
+        c.drawText("Left · logic",leftH,hemiY+dp(4),text); c.drawText("Right · imagination",rightH,hemiY+dp(4),text);
+        line(c,leftH,hemiY+dp(22),left+w*.5f,frontY-dp(22)); line(c,rightH,hemiY+dp(22),left+w*.5f,frontY-dp(22));
+        roundedCentered(c,left+w*.5f,frontY,Math.min(dp(180),w*.58f),dp(44),accent,dp(13));
+        Paint inverse = new Paint(text); inverse.setColor(Color.WHITE); c.drawText("Front · appraisal / intent",left+w*.5f,frontY+dp(4),inverse);
+        line(c,left+w*.5f,frontY+dp(22),left+w*.5f,interfaceY-dp(21));
+        roundedCentered(c,left+w*.5f,interfaceY,Math.min(dp(180),w*.58f),dp(42),surface,dp(13));
+        c.drawText("Interface · expression / action",left+w*.5f,interfaceY+dp(4),text);
     }
 
     private void drawFallback(Canvas c) {
-        text.setColor(isDark()?Color.LTGRAY:Color.DKGRAY); text.setTextAlign(Paint.Align.CENTER); text.setTextSize(sp(12));
-        c.drawText("7 specialists  →  2 hemispheres  →  Consensus  →  Interface", getWidth()/2f, Math.max(dp(32),getHeight()/2f), text);
+        text.setColor(isDark()?Color.LTGRAY:Color.DKGRAY); text.setTextAlign(Paint.Align.CENTER); text.setTextSize(sp(11.5f));
+        c.drawText("7 Fano senses → Left/Right → Front → Interface", getWidth()/2f, Math.max(dp(32),getHeight()/2f), text);
     }
     private void line(Canvas c,float x1,float y1,float x2,float y2){c.drawLine(x1,y1,x2,y2,stroke);}
     private void rounded(Canvas c,float x,float y,float w,float h,int color,float radius){fill.setColor(color);box.set(x,y,x+w,y+h);c.drawRoundRect(box,radius,radius,fill);c.drawRoundRect(box,radius,radius,stroke);}
