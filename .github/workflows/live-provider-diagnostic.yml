@@ -1,0 +1,89 @@
+name: Diagnose live JANUS v2 provider
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/live-provider-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install requests
+      - name: Wait for diagnostic-enabled v2 and test it
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY' > /tmp/provider.log 2>&1
+          import json, random, string, time, requests
+          BASE='https://janus-global-core.onrender.com'
+          target='48ab80ccb752ae200a6ee47b49191d3bc231c7ed'
+          def g(path,**kw): return requests.get(BASE+path,timeout=90,**kw)
+          def p(path,**kw): return requests.post(BASE+path,timeout=180,**kw)
+          ready=False; seen=''
+          for _ in range(60):
+              try:
+                  r=g('/protocol/capabilities')
+                  if r.status_code==200:
+                      seen=str(r.json().get('deployed_commit') or '')
+                      if seen==target: ready=True; break
+              except Exception: pass
+              time.sleep(10)
+          result={'target':target,'seen':seen,'ready':ready}
+          if not ready:
+              print(json.dumps(result,indent=2)); raise SystemExit(1)
+          suffix=''.join(random.choice(string.ascii_lowercase+string.digits) for _ in range(9))
+          u='diag-'+suffix; pw='JANUS-Diag-'+suffix+'-A9z7'; email=u+'@example.invalid'
+          reg=p('/auth/register',json={'username':u,'email':email,'password':pw})
+          result['register_status']=reg.status_code
+          if reg.status_code!=200:
+              result['register_body']=reg.text[:800]; print(json.dumps(result,indent=2)); raise SystemExit(1)
+          headers={'Authorization':'Bearer '+reg.json()['access_token']}
+          try:
+              provider=g('/diagnostics/provider-status',headers=headers)
+              result['provider_status']=provider.status_code
+              result['provider']=provider.json() if provider.headers.get('content-type','').startswith('application/json') else provider.text[:1200]
+              chat=p('/desktop/chat',headers=headers,json={'message':'hello JANUS','client_message_id':'provider-diag-1'})
+              result['chat_status']=chat.status_code
+              result['chat']=chat.json() if chat.headers.get('content-type','').startswith('application/json') else chat.text[:1200]
+              obs=g('/desktop/core-observe?limit=250',headers=headers)
+              result['observe_status']=obs.status_code
+              if obs.status_code==200:
+                  result['observe_cores']=sorted({x.get('core_name') for x in obs.json().get('items',[]) if x.get('core_name')})
+              runtime=g('/desktop/runtime-cores',headers=headers)
+              result['runtime_status']=runtime.status_code
+              if runtime.status_code==200:
+                  rt=runtime.json().get('runtime',{})
+                  result['runtime']={'core_count':rt.get('core_count'),'phase':rt.get('phase'),'registered_clients':rt.get('registered_clients')}
+          finally:
+              for _ in range(5):
+                  try:
+                      d=requests.delete(BASE+'/auth/account',headers=headers,json={'confirmation':'DELETE','current_password':pw},timeout=90)
+                      result['cleanup_status']=d.status_code
+                      if d.status_code==200: break
+                  except Exception as e: result['cleanup_error']=repr(e)
+                  time.sleep(5)
+          print(json.dumps(result,indent=2))
+          structural=(result.get('provider_status')==200 and result.get('chat_status')==200 and result.get('observe_status')==200 and result.get('runtime_status')==200 and result.get('cleanup_status')==200)
+          raise SystemExit(0 if structural else 1)
+          PY
+          STATUS=$?
+          mkdir -p docs
+          { echo "JANUS V2 LIVE PROVIDER DIAGNOSTIC"; echo "exit=${STATUS}"; echo; cat /tmp/provider.log; } > docs/SERVER_V2_PROVIDER_DIAGNOSTIC.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/SERVER_V2_PROVIDER_DIAGNOSTIC.txt
+          git commit -m "Record live JANUS v2 provider diagnostic" || true
+          git push || true
+          exit "$STATUS"
