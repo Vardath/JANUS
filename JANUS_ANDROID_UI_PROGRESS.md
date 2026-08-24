@@ -3,55 +3,37 @@
 Updated: 2026-08-24
 
 ## Authoritative baseline
-
-- Android product: native `android/` client only; no WebView/generated HTML/patch-composer product path.
+- Native `android/` client only; no WebView/generated HTML/patch-composer product path.
 - Production server: `server_v2/`.
-- Runtime topology remains 7 specialists -> 2 hemispheres -> Consensus -> Interface.
+- Runtime topology: 7 specialists -> 2 hemispheres -> Consensus -> Interface.
 - Preserve forward-only routing, feedback-only federation, stable Observe snapshots, zero-API deterministic local cycles, authenticated account ownership, and owner-gated maintenance.
 
-## v0.83 — safe areas and native chrome
-Implemented and published: system/status/navigation/IME insets, theme-aware system bars, rounded native controls, app-wide dynamic-screen polish.
+## Verified published passes
+- v0.83: Android status/navigation/IME safe areas and native chrome.
+- v0.84: Chat readability, selectable responses, Copy/Share/Report, delivery and attachment/image polish.
+- v0.85: Cores/Observe 7->2->1->1 presentation, Local/Global distinction, readable Fano modes, stable snapshots.
+- v0.86: Options/Memory/Research/System/Settings/Maintenance product readability.
+- v0.87: Messages/Auth usability and authenticated route hygiene.
+- v0.88: screen-state extraction and loading/empty/failure presentation.
+- v0.89: Memory filtering/search, Research evidence presentation, Account session/security presentation.
+- v0.90: Messages Reply-in-Chat context card with context retained in outgoing payload.
+- v0.91: tappable Chat source cards and consolidated less-brittle Android CI gate.
+- v0.92: immutable `JanusChatPresentation` model plus adaptive/accessibility layer and 48dp touch targets.
+- v0.93: source-card renderer accepts structured `JanusChatPresentation.Source` records directly rather than parsing a text appendix.
 
-## v0.84 — Chat readability/actions
-Implemented and published: selectable responses, Copy/Share/Report, delivery-status cards, improved attachment/image treatment, tappable links and long-response spacing.
-
-## v0.85 — Cores and Observe architecture presentation
-Implemented and published: native 7 -> 2 -> 1 -> 1 architecture map, Local/Global distinction, human-readable Fano orientations, stable non-auto-jumping Observe snapshots.
-
-## v0.86 — product-surface readability
-Implemented and published: clearer Options hub, Memory tiers, Research headings, semantic System Status, background cadence labels, owner-gated Maintenance explanation.
-
-## v0.87 — Messages/Auth usability + authenticated route hygiene
-Implemented and published: centralized account-owned path policy, bearer-token ownership hygiene, clearer Messages categories, Reply in Chat / Mark read wording, cleaner auth/account continuity and common loading/error copy.
-
-## v0.88 — screen-state and high-level presentation extraction
-Implemented and published: `JanusScreenStatePolish` extracted consistent loading, empty, failure, inbox and account/session state presentation from `MainActivity`; CI assertion corrected and matching APK published.
-
-## v0.89 — Memory / Research / Account feature extraction
-Implemented and published: visible-memory search and tier filters, clearer Research evidence/category presentation, and clearer Account session/security actions.
-
-## v0.90 — Messages reply-context extraction
-Implemented and published:
-- `JanusReplyContextPolish` converts the legacy visible quoted composer prefix into a separate native `Replying to JANUS` context card;
-- the composer shows only the user's new text while typing;
-- hidden quoted context is restored immediately before Send so the existing chat transport retains the same context;
-- temporary reply context clears after send;
-- no server/cognition/federation contract changed.
-
-## v0.91 — Chat source-card presentation
+## v0.94 — live structured Chat source handoff
 Implemented on integration branch; release verification pending:
-- new `JanusSourcePolish` extracts the current source appendix from rendered JANUS answers into a dedicated `Sources · N` panel;
-- source title and domain are presented separately from the answer body;
-- source rows with URLs are tappable and open through Android `ACTION_VIEW`;
-- answer text no longer displays the raw appended `Sources:` block;
-- source rendering is isolated from network/cognition logic and preserves the existing server response contract;
-- this is a compatibility presentation bridge: MainActivity still flattens the structured server source array before render, and a later transport refactor can pass the raw source objects directly;
-- the Android workflow is consolidated to reduce brittle historical literal-string checks while retaining native-boundary, safe-inset, reply-context, source-card, route-hygiene, 11-core architecture, Java compile, APK assemble and publication checks.
+- `JanusApiClient` captures successful `/desktop/chat` response JSON at the HTTP boundary before `MainActivity` flattens any source metadata;
+- new bounded `JanusChatResponseRegistry` converts that response immediately into `JanusChatPresentation` and retains only a small in-process recent queue;
+- `JanusSourcePolish` matches a rendered JANUS reply to its captured structured presentation, replaces the visible body with the clean reply, and builds source cards from the original structured source records;
+- source title/domain/URL therefore come from server JSON rather than reparsing the rendered `Sources:` appendix;
+- legacy `formatSources()` remains inside `MainActivity` only as a compatibility/persistence fallback while the monolithic Activity is progressively extracted; it is no longer the data source used by the v0.94 source-card renderer;
+- no server, cognition, federation, auth ownership or 11-core routing contract changed;
+- CI requires API-boundary capture, registry handoff, structured source rendering, safe insets, reply context, route hygiene, forward-only core routing, Java compilation and APK assembly.
 
 ## Next intended passes
+1. Extract the Chat network/send controller from `MainActivity` so the legacy `formatSources()` compatibility append can be removed entirely rather than merely bypassed for presentation.
+2. Move saved Chat history to a structured record that can retain source metadata and generated-image metadata across app restarts.
+3. Continue separating Messages/Observe/Research surfaces and improve larger-screen layouts once the live Chat controller is independent.
 
-1. Move raw source metadata and reply context into explicit Chat presentation models so the renderer no longer needs compatibility parsing.
-2. Continue extracting endpoint/feature responsibilities from `MainActivity` into dedicated native surfaces/controllers.
-3. Improve wider-screen/tablet responsiveness and remaining accessibility/details after the core product surfaces are separated.
-
-Release rule: do not mark an Android pass fully released until the `apk-download` branch publishes the matching version after CI compilation and APK assembly.
+Release rule: do not mark a pass fully released until `apk-download` publishes the matching version after CI compilation and APK assembly.
