@@ -6,8 +6,8 @@ services:
     region: singapore
     branch: main
     autoDeployTrigger: commit
-    buildCommand: python tools/rebuild_server.py && pip install -r requirements.txt
-    startCommand: uvicorn janus_app:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server_v2.entrypoint:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     disk:
       name: janus-data
@@ -21,17 +21,27 @@ services:
       - key: JANUS_ACCESS_TOKEN
         generateValue: true
       - key: JANUS_MODEL
-        value: gpt-5.6
-      - key: JANUS_CORE_MODEL_CONSULT
-        value: "1"
+        value: gpt-5.6-sol
+      - key: JANUS_MODEL_LUNA
+        value: gpt-5.6-luna
+      - key: JANUS_MODEL_TERRA
+        value: gpt-5.6-terra
+      - key: JANUS_MODEL_SOL
+        value: gpt-5.6-sol
+      - key: JANUS_TERRA_ESCALATION_THRESHOLD
+        value: "0.42"
+      - key: JANUS_SOL_ESCALATION_THRESHOLD
+        value: "0.72"
       - key: JANUS_FOREGROUND_WEB
         value: "1"
       - key: JANUS_CORE_FOREGROUND_MODEL
-        value: gpt-5.6
+        value: gpt-5.6-luna
       - key: JANUS_BACKGROUND_MODEL
-        value: gpt-5.6
+        value: gpt-5.6-luna
       - key: JANUS_DB_PATH
         value: /data/janus.sqlite3
+      - key: JANUS_FILE_ROOT
+        value: /data/janus_files_v2
       - key: JANUS_CORE_CHECKPOINT_SECONDS
         value: "30"
       - key: JANUS_GOOGLE_CLIENT_ID
@@ -50,14 +60,6 @@ services:
         value: development
       - key: JANUS_SMTP_TLS
         value: "1"
-      - key: JANUS_AUTH_TOKEN_CLEANUP_DAYS
-        value: "7"
-      - key: JANUS_CHAT_RECEIPT_RETENTION_DAYS
-        value: "7"
-      - key: JANUS_RUNTIME_SNAPSHOT_RETENTION_DAYS
-        value: "30"
-      - key: JANUS_DELETION_REQUEST_RETENTION_DAYS
-        value: "90"
       - key: JANUS_INTERVAL_MINUTES
         value: "15"
       - key: JANUS_DORMANCY_PERCENT
@@ -66,24 +68,18 @@ services:
         value: "300"
       - key: JANUS_SLEEP_SECONDS
         value: "600"
-      - key: JANUS_THOUGHT_COUNT
-        value: "1"
+      - key: JANUS_V2_BACKGROUND_TICK_SECONDS
+        value: "300"
       - key: JANUS_MEMORY_PROCESSING
         value: "1"
-      - key: JANUS_SELF_EVALUATION
-        value: "0"
       - key: JANUS_EXTERNAL_ACCESS
         value: "1"
-      - key: JANUS_SUPERVISOR_CONSULTATION
-        value: "0"
       - key: JANUS_MESSAGE_QUEUE
-        value: "1"
-      - key: JANUS_THOUGHT_HISTORY
         value: "1"
       - key: JANUS_COMPUTE_BUDGET
         value: balanced
-      - key: JANUS_PAID_BACKGROUND_REFLECTION
-        value: "0"
+      - key: JANUS_FOREGROUND_DAILY_CALL_CAP
+        value: "500"
       - key: JANUS_BACKGROUND_DAILY_CALL_CAP
         value: "12"
       - key: JANUS_BACKGROUND_DAILY_TOKEN_CAP
@@ -100,8 +96,16 @@ services:
         value: "1"
       - key: JANUS_CURIOSITY_MIN_GAP_SECONDS
         value: "7200"
-      - key: JANUS_CURIOSITY_MODEL
-        value: gpt-5.6
+      - key: JANUS_IMAGE_MODEL
+        value: gpt-image-1
+      - key: JANUS_IMAGE_QUALITY
+        value: medium
+      - key: JANUS_IMAGE_DAILY_CAP
+        value: "20"
+      - key: JANUS_AUTO_EXPLANATORY_IMAGES
+        value: "1"
+      - key: JANUS_AUTO_IMAGE_DAILY_CAP
+        value: "2"
       - key: JANUS_ALLOW_LEGACY_BRIDGE_AUTH
         value: "0"
       - key: JANUS_AUTH_DEV_TOKENS
