@@ -24,6 +24,7 @@ public class JanusApplication extends Application {
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private void install(Activity activity) {
                 JanusUiPolish.install(activity);
+                JanusSystemChrome.install(activity);
                 JanusProductPolish.install(activity);
                 JanusScreenStatePolish.install(activity);
                 JanusFeaturePolish.install(activity);
@@ -35,7 +36,7 @@ public class JanusApplication extends Application {
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
-            @Override public void onActivityResumed(Activity activity) { install(activity); }
+            @Override public void onActivityResumed(Activity activity) { install(activity); JanusSystemChrome.apply(activity); }
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
