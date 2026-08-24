@@ -37,10 +37,12 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn('(\"/health\",\"GET\")', entrypoint)
         self.assertIn("architecture_router", entrypoint)
 
-    def test_render_rebuilds_base_server_before_boot(self):
+    def test_render_uses_clean_server_v2_entrypoint(self):
         text = (ROOT / "render.yaml").read_text(encoding="utf-8")
-        self.assertIn("python tools/rebuild_server.py", text)
-        self.assertIn("uvicorn janus_app:app", text)
+        self.assertIn("uvicorn server_v2.entrypoint:app", text)
+        self.assertIn("server_v2/**", text)
+        self.assertNotIn("python tools/rebuild_server.py", text)
+        self.assertNotIn("uvicorn janus_app:app", text)
 
     def test_docker_rebuilds_base_server_before_boot(self):
         text = (ROOT / "Dockerfile").read_text(encoding="utf-8")
@@ -48,7 +50,7 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn("uvicorn janus_app:app", text)
         self.assertNotIn("patch_url_media_ingestion.py", text)
 
-    def test_server_fragments_exist(self):
+    def test_server_fragments_exist_for_legacy_docker_compatibility(self):
         parts = sorted((ROOT / "src").glob("server.py.gz.b64.*"))
         self.assertGreaterEqual(len(parts), 1)
 
