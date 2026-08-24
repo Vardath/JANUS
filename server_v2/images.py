@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 
-from . import auth, governance, storage
+from . import auth, governance, sensory_bus, storage
 
 router = APIRouter()
 
@@ -29,6 +29,17 @@ def _generate(account_id: int, prompt: str, *, automatic: bool = False) -> dict[
         raise HTTPException(502, f"Image generation failed: {type(exc).__name__}")
     file = storage.save_file(account_id, "janus-generated.png", "image/png", raw)
     storage.add_event(account_id,"interface","automatic_visual" if automatic else "image_generated",f"Generated image {file['id']}",f"Generated image {file['id']}","foreground")
+    sensory_bus.ingest(
+        account_id,
+        "image",
+        "generated_visual",
+        f"JANUS generated an image artifact for this prompt: {prompt[:2200]}",
+        salience=0.7 if automatic else 0.82,
+        uncertainty=0.35,
+        novelty=0.72,
+        metadata={"file_id": file["id"], "automatic": automatic, "mime_type": "image/png"},
+        mode="foreground",
+    )
     return {**file,"inline_path":f"/images/{file['id']}/inline","automatic":automatic,"quality":os.getenv("JANUS_IMAGE_QUALITY","medium")}
 
 
