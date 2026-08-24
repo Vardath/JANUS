@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusFanoPolicy JanusSensePolicy JanusUiPolish JanusSystemChrome JanusCoreMapView JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge JanusClientDiagnostics JanusMaintenanceSupervisorPolish; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusLocalTypedSense JanusFanoPolicy JanusSensePolicy JanusUiPolish JanusSystemChrome JanusCoreMapView JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge JanusClientDiagnostics JanusMaintenanceSupervisorPolish; do test -s "$BASE/$f.java"; done
           test ! -e "$BASE/JanusChatV2Surface.java"
           test ! -e "$BASE/JanusChatHistoryBridge.java"
           test ! -e "$BASE/JanusThoughtContextPolish.java"
@@ -83,7 +83,7 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          THOUGHT="$BASE/JanusThoughtBridge.java"; FANO="$BASE/JanusFanoPolicy.java"; SENSE="$BASE/JanusSensePolicy.java"; CORE="$BASE/JanusLocalCoreRuntime.java"; API="$BASE/JanusApiClient.java"
+          THOUGHT="$BASE/JanusThoughtBridge.java"; FANO="$BASE/JanusFanoPolicy.java"; SENSE="$BASE/JanusSensePolicy.java"; CORE="$BASE/JanusLocalCoreRuntime.java"; API="$BASE/JanusApiClient.java"; ADAPTER="$BASE/JanusLocalTypedSense.java"
           grep -q 'between messages' "$THOUGHT"
           grep -q '\[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT\]' "$THOUGHT"
           grep -q 'Current Fano attention orientations' "$THOUGHT"
@@ -91,6 +91,19 @@ jobs:
           grep -q 'truth/grounding' "$FANO"; grep -q 'valence/welfare' "$FANO"; grep -q 'significance/conflict' "$FANO"; grep -q 'pattern/context' "$FANO"; grep -q 'understanding/model' "$FANO"; grep -q 'possibility/imagination' "$FANO"; grep -q 'continuity/experience' "$FANO"
           grep -q 'actionPosture' "$SENSE"; grep -q 'confidence' "$SENSE"; grep -q 'valence' "$SENSE"; grep -q 'risk' "$SENSE"; grep -q 'opportunity' "$SENSE"
           grep -q 'JanusFanoPolicy.directive(direction)' "$CORE"; grep -q 'active_orientation' "$CORE"; grep -q 'active_salience_percent' "$CORE"
+          grep -q 'getDeclaredMethod' "$ADAPTER"
+          grep -q 'broadcastSense' "$ADAPTER"
+          grep -q 'serviceBurst' "$ADAPTER"
+          grep -q '"persist"' "$ADAPTER"
+          grep -q 'Fail closed' "$ADAPTER"
+          grep -q 'path.startsWith("/auth/")' "$API"
+          grep -q 'path.startsWith("/maintenance/")' "$API"
+          grep -q 'JanusLocalTypedSense.ingest(appContext, "file"' "$API"
+          grep -q 'JanusLocalTypedSense.ingest(appContext, "image"' "$API"
+          grep -q 'JanusLocalTypedSense.ingest(appContext, "web"' "$API"
+          grep -q 'JanusLocalTypedSense.ingest(appContext, "action_result"' "$API"
+          grep -q 'Raw file bytes/base64, session tokens, passwords and authentication payloads' "$API"
+          ! grep -q 'JanusLocalTypedSense.ingest(appContext, "text"' "$API"
       - name: Verify v1.04 Chat decoration performance regression remains fixed
         shell: bash
         run: |

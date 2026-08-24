@@ -3,6 +3,7 @@ package com.vardath.janus;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -84,12 +85,78 @@ public final class JanusApiClient {
             int code = c.getResponseCode();
             InputStream in = code >= 200 && code < 400 ? c.getInputStream() : c.getErrorStream();
             String responseBody = read(in);
+            if (code >= 200 && code < 300 && auth) senseCapability(method, effectivePath, body, responseBody);
             if (captureChat && code >= 200 && code < 300 && "POST".equals(method) && "/desktop/chat".equals(effectivePath)) {
                 JanusChatResponseRegistry.capture(responseBody);
             }
             return new Response(code, responseBody, null);
         } catch (Exception e) { return new Response(0, "", e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage())); }
         finally { if (c != null) c.disconnect(); }
+    }
+
+    /**
+     * Convert successful, non-auth capability results into bounded local typed senses.
+     * Raw file bytes/base64, session tokens, passwords and authentication payloads are
+     * never forwarded into the local sensory runtime.
+     */
+    private void senseCapability(String method, String path, String requestBody, String responseBody) {
+        if (path == null || path.startsWith("/auth/") || path.startsWith("/maintenance/") || "/core-sync/exchange".equals(path)) return;
+        try {
+            if ("POST".equals(method) && "/files/upload".equals(path)) {
+                JSONObject req = requestBody == null ? new JSONObject() : new JSONObject(requestBody);
+                JSONObject root = new JSONObject(responseBody);
+                JSONObject file = root.optJSONObject("file");
+                String name = req.optString("filename", file == null ? "attachment" : file.optString("filename", "attachment"));
+                String mime = req.optString("mime_type", file == null ? "application/octet-stream" : file.optString("mime_type", "application/octet-stream"));
+                long size = file == null ? 0L : file.optLong("size_bytes", 0L);
+                JanusLocalTypedSense.ingest(appContext, "file", "upload", "Attached file ready: " + name + " (" + mime + ", " + size + " bytes). Content bytes are not copied into local telemetry.");
+                return;
+            }
+            if ("POST".equals(method) && "/images/generate".equals(path)) {
+                JSONObject root = new JSONObject(responseBody);
+                JSONObject image = root.optJSONObject("generated_image");
+                if (image == null) image = root.optJSONObject("image");
+                String id = image == null ? "" : image.optString("id", image.optString("file_id", ""));
+                JanusLocalTypedSense.ingest(appContext, "image", "generated_visual", "Generated image is available" + (id.isBlank() ? "." : " as file " + id + "."));
+                return;
+            }
+            if ("GET".equals(method) && path.startsWith("/images/") && path.endsWith("/inline")) {
+                JSONObject root = new JSONObject(responseBody);
+                JanusLocalTypedSense.ingest(appContext, "image", "display", "Image rendered locally: file " + root.optString("file_id", "unknown") + " (" + root.optString("mime_type", "image") + "). Raw image bytes are not copied into sensory telemetry.");
+                return;
+            }
+            if ("POST".equals(method) && "/desktop/chat".equals(path)) {
+                JSONObject root = new JSONObject(responseBody);
+                JSONArray sources = root.optJSONArray("sources");
+                if (sources != null && sources.length() > 0) {
+                    StringBuilder b = new StringBuilder("Live research sources returned: ");
+                    for (int i = 0; i < Math.min(8, sources.length()); i++) {
+                        JSONObject s = sources.optJSONObject(i); if (s == null) continue;
+                        if (b.length() > 32) b.append(" | ");
+                        b.append(s.optString("title", "source")).append(' ').append(s.optString("url", ""));
+                    }
+                    JanusLocalTypedSense.ingest(appContext, "web", "chat_research", b.toString());
+                } else if (root.optBoolean("research_grounding", false)) {
+                    JanusLocalTypedSense.ingest(appContext, "web", "chat_research", "The current answer used external research grounding; detailed source content remains server-side.");
+                }
+                JSONObject generated = root.optJSONObject("generated_image");
+                if (generated != null) {
+                    JanusLocalTypedSense.ingest(appContext, "image", "chat_generated_visual", "JANUS attached a generated visual artifact to the current response.");
+                }
+                return;
+            }
+            if ("POST".equals(method) && "/artifacts".equals(path)) {
+                JSONObject root = new JSONObject(responseBody);
+                JSONObject artifact = root.optJSONObject("artifact");
+                if (artifact != null) JanusLocalTypedSense.ingest(appContext, "action_result", "artifact", "Artifact created: " + artifact.optString("title", "JANUS artifact") + " (" + artifact.optString("kind", "artifact") + ").");
+                return;
+            }
+            if ("POST".equals(method) && (path.startsWith("/claims") || path.startsWith("/desktop/continuity"))) {
+                JanusLocalTypedSense.ingest(appContext, "action_result", "workspace", "JANUS workspace state changed successfully at " + path + ".");
+            }
+        } catch (Exception ignored) {
+            // Sensing is supplementary and must never break the underlying capability.
+        }
     }
 
     public byte[] download(String path, boolean auth) throws Exception {
@@ -101,7 +168,12 @@ public final class JanusApiClient {
             String token = token(); if (auth && token != null && !token.trim().isEmpty()) c.setRequestProperty("Authorization", "Bearer " + token.trim());
             int code = c.getResponseCode();
             if (code < 200 || code >= 300) { String responseBody = read(c.getErrorStream()); throw new IllegalStateException("HTTP " + code + (responseBody.isEmpty() ? "" : " · " + responseBody)); }
-            try (InputStream in = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) { byte[] buffer = new byte[32768]; int n; while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n); return out.toByteArray(); }
+            try (InputStream in = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[32768]; int n; while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);
+                byte[] result = out.toByteArray();
+                if (auth && effectivePath.startsWith("/files/")) JanusLocalTypedSense.ingest(appContext, "file", "download", "Downloaded an authenticated JANUS file artifact (" + result.length + " bytes). Raw bytes are not copied into local telemetry.");
+                return result;
+            }
         } finally { if (c != null) c.disconnect(); }
     }
 
