@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusChatHistoryBridge JanusAdaptiveUi JanusApplication JanusOfflineQueue; do test -s "$BASE/$f.java"; done
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
           grep -q "versionName '0.99'" android/app/build.gradle
@@ -36,7 +36,10 @@ jobs:
           grep -q 'public static synchronized void append' "$BASE/JanusChatHistoryStore.java"
           grep -q 'presentation.toJson()' "$BASE/JanusChatHistoryStore.java"
           ! grep -q 'OnSharedPreferenceChangeListener' "$BASE/JanusChatHistoryStore.java"
-          grep -q 'JanusChatHistoryStore.install(this)' "$BASE/JanusApplication.java"
+          grep -q 'JanusChatHistoryBridge.prepare(activity)' "$BASE/JanusApplication.java"
+          grep -q 'JanusChatHistoryBridge.capture(activity)' "$BASE/JanusApplication.java"
+          grep -q 'JanusChatHistoryStore.append(activity' "$BASE/JanusChatHistoryBridge.java"
+          grep -q 'JanusChatHistoryStore.clear(activity)' "$BASE/JanusChatHistoryBridge.java"
           grep -q 'JanusGeneratedImagePolish.install(activity)' "$BASE/JanusApplication.java"
           grep -q 'buildPanel(activity,p.sources)' "$BASE/JanusSourcePolish.java"
           grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
@@ -78,7 +81,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: authoritative structured Chat history v2 + one-way legacy migration + shared Chat controller + persistent sources/generated images; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: authoritative structured Chat history v2 + compatibility UI bridge + shared Chat controller + persistent sources/generated images; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
