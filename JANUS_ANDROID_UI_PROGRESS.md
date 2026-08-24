@@ -21,20 +21,25 @@ Updated: 2026-08-24
 - v0.92: immutable `JanusChatPresentation` model plus adaptive/accessibility layer and 48dp touch targets.
 - v0.93: source-card renderer accepts structured source records directly.
 - v0.94: live structured source handoff captured at the API boundary and matched to rendered Chat responses.
+- v0.95: persistent structured reply/source/generated-image metadata and Chat controller foundation.
+- v0.96: controller-owned raw `/desktop/chat` transport primitive (`postRaw`) separated from the general API response-capture path.
 
-## v0.95 — persistent structured Chat metadata + controller extraction foundation
+## v0.97 — shared queued Chat delivery + persistent generated images
 Implemented on integration branch; release verification pending:
-- `JanusChatPresentation` now serializes/deserializes reply, source and generated-image metadata;
-- `JanusChatResponseRegistry` is bounded to 16 entries and persists structured presentation records across app restarts;
-- `JanusApplication` initializes that registry at process startup, so saved JANUS messages can regain source/image metadata after relaunch;
-- new `JanusChatController` centralizes the intended retry schedule, response parsing and failure classification for the next MainActivity migration step;
-- the current MainActivity send loop remains the live sender in this pass; the controller is deliberately introduced and compile-gated before the risky final wiring, rather than pretending the monolithic Activity has already been removed;
+- `JanusChatController` now exposes `sendOnce()` for WorkManager/offline delivery while retaining its bounded foreground retry policy;
+- `JanusOfflineQueue` no longer maintains a second raw `HttpURLConnection` Chat client: queued messages now use `JanusApiClient` + `JanusChatController.sendOnce()`;
+- worker scheduling remains responsible for later queue retries, avoiding nested retry storms;
+- `JanusChatResponseRegistry` adds non-destructive `findForReply()` so source and image renderers can share the same persisted structured presentation;
+- new `JanusGeneratedImagePolish` restores generated images from persisted `generated_image.file_id` metadata, including after process/app restart, with accessibility descriptions and duplicate protection;
+- `JanusApplication` installs the generated-image restoration layer alongside structured sources, reply context, safe-area and adaptive UI layers;
 - no server, cognition, federation, auth ownership or 11-core routing contract changed;
-- CI requires persistent registry initialization/storage, Chat presentation serialization, controller compilation, structured source rendering, safe insets, reply context, route hygiene, forward-only core routing, Java compilation and APK assembly.
+- the large foreground `MainActivity.sendChat()` method is still the remaining direct sender and is explicitly NOT claimed as migrated in this pass;
+- CI rejects a return of raw `HttpURLConnection` logic inside `JanusOfflineQueue` and verifies controller delivery, image restoration, structured sources, safe insets, reply context, route hygiene, forward-only core routing, Java compilation and APK assembly.
 
 ## Next intended passes
-1. Switch `MainActivity.sendChat()` onto `JanusChatController` and remove the duplicate retry/response-parse block from the Activity.
-2. Remove the live `formatSources()` compatibility append from Chat, leaving it only for non-Chat legacy/background-research formatting or replacing that use too.
-3. Move saved Chat history itself to structured records and continue separating Messages/Observe/Research surfaces.
+1. Replace the remaining foreground `MainActivity.sendChat()` networking/retry/parser block with `JanusChatController.send()` using a safe source-level edit, then remove the duplicate Activity retry policy.
+2. Remove the live Chat `formatSources()` compatibility append completely; retain/replace the separate Background Research formatter independently.
+3. Move Chat history from plain `who/body` records to structured message records so source/image/reply metadata is attached directly to each saved message rather than matched through a bounded registry.
+4. Continue separating Messages/Observe/Research surfaces and wider-screen layouts after the Chat boundary is clean.
 
 Release rule: do not mark a pass fully released until `apk-download` publishes the matching version after CI compilation and APK assembly.
