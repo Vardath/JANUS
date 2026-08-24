@@ -9,16 +9,20 @@ import android.os.Bundle;
 /** Application bootstrap for the authoritative native JANUS Android rebuild. */
 public class JanusApplication extends Application {
     private static final String BOOT_PREFS = "janus_native_rebuild_bootstrap";
-    private static final String CLEAN_MARKER = "v082_clean_client_initialized";
+    private static final String RC1_MIGRATION_MARKER = "v109_rc1_nondestructive_migration";
 
     @Override public void onCreate() {
         super.onCreate();
         JanusClientDiagnostics.install(this);
+
+        // RC1 migration invariant: upgrades must preserve the existing JANUS account
+        // session, local 11-core state, memories and user options. Historical rebuilds
+        // used a one-time preference wipe here; that is intentionally retired.
         SharedPreferences boot = getSharedPreferences(BOOT_PREFS, Context.MODE_PRIVATE);
-        if (!boot.getBoolean(CLEAN_MARKER, false)) {
-            getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE).edit().clear().commit();
-            boot.edit().putBoolean(CLEAN_MARKER, true).commit();
+        if (!boot.getBoolean(RC1_MIGRATION_MARKER, false)) {
+            boot.edit().putBoolean(RC1_MIGRATION_MARKER, true).apply();
         }
+
         JanusChatResponseRegistry.init(this);
         JanusChatHistoryStore.install(this);
 
