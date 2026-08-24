@@ -1,0 +1,54 @@
+name: Test JANUS Android Localization
+
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/test-android-localization.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/test-android-localization.yml'
+
+jobs:
+  localization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate translation catalogue and fallback contract
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          p = Path('android/app/src/main/java/com/vardath/janus/JanusUiTranslations.java')
+          s = p.read_text(encoding='utf-8')
+          key_block = re.search(r'commonKeys\(\) \{ return new String\[\]\{(.*?)\}; \}', s, re.S)
+          assert key_block, 'common key catalogue not found'
+          string_re = re.compile(r'"(?:\\.|[^"\\])*"')
+          keys = string_re.findall(key_block.group(1))
+          assert len(keys) >= 40, f'expected broad common UI coverage, found {len(keys)} keys'
+          methods = re.findall(r'private static Map<String,String> ([A-Za-z0-9_]+)\(\)\{return map\((.*?)\);\}', s, re.S)
+          assert len(methods) >= 23, f'expected at least 23 localized language/script tables, found {len(methods)}'
+          bad = []
+          for name, body in methods:
+              values = string_re.findall(body)
+              if len(values) != len(keys): bad.append((name, len(values), len(keys)))
+          assert not bad, f'translation table length mismatch: {bad}'
+          for code in ['es','fr','de','pt','it','nl','pl','tr','ru','uk','ar','fa','he','ur','hi','bn','id','vi','th','ja','ko','zh-Hans','zh-Hant']:
+              assert f'all.put("{code}"' in s, f'missing language {code}'
+          assert 'return english;' in s, 'English fallback must remain explicit'
+          assert 'activity.recreate();' in Path('android/app/src/main/java/com/vardath/janus/JanusLanguagePolish.java').read_text(encoding='utf-8')
+          assert 'JanusUiLocalizationPolish.install(activity);' in Path('android/app/src/main/java/com/vardath/janus/JanusApplication.java').read_text(encoding='utf-8')
+          print(f'Validated {len(methods)} translation tables x {len(keys)} common UI strings')
+          PY
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Compile and assemble localized APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:compileDebugJavaWithJavac :app:assembleDebug --stacktrace
