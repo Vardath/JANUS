@@ -9,7 +9,9 @@ final class APIClient: ObservableObject {
     @Published var accessToken: String = KeychainStore.readToken()
     @Published var conceptualTopology: String = "1|3|7"
     @Published var frontPosture: String = ""
+    @Published var localFrontPosture: String = LocalJanusSociety.shared.snapshot().frontAppraisal.actionPosture
 
+    let localSociety = LocalJanusSociety.shared
     private let decoder = JSONDecoder()
     private let maxFileBytes = 8 * 1024 * 1024
     private var deviceID: String {
@@ -26,9 +28,9 @@ final class APIClient: ObservableObject {
             if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 conceptualTopology = root["conceptual_topology"] as? String ?? "1|3|7"
             }
-            status = "Active · \(conceptualTopology)"
+            status = "Local \(localFrontPosture.replacingOccurrences(of: "_", with: " ")) · Global \(conceptualTopology)"
         } catch {
-            status = "Dormant"
+            status = "Local active · Global offline"
         }
     }
 
@@ -37,7 +39,12 @@ final class APIClient: ObservableObject {
             path: "/auth/login", method: "POST",
             body: ["identifier": identifier, "password": password], authenticated: false
         )
-        if let token = response.access_token { setToken(token); await presenceHeartbeat() }
+        if let token = response.access_token {
+            setToken(token)
+            let local = localSociety.sense(modality: "runtime", source: "ios-client", content: "authenticated iOS JANUS session became active", salience: 0.45, uncertainty: 0.05, novelty: 0.15)
+            localFrontPosture = local.frontAppraisal.actionPosture
+            await presenceHeartbeat()
+        }
         return response
     }
 
@@ -46,7 +53,12 @@ final class APIClient: ObservableObject {
             path: "/auth/register", method: "POST",
             body: ["username": username, "email": email, "password": password], authenticated: false
         )
-        if let token = response.access_token { setToken(token); await presenceHeartbeat() }
+        if let token = response.access_token {
+            setToken(token)
+            let local = localSociety.sense(modality: "runtime", source: "ios-client", content: "new authenticated iOS JANUS session became active", salience: 0.45, uncertainty: 0.05, novelty: 0.2)
+            localFrontPosture = local.frontAppraisal.actionPosture
+            await presenceHeartbeat()
+        }
         return response
     }
 
@@ -60,6 +72,8 @@ final class APIClient: ObservableObject {
         if !accessToken.isEmpty {
             _ = try? await request(path: "/auth/logout", method: "POST", body: [String: String]()) as Data
         }
+        let local = localSociety.sense(modality: "runtime", source: "ios-client", content: "authenticated iOS JANUS session signed out", salience: 0.3, uncertainty: 0.05, novelty: 0.1)
+        localFrontPosture = local.frontAppraisal.actionPosture
         setToken("")
         frontPosture = ""
     }
@@ -71,17 +85,36 @@ final class APIClient: ObservableObject {
             let platform: String
             let client_version: String
             let phase: String
+            let architecture: String
+            let mechanical_flow: String
             let cycles: [String: Int]
+            let core_summaries: [String: String]
+            let front: String
+            let front_appraisal: LocalAppraisal
+            let consensus: String
+            let interface: String
+            let interface_appraisal: LocalAppraisal
             let observe_events: [[String: String]]
             let memories: [String]
             let conclusions: [String]
         }
-        let body = PresenceBody(device_id: deviceID, platform: "ios", client_version: "0.4", phase: "interface", cycles: [:], observe_events: [], memories: [], conclusions: [])
+        let local = localSociety.pulse()
+        localFrontPosture = local.frontAppraisal.actionPosture
+        let body = PresenceBody(
+            device_id: deviceID, platform: "ios", client_version: "0.5", phase: local.phase,
+            architecture: "1|3|7", mechanical_flow: "7 -> 2 -> 1 -> 1",
+            cycles: local.cycles, core_summaries: local.coreSummaries,
+            front: local.front, front_appraisal: local.frontAppraisal, consensus: local.front,
+            interface: local.interface, interface_appraisal: local.interfaceAppraisal,
+            observe_events: [], memories: [], conclusions: []
+        )
         do {
             let data: Data = try await request(path: "/core-sync/exchange", method: "POST", body: body)
             if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let presence = root["presence"] as? [String: Any],
                let server = root["server"] as? [String: Any] {
+                localSociety.ingestPeer(server)
+                localFrontPosture = localSociety.snapshot().frontAppraisal.actionPosture
                 let online = presence["online"] as? Int ?? 0
                 let registered = presence["registered"] as? Int ?? 0
                 let phase = server["phase"] as? String ?? "unknown"
@@ -91,18 +124,23 @@ final class APIClient: ObservableObject {
                 } else {
                     frontPosture = ""
                 }
-                let postureSuffix = frontPosture.isEmpty ? "" : " · Front \(frontPosture.replacingOccurrences(of: "_", with: " "))"
-                status = "Global \(conceptualTopology) · \(phase) · \(online)/\(registered) clients\(postureSuffix)"
+                let globalSuffix = frontPosture.isEmpty ? "" : " · global \(frontPosture.replacingOccurrences(of: "_", with: " "))"
+                status = "Local \(localFrontPosture.replacingOccurrences(of: "_", with: " ")) ↔ Global \(conceptualTopology) \(phase) · \(online)/\(registered)\(globalSuffix)"
             }
         } catch {
-            status = "Global offline"
+            status = "Local \(localFrontPosture.replacingOccurrences(of: "_", with: " ")) · Global offline"
         }
     }
 
     func chat(profile: String, message: String, attachmentIDs: [String] = []) async throws -> ChatResponse {
+        let local = localSociety.sense(modality: "text", source: "user", content: message, salience: 0.8, uncertainty: 0.25, novelty: 0.5)
+        localFrontPosture = local.frontAppraisal.actionPosture
         await presenceHeartbeat()
         let body = ChatRequest(profile_id: profile, message: message, attachment_ids: attachmentIDs)
-        return try await request(path: "/desktop/chat", method: "POST", body: body)
+        let response: ChatResponse = try await request(path: "/desktop/chat", method: "POST", body: body)
+        let action = localSociety.sense(modality: "action_result", source: "global-chat", content: "global JANUS returned a Chat response", salience: 0.65, uncertainty: 0.25, novelty: 0.35)
+        localFrontPosture = action.frontAppraisal.actionPosture
+        return response
     }
 
     func uploadFile(url: URL) async throws -> UploadedFile {
@@ -116,6 +154,8 @@ final class APIClient: ObservableObject {
         guard !data.isEmpty else { throw NSError(domain: "JANUS", code: 400, userInfo: [NSLocalizedDescriptionKey: "Empty files are not supported."]) }
         guard data.count <= maxFileBytes else { throw NSError(domain: "JANUS", code: 413, userInfo: [NSLocalizedDescriptionKey: "JANUS currently accepts files up to 8 MiB."]) }
         let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+        let local = localSociety.sense(modality: "file", source: "user-attachment", content: url.lastPathComponent, salience: 0.65, uncertainty: 0.45, novelty: 0.45)
+        localFrontPosture = local.frontAppraisal.actionPosture
         struct FileBody: Encodable { let filename: String; let mime_type: String; let data_base64: String }
         let body = FileBody(filename: url.lastPathComponent, mime_type: mime, data_base64: data.base64EncodedString())
         let response: UploadResponse = try await request(path: "/files/upload", method: "POST", body: body)
@@ -123,7 +163,10 @@ final class APIClient: ObservableObject {
     }
 
     func generatedImageData(path: String) async throws -> Data {
-        try await request(path: path, method: "GET", body: Optional<[String: String]>.none)
+        let data: Data = try await request(path: path, method: "GET", body: Optional<[String: String]>.none)
+        let local = localSociety.sense(modality: "image", source: "global-generated-image", content: "generated image became available to the iOS client", salience: 0.55, uncertainty: 0.25, novelty: 0.65)
+        localFrontPosture = local.frontAppraisal.actionPosture
+        return data
     }
 
     func home(profile: String) async throws -> HomeResponse {
