@@ -36,17 +36,20 @@ def _epoch(value: Any) -> int:
 def migrate_persistent_data_once() -> dict[str, int]:
     """Import durable user data into the new server schema once.
 
-    This module does not import or execute legacy application code. It reads only
-    well-defined persisted records from the existing SQLite database so users do
-    not lose account identity or continuity when orchestration is replaced.
+    No legacy application module is imported or executed. Only persisted rows are
+    copied into the independently implemented v2 schema. Active session hashes are
+    copied as data as well, so a signed-in native client can survive the server
+    cutover without being forced to re-authenticate merely because orchestration
+    was replaced.
     """
-    counts = {"accounts": 0, "memories": 0, "events": 0}
+    counts = {"accounts": 0, "sessions": 0, "memories": 0, "events": 0}
     with storage.db() as c:
         existing = c.execute("SELECT count(*) FROM v2_accounts").fetchone()[0]
         if existing:
             return counts
 
         account_map: dict[str, int] = {}
+        imported_ids: set[int] = set()
         cols = _columns(c, "accounts")
         if {"id", "username", "email", "password_hash"}.issubset(cols):
             select_cols = ["id", "username", "email", "password_hash"]
@@ -56,16 +59,37 @@ def migrate_persistent_data_once() -> dict[str, int]:
                 created = _epoch(d.get("created_at"))
                 updated = _epoch(d.get("updated_at") or created)
                 try:
+                    aid = int(d["id"])
                     c.execute(
                         "INSERT INTO v2_accounts(id,username,email,password_hash,google_sub,email_verified,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                         (
-                            int(d["id"]), str(d["username"]), str(d["email"]).lower(), d.get("password_hash"),
+                            aid, str(d["username"]), str(d["email"]).lower(), d.get("password_hash"),
                             d.get("google_sub"), int(d.get("email_verified") or 0), created, updated,
                         ),
                     )
-                    account_map[str(d["username"]).lower()] = int(d["id"])
+                    account_map[str(d["username"]).lower()] = aid
+                    imported_ids.add(aid)
                     counts["accounts"] += 1
                 except sqlite3.IntegrityError:
+                    pass
+
+        # Preserve only active legacy sessions whose account was actually copied.
+        # Both generations store SHA-256 token hashes, not bearer token plaintext.
+        session_cols = _columns(c, "sessions")
+        if imported_ids and {"token_hash", "account_id", "created_at", "expires_at"}.issubset(session_cols):
+            now = storage.now()
+            for r in c.execute("SELECT token_hash,account_id,created_at,expires_at FROM sessions WHERE expires_at>?", (now,)):
+                d = dict(r)
+                aid = int(d.get("account_id") or 0)
+                if aid not in imported_ids:
+                    continue
+                try:
+                    c.execute(
+                        "INSERT OR IGNORE INTO v2_sessions(token_hash,account_id,created_at,expires_at) VALUES(?,?,?,?)",
+                        (str(d["token_hash"]), aid, _epoch(d["created_at"]), _epoch(d["expires_at"])),
+                    )
+                    counts["sessions"] += int(c.execute("SELECT changes()").fetchone()[0] or 0)
+                except (sqlite3.IntegrityError, ValueError, TypeError):
                     pass
 
         if _has_table(c, "desktop_memory") and account_map:
