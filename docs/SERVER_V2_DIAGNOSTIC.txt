@@ -1,17 +1,13 @@
 JANUS SERVER V2 DIAGNOSTIC
-verified_sha=39302cec11fea23358780fd60b1625e9e9c70666
+verified_sha=d5ba11ed449475d660ad7afb2245ea7b15eb35a7
 compile_exit=0
-verify_exit=1
+verify_exit=0
 legacy_from_grep_exit=1
 legacy_import_grep_exit=1
 
 --- compile log ---
 
 --- verifier log ---
-Traceback (most recent call last):
-  File "/home/runner/work/JANUS/JANUS/tools/verify_server_v2.py", line 59, in <module>
-    assert caps.json()["features"].get(key) is True, key
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: maintenance
+JANUS server v2 verification passed: independent code, data migration, private durable 11-core routing, protected identity, adaptive calibration, model escalation, federation, files, continuity, research, artifacts and owner-gated maintenance.
 
 --- legacy import matches ---
