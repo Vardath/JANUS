@@ -24,6 +24,7 @@ from .identity_api import router as identity_router  # noqa: E402
 from .images import router as image_router  # noqa: E402
 from .maintenance import router as maintenance_router  # noqa: E402
 from .protocol import router as protocol_router  # noqa: E402
+from .provider_diagnostics import router as provider_router  # noqa: E402
 from .sync_contract import router as sync_router  # noqa: E402
 
 # Route ownership is explicit. Provisional routes in app.py are removed and each
@@ -45,6 +46,7 @@ app.include_router(chat_router)
 app.include_router(sync_router)
 app.include_router(desktop_router)
 app.include_router(protocol_router)
+app.include_router(provider_router)
 app.include_router(image_router)
 app.include_router(maintenance_router)
 app.include_router(identity_router)
