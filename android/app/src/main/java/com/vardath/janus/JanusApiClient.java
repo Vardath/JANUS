@@ -37,12 +37,21 @@ public final class JanusApiClient {
         prefs.edit().putString(TOKEN, token == null ? "" : token).putString(PROFILE, profile == null ? "" : profile).apply();
     }
     public void clearSession() {
-        // Startup validation must not turn a transient network/Render wake failure into
-        // a destructive logout. Explicit logout/delete requests still clear locally.
         if ("/auth/me".equals(lastRequestPath) && isTransient(lastResponseCode)) return;
         JanusAccountIsolation.clearForSignOut(appContext);
     }
-    public Response get(String path, boolean auth) { return request("GET", path, null, auth, true); }
+    public Response get(String path, boolean auth) {
+        Response response = request("GET", path, null, auth, true);
+        String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
+        if (auth && "/auth/me".equals(effectivePath) && isTransient(response.code)
+                && !token().trim().isEmpty() && !profile().trim().isEmpty()) {
+            try {
+                JSONObject account = new JSONObject().put("username", profile()).put("offline_cached", true);
+                return new Response(200, new JSONObject().put("account", account).put("offline_cached", true).toString(), null);
+            } catch (Exception ignored) {}
+        }
+        return response;
+    }
 
     public Response post(String path, String body, boolean auth) {
         String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
@@ -66,9 +75,6 @@ public final class JanusApiClient {
             JSONObject j = new JSONObject(body);
             String message = j.optString("message", "");
             if (message.isBlank()) return body;
-            // Preserve the exact visible message separately. The server uses this for
-            // complete owner-controlled Supervisor transcripts and never stores the
-            // hidden local-core context as if the user typed it.
             j.put("user_visible_message", message);
             String augmented = JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message);
             if (!augmented.equals(message)) j.put("message", augmented);
@@ -106,19 +112,15 @@ public final class JanusApiClient {
         } catch (Exception e) {
             lastResponseCode = 0;
             return new Response(0, "", e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage()));
+        } finally {
+            if (c != null) c.disconnect();
         }
-        finally { if (c != null) c.disconnect(); }
     }
 
     private static boolean isTransient(int code) {
         return code == 0 || code == 408 || code == 425 || code == 429 || code == 502 || code == 503 || code == 504 || code >= 500;
     }
 
-    /**
-     * Convert successful, non-auth capability results into bounded local typed senses.
-     * Raw file bytes/base64, session tokens, passwords and authentication payloads are
-     * never forwarded into the local sensory runtime.
-     */
     private void senseCapability(String method, String path, String requestBody, String responseBody) {
         if (path == null || path.startsWith("/auth/") || path.startsWith("/maintenance/") || "/core-sync/exchange".equals(path)) return;
         try {
@@ -160,9 +162,7 @@ public final class JanusApiClient {
                     JanusLocalTypedSense.ingest(appContext, "web", "chat_research", "The current answer used external research grounding; detailed source content remains server-side.");
                 }
                 JSONObject generated = root.optJSONObject("generated_image");
-                if (generated != null) {
-                    JanusLocalTypedSense.ingest(appContext, "image", "chat_generated_visual", "JANUS attached a generated visual artifact to the current response.");
-                }
+                if (generated != null) JanusLocalTypedSense.ingest(appContext, "image", "chat_generated_visual", "JANUS attached a generated visual artifact to the current response.");
                 return;
             }
             if ("POST".equals(method) && "/artifacts".equals(path)) {
@@ -174,9 +174,7 @@ public final class JanusApiClient {
             if ("POST".equals(method) && (path.startsWith("/claims") || path.startsWith("/desktop/continuity"))) {
                 JanusLocalTypedSense.ingest(appContext, "action_result", "workspace", "JANUS workspace state changed successfully at " + path + ".");
             }
-        } catch (Exception ignored) {
-            // Sensing is supplementary and must never break the underlying capability.
-        }
+        } catch (Exception ignored) {}
     }
 
     public byte[] download(String path, boolean auth) throws Exception {
@@ -194,7 +192,9 @@ public final class JanusApiClient {
                 if (auth && effectivePath.startsWith("/files/")) JanusLocalTypedSense.ingest(appContext, "file", "download", "Downloaded an authenticated JANUS file artifact (" + result.length + " bytes). Raw bytes are not copied into local telemetry.");
                 return result;
             }
-        } finally { if (c != null) c.disconnect(); }
+        } finally {
+            if (c != null) c.disconnect();
+        }
     }
 
     private static String read(InputStream in) throws Exception {
