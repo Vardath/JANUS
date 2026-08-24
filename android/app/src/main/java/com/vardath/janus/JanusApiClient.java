@@ -54,9 +54,12 @@ public final class JanusApiClient {
             JSONObject j = new JSONObject(body);
             String message = j.optString("message", "");
             if (message.isBlank()) return body;
+            // Preserve the exact visible message separately. The server uses this for
+            // complete owner-controlled Supervisor transcripts and never stores the
+            // hidden local-core context as if the user typed it.
+            j.put("user_visible_message", message);
             String augmented = JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message);
-            if (augmented.equals(message)) return body;
-            j.put("message", augmented);
+            if (!augmented.equals(message)) j.put("message", augmented);
             return j.toString();
         } catch (Exception ignored) {
             return body;
