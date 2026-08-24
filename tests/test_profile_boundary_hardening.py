@@ -94,3 +94,18 @@ def test_private_route_inventory_includes_profile_scoped_surfaces():
         "/desktop/continuity",
     }
     assert expected.issubset(secure_desktop.PRIVATE_PATHS)
+
+
+def test_authoritative_app_chat_gate_preserves_authenticated_profile_boundary():
+    # Read source text rather than importing janus_app: importing the authoritative
+    # ASGI composition can start real runtime subsystems during a unit test.
+    from pathlib import Path
+    source = (Path(__file__).resolve().parents[1] / "janus_app.py").read_text(encoding="utf-8")
+    assert "async def authoritative_chat(request: Request, payload: dict[str, Any])" in source
+    assert "profile = secure_desktop._profile(request, payload)" in source
+    assert 'safe["profile_id"] = profile' in source
+    assert 'safe["username"] = profile' in source
+    assert 'safe.pop("_janus_token", None)' in source
+    assert "foreground_deliberate(profile, message)" in source
+    assert "return await _call_chat_impl(previous, request, safe)" in source
+    assert 'payload.get("profile_id") or payload.get("username")' not in source
