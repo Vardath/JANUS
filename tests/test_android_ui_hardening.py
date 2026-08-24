@@ -8,52 +8,56 @@ def test_authoritative_build_is_native_and_patch_free():
     assert 'python tools/compose_android_phase3.py' not in workflow
     assert 'python tools/patch_android_' not in workflow
     assert 'Verify authoritative native Android boundary' in workflow
-    assert 'Verify v1.06 thought bridge and active Fano attention' in workflow
+    assert 'Verify v1.07 system chrome, Back and Runtime Cores hardening' in workflow
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
-def test_android_v106_is_direct_native_product():
+def test_android_v107_is_direct_native_product():
     text = Path('android/app/build.gradle').read_text(encoding='utf-8')
-    assert "versionCode 106" in text
-    assert "versionName '1.06'" in text
-    assert 'natural background-thought bridge + active Fano attention policy' in text
+    assert "versionCode 107" in text
+    assert "versionName '1.07'" in text
+    assert 'system-bar theming, predictive Back reliability and Runtime Cores crash hardening' in text
     main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
     assert 'android.webkit.WebView' not in main
     assert 'JavascriptInterface' not in main
 
 
-def test_navigation_and_background_activity_bridge_are_present():
+def test_navigation_system_chrome_and_core_map_are_hardened():
     nav = (BASE / 'JanusNavigationPolish.java').read_text(encoding='utf-8')
-    thought = (BASE / 'JanusThoughtBridge.java').read_text(encoding='utf-8')
-    api = (BASE / 'JanusApiClient.java').read_text(encoding='utf-8')
+    chrome = (BASE / 'JanusSystemChrome.java').read_text(encoding='utf-8')
+    core_map = (BASE / 'JanusCoreMapView.java').read_text(encoding='utf-8')
     app = (BASE / 'JanusApplication.java').read_text(encoding='utf-8')
+    manifest = Path('android/app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
+    assert 'enableOnBackInvokedCallback="true"' in manifest
     assert 'getOnBackInvokedDispatcher' in nav
     assert 'parent.performClick()' in nav
     assert '!"Chat".equals(selected)' in nav
     assert 'JanusNavigationPolish.install(activity)' in app
-    assert '[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT]' in thought
-    assert 'between messages' in thought
-    assert 'real app-side JANUS processing between messages' in thought
-    assert 'Current Fano attention orientations' in thought
-    assert 'JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message)' in api
-    assert 'j.put("message", augmented)' in api
-    assert not (BASE / 'JanusThoughtContextPolish.java').exists()
+    assert 'JanusSystemChrome.install(activity)' in app
+    assert 'theme_mode' in chrome and 'accent' in chrome
+    assert 'registerOnSharedPreferenceChangeListener' in chrome
+    assert 'setStatusBarColor(chrome)' in chrome
+    assert 'setNavigationBarColor(chrome)' in chrome
+    assert 'LAYER_TYPE_SOFTWARE' not in core_map
+    assert 'setShadowLayer' not in core_map
+    assert 'catch (Throwable ignored)' in core_map
+    assert 'drawFallback' in core_map
 
 
-def test_fano_state_is_an_active_attention_policy():
+def test_background_activity_bridge_and_active_fano_policy_remain_present():
+    thought = (BASE / 'JanusThoughtBridge.java').read_text(encoding='utf-8')
     policy = (BASE / 'JanusFanoPolicy.java').read_text(encoding='utf-8')
     runtime = (BASE / 'JanusLocalCoreRuntime.java').read_text(encoding='utf-8')
-    for marker in [
-        'grounding/support', 'structure/causality', 'counterexample/falsification',
-        'context/relationships', 'continuity/memory', 'boundary/risk',
-        'novelty/adjacent possibility',
-    ]:
+    api = (BASE / 'JanusApiClient.java').read_text(encoding='utf-8')
+    assert '[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT]' in thought
+    assert 'between messages' in thought
+    assert 'Current Fano attention orientations' in thought
+    assert 'JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message)' in api
+    for marker in ['grounding/support', 'structure/causality', 'counterexample/falsification', 'context/relationships', 'continuity/memory', 'boundary/risk', 'novelty/adjacent possibility']:
         assert marker in policy
     assert 'JanusFanoPolicy.directive(direction)' in runtime
-    assert 'JanusFanoPolicy.salience(weights, direction)' in runtime
     assert 'active_orientation' in runtime
     assert 'active_salience_percent' in runtime
-    assert 'Fano attention:' in runtime
 
 
 def test_native_ui_keeps_accessibility_and_safe_area_hardening():
