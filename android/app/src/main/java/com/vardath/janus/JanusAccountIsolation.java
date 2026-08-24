@@ -28,8 +28,12 @@ final class JanusAccountIsolation {
         String clean = newProfile == null ? "" : newProfile.trim();
         SharedPreferences binding = app.getSharedPreferences(BINDING_PREFS, Context.MODE_PRIVATE);
         String previous = binding.getString(BINDING_KEY, "");
-        if (!previous.isBlank() && !clean.isBlank() && !previous.equals(clean)) {
+        boolean switched = !previous.isBlank() && !clean.isBlank() && !previous.equals(clean);
+        if (switched) {
             resetAccountBoundState(app);
+            // The old in-memory society was stopped. Start a fresh local 11-core
+            // runtime now; saveSession writes the new token/profile immediately after.
+            JanusLocalCoreRuntime.get(app).start();
         }
         if (!clean.isBlank()) binding.edit().putString(BINDING_KEY, clean).apply();
     }
@@ -45,7 +49,8 @@ final class JanusAccountIsolation {
 
         SharedPreferences prefs = app.getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE);
         Map<String, Object> keep = new LinkedHashMap<>();
-        for (String key : DEVICE_KEYS) if (prefs.contains(key)) keep.put(key, prefs.getAll().get(key));
+        Map<String, ?> all = prefs.getAll();
+        for (String key : DEVICE_KEYS) if (all.containsKey(key)) keep.put(key, all.get(key));
         prefs.edit().clear().commit();
         SharedPreferences.Editor restore = prefs.edit();
         for (Map.Entry<String, Object> entry : keep.entrySet()) put(restore, entry.getKey(), entry.getValue());
