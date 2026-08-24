@@ -33,8 +33,12 @@ public final class JanusUiLocalizationPolish {
     }
 
     private static void translate(Activity activity, TextView view) {
+        // Chat bubbles are user/JANUS content, not shell text. Never rewrite the
+        // second TextView in a bubble headed by "You" or "JANUS", even when its
+        // content happens to equal a translatable navigation label such as "Settings".
+        boolean conversationBody = isConversationBody(view);
         CharSequence current = view.getText();
-        if (!TextUtils.isEmpty(current)) {
+        if (!conversationBody && !TextUtils.isEmpty(current)) {
             String before = current.toString();
             String after = JanusUiTranslations.translate(activity, before);
             if (!before.equals(after)) view.setText(after);
@@ -47,5 +51,13 @@ public final class JanusUiLocalizationPolish {
         }
         view.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         view.setTextAlignment(JanusUiTranslations.isRightToLeft(activity) ? View.TEXT_ALIGNMENT_VIEW_END : View.TEXT_ALIGNMENT_INHERIT);
+    }
+
+    private static boolean isConversationBody(TextView view) {
+        if (!(view.getParent() instanceof ViewGroup)) return false;
+        ViewGroup parent = (ViewGroup) view.getParent();
+        if (parent.getChildCount() < 2 || parent.getChildAt(1) != view || !(parent.getChildAt(0) instanceof TextView)) return false;
+        String author = String.valueOf(((TextView) parent.getChildAt(0)).getText()).trim();
+        return "You".equals(author) || "JANUS".equals(author);
     }
 }
