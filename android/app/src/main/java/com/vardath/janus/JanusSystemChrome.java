@@ -9,12 +9,28 @@ import android.view.Window;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
+import java.util.Map;
+import java.util.WeakHashMap;
+
 /** Applies JANUS theme preferences to the otherwise-unused Android status/navigation bar areas. */
 public final class JanusSystemChrome {
+    private static final Map<Activity, SharedPreferences.OnSharedPreferenceChangeListener> LISTENERS = new WeakHashMap<>();
     private JanusSystemChrome() {}
 
-    public static void apply(Activity activity) {
+    public static synchronized void install(Activity activity) {
         if (activity == null) return;
+        apply(activity);
+        if (LISTENERS.containsKey(activity)) return;
+        SharedPreferences prefs = activity.getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE);
+        SharedPreferences.OnSharedPreferenceChangeListener listener = (p, key) -> {
+            if ("theme_mode".equals(key) || "accent".equals(key)) activity.runOnUiThread(() -> apply(activity));
+        };
+        prefs.registerOnSharedPreferenceChangeListener(listener);
+        LISTENERS.put(activity, listener);
+    }
+
+    public static void apply(Activity activity) {
+        if (activity == null || activity.isFinishing()) return;
         boolean dark = isDark(activity);
         int chrome = chromeColor(activity, dark);
         Window w = activity.getWindow();
@@ -39,7 +55,6 @@ public final class JanusSystemChrome {
             default: a = dark ? Color.rgb(56,60,64) : Color.rgb(112,116,120); break;
         }
         if ("slate".equals(accent)) return dark ? Color.rgb(48,50,52) : Color.rgb(188,190,192);
-        // Theme colours are intentionally muted in system-bar space so they frame rather than dominate the app.
         int base = dark ? 36 : 214;
         float mix = dark ? 0.48f : 0.28f;
         return Color.rgb(
