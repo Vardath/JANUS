@@ -12,29 +12,46 @@ Updated: 2026-08-24
 - v0.83-v0.96: native safe areas, Chat/product polish, Cores/Observe architecture, Memory/Research/Account improvements, Reply-in-Chat, structured sources/images, accessibility and shared Chat-controller foundations.
 - v0.97: queued delivery moved onto the shared Chat controller/API stack; generated-image metadata restored after restart.
 - v0.98: foreground `/desktop/chat` API posts cross the shared controller boundary; structured history v2 introduced alongside legacy history.
-- v0.99: structured history v2 became an independent bounded store with one-way legacy migration; completed migration build verified and published.
-- v1.00: structured Chat v2 became the visible surface authority; published APK verified.
+- v0.99: structured history v2 became an independent bounded store with one-way legacy migration.
+- v1.00: structured Chat v2 became the visible surface authority.
+- v1.01: foreground Chat switched directly to `JanusChatController`; live `Sources:` appendix removed; structured v2 history became the normal read/write path.
+- v1.02: queued/offline replay retained structured sources/generated-image metadata; obsolete v1 bridge classes retired.
+- v1.03: Messages and read-only Observe gained dedicated native screen owners; all pre-merge checks passed and the APK was published.
 
-## v1.01 — direct foreground Chat controller + v2 history
-Pre-merge Android CI is green (gate, Java compilation, APK assembly):
-- `MainActivity.sendChat()` now calls `JanusChatController.send(api, prepared)` directly; the Activity-local retry array/loop is removed;
-- successful foreground replies use `JanusChatPresentation` as the authoritative reply/source/generated-image model;
-- the live Chat bubble receives clean reply text only; the old foreground `Sources:` appendix construction is removed;
-- Background Research retains a separate `formatResearchSources()` helper so research provenance formatting is independent from Chat rendering;
-- foreground JANUS replies are persisted directly with `JanusChatHistoryStore.append(..., presentation)`;
-- user/system bubbles use the v2 history append path through `rememberChat()`;
-- `renderSavedChat()` reads `JanusChatHistoryStore.read()` directly and reseeds the presentation registry from each stored structured presentation so source cards/generated images remain available after restart;
-- `JanusChatResponseRegistry.remember()` was added for authoritative-history reseeding and de-duplication;
-- `JanusApplication` no longer installs the v1.00 reflective `JanusChatV2Surface` or lifecycle capture bridge in normal operation;
-- legacy v1 history remains only as the one-way migration source inside `JanusChatHistoryStore` during the compatibility window;
-- version advances to 1.01 / versionCode 101;
-- no server, cognition, federation, auth ownership or 11-core routing contract changed;
-- PR #13 pre-merge build successfully passed the v1.01 ownership gate, Java compilation and APK assembly before merge.
+## v1.04 — Chat UI spam / typing-lag hotfix
+### Device-observed failure
+On a long Chat history, asking JANUS what it had been thinking about while away exposed a client rendering bug:
+- a JANUS response accumulated Copy/Share rows repeatedly without stopping;
+- the app progressively slowed;
+- composer keystrokes became delayed;
+- the Observe guide could appear on Chat near the bottom navigation.
 
-## Next intended passes
-1. After v1.01 publishes, delete or quarantine the now-unused `JanusChatV2Surface` / `JanusChatHistoryBridge` compatibility classes after confirming no remaining references.
-2. Preserve structured metadata for queued/offline replies rather than only their reply text.
-3. Continue extracting Messages/Observe/Research surfaces from `MainActivity` and improve wider-screen/tablet layouts.
-4. Add targeted regression tests around v2 history migration, reply-context send, source-card restoration and generated-image restoration.
+### Root cause audit
+1. `JanusUiPolish` used the ordinary single `View.setTag()` slot to remember that a Chat card had received Copy/Share controls.
+2. `JanusSourcePolish` reused that same tag slot for its own structured-source marker, overwriting the Chat marker.
+3. On the next global-layout callback, `JanusUiPolish` therefore believed the same JANUS card was unprocessed and appended another Copy/Share row. Repetition created unbounded view growth.
+4. Four independent decorators (`JanusUiPolish`, `JanusSourcePolish`, `JanusGeneratedImagePolish`, `JanusReplyContextPolish`) performed recursive view-tree work from global-layout callbacks. With a long conversation this amplified UI-thread work during keyboard/composer layout changes.
+5. Observe-guide title matching accepted `Button` because Android `Button` subclasses `TextView`; the bottom navigation button labelled `Observe` could be mistaken for the actual Observe page title.
 
-Release rule: do not mark a pass fully released until `apk-download` publishes the matching version after CI compilation and APK assembly.
+### v1.04 remediation on `android-v104-ui-spam-fix`
+- `JanusUiPolish` now uses weak identity sets (`CHAT_ENHANCED`, `BASE_POLISHED`, dedicated core-map/Observe-guide sets) rather than shared plain `View.setTag()` ownership markers.
+- Copy/Share decoration is idempotent per Chat card.
+- base styling is idempotent per View rather than rewriting properties on every pass.
+- global-layout polishing is debounced so typing does not synchronously trigger a full recursive polish for every layout event.
+- source, generated-image and Reply-in-Chat scanners are independently debounced.
+- source decoration uses a weak `ENHANCED` set and no longer overwrites Chat-decoration ownership.
+- Observe/core-title matching excludes `Button` instances, preventing navigation labels from being treated as page titles.
+- Android version advances to 1.04 / versionCode 104.
+- UI-hardening tests and the Android build gate explicitly reject return of the shared-tag Chat marker and require the debounce/idempotence protections.
+
+## Release rule for v1.04
+Do not merge or publish until:
+1. UI hardening regression tests pass;
+2. existing maintenance/auth/protocol gates pass;
+3. authoritative Java compilation succeeds;
+4. APK assembly succeeds;
+5. after merge, `apk-download` records `Publish JANUS Android native v1.04`;
+6. real-device validation confirms one Copy/Share row per JANUS message, no Observe guide on Chat, and responsive typing with a long history.
+
+## Next intended work after the hotfix
+Resume architecture cleanup only after v1.04 is stable on-device. Continue reducing `MainActivity` responsibilities and improving tablet/wide-layout behavior, but do not stack UI architecture work on top of an unverified performance regression.
