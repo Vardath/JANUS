@@ -29,10 +29,7 @@ public final class JanusChatResponseRegistry {
         } catch (Exception ignored) {}
     }
 
-    public static synchronized void capture(Context context, String rawJson) {
-        init(context);
-        capture(rawJson);
-    }
+    public static synchronized void capture(Context context, String rawJson) { init(context); capture(rawJson); }
 
     public static synchronized void capture(String rawJson) {
         try {
@@ -44,7 +41,8 @@ public final class JanusChatResponseRegistry {
         } catch (Exception ignored) {}
     }
 
-    public static synchronized JanusChatPresentation consumeForReply(String reply) {
+    /** Non-destructive lookup so source and image renderers can share the same presentation. */
+    public static synchronized JanusChatPresentation findForReply(String reply) {
         if (reply == null) return null;
         JanusChatPresentation match = null;
         String needle = reply.trim();
@@ -52,14 +50,11 @@ public final class JanusChatResponseRegistry {
             String candidate = p.reply.trim();
             if (!needle.isEmpty() && (needle.startsWith(candidate) || candidate.startsWith(needle))) match = p;
         }
-        if (match != null) {
-            RECENT.remove(match);
-            // Keep consumed entries persisted so saved Chat can regain source/image metadata after restart.
-            RECENT.addLast(match);
-            persist();
-        }
         return match;
     }
+
+    /** Backward-compatible alias retained for the source renderer. */
+    public static synchronized JanusChatPresentation consumeForReply(String reply) { return findForReply(reply); }
 
     private static void persist() {
         if (prefs == null) return;
