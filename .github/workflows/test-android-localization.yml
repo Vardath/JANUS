@@ -48,7 +48,7 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v5
       - name: Compile and assemble localized APK
-        working-directory: android
         run: |
+          cd android
           chmod +x gradlew
           ./gradlew :app:compileDebugJavaWithJavac :app:assembleDebug --stacktrace
