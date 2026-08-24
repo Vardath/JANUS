@@ -1,5 +1,5 @@
 JANUS SERVER V2 DIAGNOSTIC
-verified_sha=32d9de99b590a662b4c76c43d763e94da49e3a23
+verified_sha=8286d8717c772fa5e7c596a957c6210ae49adaa1
 compile_exit=0
 verify_exit=0
 session_cutover_exit=0
