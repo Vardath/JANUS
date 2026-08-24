@@ -3,6 +3,7 @@ package com.vardath.janus;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.Iterator;
 import java.util.Locale;
 
 /**
@@ -31,17 +32,35 @@ public final class JanusThoughtBridge {
                     added++;
                 }
             }
-            String consensus = clip(s.optString("consensus", ""), 700);
-            String face = clip(s.optString("interface", ""), 700);
+
+            StringBuilder fano = new StringBuilder();
+            JSONObject cores = s.optJSONObject("cores");
+            if (cores != null) {
+                Iterator<String> names = cores.keys();
+                while (names.hasNext()) {
+                    String name = names.next();
+                    JSONObject core = cores.optJSONObject(name);
+                    JSONObject fs = core == null ? null : core.optJSONObject("fano");
+                    if (fs == null) continue;
+                    fano.append("- ").append(name).append(": d").append(fs.optInt("active_direction", 0))
+                            .append(" ").append(fs.optString("active_orientation", "unknown"))
+                            .append(", salience ").append(fs.optLong("active_salience_percent", 0L)).append("%\n");
+                }
+            }
+
+            String consensus = clip(s.optString("consensus", ""), 900);
+            String face = clip(s.optString("interface", ""), 900);
             String context = "\n\n[DEVICE JANUS BACKGROUND-ACTIVITY CONTEXT]\n"
                     + "The Android local 11-core runtime reports phase=" + s.optString("phase", "unknown")
                     + ", running=" + s.optBoolean("running", false)
                     + ", background_cycles_enabled=" + s.optBoolean("background_cycles_enabled", false) + ".\n"
                     + "These are persisted deterministic local processing events with zero model/API calls. They are real app-side JANUS processing between messages. Describe what the cores actually processed when asked, rather than claiming that no background thinking/processing occurred. Do not describe this as phenomenal consciousness or an uninterrupted private stream of consciousness.\n"
                     + (recent.length() == 0 ? "Recent externalizable local activity: none retained.\n" : "Recent externalizable local activity:\n" + recent)
+                    + (fano.length() == 0 ? "" : "Current Fano attention orientations used by the local cores:\n" + fano)
                     + (consensus.isEmpty() ? "" : "Current local consensus: " + consensus + "\n")
                     + (face.isEmpty() ? "" : "Current local interface state: " + face + "\n")
-                    + "Answer the user's question from this device activity. If there was activity, summarize its actual topics/results. Distinguish deterministic local-core processing from server/model activity.\n"
+                    + "The seven Fano directions are computational attention lenses (grounding, structure, counterpoint, context, continuity, boundary, novelty). They influence what each core prioritizes, but they are not evidence that the Fano mathematics proves any claim being discussed.\n"
+                    + "Answer the user's question from this device activity. If there was activity, summarize its actual topics/results and, when useful, mention which attention orientations dominated. Distinguish deterministic local-core processing from server/model activity.\n"
                     + "[END DEVICE JANUS CONTEXT]";
             return userMessage + context;
         } catch (Exception ignored) {
@@ -62,9 +81,6 @@ public final class JanusThoughtBridge {
                 || s.contains("in the background") || s.contains("background") || s.contains("while idle");
         if (away) return true;
 
-        // Natural direct questions such as "what have you been thinking about?" should also
-        // expose the persisted local-core activity. Avoid triggering on ordinary topical uses
-        // such as "what do you think about X?".
         return s.matches(".*\\b(what|anything|any)\\b.*\\b(thinking|thoughts?)\\b.*")
                 && !s.matches(".*\\bthink about\\b.+");
     }
