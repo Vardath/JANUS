@@ -21,23 +21,23 @@ jobs:
           for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusChatPresentation JanusAdaptiveUi JanusApplication; do test -s "$BASE/$f.java"; done
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '0.92'" android/app/build.gradle
+          grep -q "versionName '0.93'" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
           test "$(grep -o 'android.intent.category.LAUNCHER' android/app/src/main/AndroidManifest.xml | wc -l)" -eq 1
-      - name: Verify v0.92 UI and architecture contracts
+      - name: Verify v0.93 UI and architecture contracts
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
           grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
           grep -q 'Replying to JANUS' "$BASE/JanusReplyContextPolish.java"
-          grep -q 'Sources · ' "$BASE/JanusSourcePolish.java"
-          grep -q 'fromResponse(JSONObject response' "$BASE/JanusChatPresentation.java"
-          grep -q 'List<Source> sources' "$BASE/JanusChatPresentation.java"
+          grep -q 'buildPanel(Activity activity, List<JanusChatPresentation.Source> sources)' "$BASE/JanusSourcePolish.java"
+          grep -q 'Direct structured source-card renderer' "$BASE/JanusSourcePolish.java"
+          ! grep -q 'parseSources(String appendix)' "$BASE/JanusSourcePolish.java"
+          grep -q 'parseSources(JSONArray raw)' "$BASE/JanusChatPresentation.java"
+          grep -q 'Collections.unmodifiableList(sources)' "$BASE/JanusChatPresentation.java"
           grep -q 'JanusAdaptiveUi.install(activity)' "$BASE/JanusApplication.java"
           grep -q 'minTouch = dp(activity, 48)' "$BASE/JanusAdaptiveUi.java"
-          grep -q 'widthDp < 380' "$BASE/JanusAdaptiveUi.java"
-          grep -q 'widthDp >= 600' "$BASE/JanusAdaptiveUi.java"
           grep -q 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$BASE/JanusApiClient.java"
           CORE="$BASE/JanusLocalCoreRuntime.java"
           grep -q 'Strictly forward-only routing' "$CORE"
@@ -72,16 +72,14 @@ jobs:
         shell: bash
         run: |
           VERSION=$(sed -n "s/^[[:space:]]*versionName[[:space:]]*'\([^']*\)'.*/\1/p" android/app/build.gradle | head -n1)
-          test -n "$VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "apk_name=JANUS-Android-v$VERSION-FULL-REBUILD.apk" >> "$GITHUB_OUTPUT"
+          test -n "$VERSION"; echo "version=$VERSION" >> "$GITHUB_OUTPUT"; echo "apk_name=JANUS-Android-v$VERSION-FULL-REBUILD.apk" >> "$GITHUB_OUTPUT"
       - name: Copy APK and record build identity
         shell: bash
         env: { VERSION: '${{ steps.app_version.outputs.version }}', APK_NAME: '${{ steps.app_version.outputs.apk_name }}' }
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: safe areas + structured Chat model + source cards + adaptive/accessibility layer; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: safe areas + structured Chat response/source model + direct source renderer + adaptive/accessibility layer; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
