@@ -28,12 +28,14 @@ public class JanusApplication extends Application {
                 JanusUiPolish.install(activity);
                 JanusProductPolish.install(activity);
                 JanusScreenStatePolish.install(activity);
+                JanusFeaturePolish.install(activity);
             }
             @Override public void onActivityStarted(Activity activity) {}
             @Override public void onActivityResumed(Activity activity) {
                 JanusUiPolish.install(activity);
                 JanusProductPolish.install(activity);
                 JanusScreenStatePolish.install(activity);
+                JanusFeaturePolish.install(activity);
             }
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
