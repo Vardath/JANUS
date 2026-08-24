@@ -8,6 +8,13 @@ on:
       - 'tools/verify_server_v2.py'
       - '.github/workflows/test-server-v2.yml'
       - 'requirements.txt'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server_v2/**'
+      - 'tools/verify_server_v2.py'
+      - '.github/workflows/test-server-v2.yml'
+      - 'requirements.txt'
   workflow_dispatch:
 
 jobs:
