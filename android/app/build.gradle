@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v0.89: authoritative native JANUS Android Memory/Research/Account feature pass.
+// v0.90: authoritative native JANUS Android Messages reply-context extraction pass.
 // No WebView UI, no generated HTML, no composer/patch pipeline.
 android {
     namespace 'com.vardath.janus'
@@ -19,8 +19,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 89
-        versionName '0.89'
+        versionCode 90
+        versionName '0.90'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
