@@ -121,6 +121,11 @@ public final class JanusApiClient {
         return code == 0 || code == 408 || code == 425 || code == 429 || code == 502 || code == 503 || code == 504 || code >= 500;
     }
 
+    /**
+     * Convert successful non-auth capability results into bounded local typed senses.
+     * Raw file bytes/base64, session tokens, passwords and authentication payloads are
+     * never forwarded into the local sensory runtime.
+     */
     private void senseCapability(String method, String path, String requestBody, String responseBody) {
         if (path == null || path.startsWith("/auth/") || path.startsWith("/maintenance/") || "/core-sync/exchange".equals(path)) return;
         try {
