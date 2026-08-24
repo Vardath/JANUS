@@ -24,14 +24,15 @@ def test_deployment_wires_owner_maintenance_api():
 
 def test_native_android_maintenance_ui_has_manual_only_decisions():
     text = Path('android/app/src/main/java/com/vardath/janus/MainActivity.java').read_text(encoding='utf-8')
-    assert 'Maintenance review' in text
+    assert 'Maintenance Review' in text
     assert '/maintenance/status' in text
     assert '/maintenance/reviews/' in text
-    assert 'Approve for manual work' in text
+    assert 'Button approve=button("Approve")' in text
     assert 'approved_for_manual_work' in text
     assert 'deferred' in text
     assert 'rejected' in text
-    assert 'will not make or deploy any changes automatically' in text
+    assert 'No automatic changes will be made.' in text
+    assert 'It never authorizes JANUS to edit code, install packages, change models/APIs or deploy itself.' in text
 
 
 def test_authoritative_android_workflow_does_not_recompose_legacy_product():
