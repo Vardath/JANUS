@@ -6,6 +6,7 @@ on:
     paths:
       - 'server_v2/**'
       - 'tools/verify_server_v2.py'
+      - 'tests/test_sensory_capability_wiring.py'
       - '.github/workflows/test-server-v2.yml'
       - 'requirements.txt'
   pull_request:
@@ -13,6 +14,7 @@ on:
     paths:
       - 'server_v2/**'
       - 'tools/verify_server_v2.py'
+      - 'tests/test_sensory_capability_wiring.py'
       - '.github/workflows/test-server-v2.yml'
       - 'requirements.txt'
   workflow_dispatch:
@@ -28,9 +30,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt pytest
       - name: Compile clean server
-        run: python -m py_compile server_v2/*.py tools/verify_server_v2.py
+        run: python -m py_compile server_v2/*.py tools/verify_server_v2.py tests/test_sensory_capability_wiring.py
+      - name: Verify typed capability sensory wiring
+        run: python -m pytest -q tests/test_sensory_capability_wiring.py
       - name: Verify clean server end to end
         run: python tools/verify_server_v2.py
       - name: Prove v2 orchestration does not import legacy server modules
