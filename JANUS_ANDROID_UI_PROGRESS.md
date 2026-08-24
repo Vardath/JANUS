@@ -13,22 +13,28 @@ Updated: 2026-08-24
 - v0.97: queued delivery moved onto the shared Chat controller/API stack; generated-image metadata restored after restart.
 - v0.98: foreground `/desktop/chat` API posts cross the shared controller boundary; structured history v2 introduced alongside legacy history.
 - v0.99: structured history v2 became an independent bounded store with one-way legacy migration; completed migration build verified and published.
+- v1.00: structured Chat v2 became the visible surface authority; published APK verified.
 
-## v1.00 — structured Chat v2 is the visible surface authority
-Implemented on integration branch; release verification pending:
-- new `JanusChatV2Surface` watches the actual native Chat surface and projects authoritative v2 history into every newly-created Chat log before normal use;
-- subsequent user/JANUS/system bubbles are captured back into the v2 store when the visible Chat log changes;
-- the existing private `MainActivity.renderSavedChat()` is invoked only as a compatibility renderer after v2 has been projected, so `chat_history_native_v1` is now an adapter/migration surface rather than the durable source of truth;
-- the v2 store remains the long-lived bounded source for clean reply text plus structured sources/generated-image metadata;
-- application lifecycle installs the v2 surface authority and retains pause/stop/save capture as additional resilience;
-- Android version advances to 1.00 / versionCode 100;
-- no server, cognition, federation, auth ownership or 11-core routing contract changes;
-- CI requires the v2 surface authority, one-way legacy migration, shared foreground/queued Chat controller path, structured source/image restoration, safe insets, reply context, route hygiene, forward-only core routing, Java compilation and APK assembly.
+## v1.01 — direct foreground Chat controller + v2 history
+Pre-merge Android CI is green (gate, Java compilation, APK assembly):
+- `MainActivity.sendChat()` now calls `JanusChatController.send(api, prepared)` directly; the Activity-local retry array/loop is removed;
+- successful foreground replies use `JanusChatPresentation` as the authoritative reply/source/generated-image model;
+- the live Chat bubble receives clean reply text only; the old foreground `Sources:` appendix construction is removed;
+- Background Research retains a separate `formatResearchSources()` helper so research provenance formatting is independent from Chat rendering;
+- foreground JANUS replies are persisted directly with `JanusChatHistoryStore.append(..., presentation)`;
+- user/system bubbles use the v2 history append path through `rememberChat()`;
+- `renderSavedChat()` reads `JanusChatHistoryStore.read()` directly and reseeds the presentation registry from each stored structured presentation so source cards/generated images remain available after restart;
+- `JanusChatResponseRegistry.remember()` was added for authoritative-history reseeding and de-duplication;
+- `JanusApplication` no longer installs the v1.00 reflective `JanusChatV2Surface` or lifecycle capture bridge in normal operation;
+- legacy v1 history remains only as the one-way migration source inside `JanusChatHistoryStore` during the compatibility window;
+- version advances to 1.01 / versionCode 101;
+- no server, cognition, federation, auth ownership or 11-core routing contract changed;
+- PR #13 pre-merge build successfully passed the v1.01 ownership gate, Java compilation and APK assembly before merge.
 
-## Remaining Chat cleanup after v1.00
-1. Replace the foreground Activity's duplicate retry/JSON/source-append block with direct `JanusChatController.send()` usage once a safe targeted source-edit path is available.
-2. Remove `formatSources()` from foreground Chat completely; keep any Background Research formatting independent.
-3. Retire the v1 compatibility adapter after a release window once v2-only history has been exercised on-device.
-4. Continue extracting Messages/Observe/Research surfaces and wider-screen layouts.
+## Next intended passes
+1. After v1.01 publishes, delete or quarantine the now-unused `JanusChatV2Surface` / `JanusChatHistoryBridge` compatibility classes after confirming no remaining references.
+2. Preserve structured metadata for queued/offline replies rather than only their reply text.
+3. Continue extracting Messages/Observe/Research surfaces from `MainActivity` and improve wider-screen/tablet layouts.
+4. Add targeted regression tests around v2 history migration, reply-context send, source-card restoration and generated-image restoration.
 
 Release rule: do not mark a pass fully released until `apk-download` publishes the matching version after CI compilation and APK assembly.
