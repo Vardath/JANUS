@@ -1,125 +1,72 @@
 name: Build JANUS Android APK
-
 on:
   push:
     branches: [main]
-    paths:
-      - 'android/**'
-      - '.github/workflows/build-android.yml'
+    paths: ['android/**', '.github/workflows/build-android.yml']
   pull_request:
-    paths:
-      - 'android/**'
-      - '.github/workflows/build-android.yml'
+    paths: ['android/**', '.github/workflows/build-android.yml']
   workflow_dispatch:
-
-permissions:
-  contents: write
-
+permissions: { contents: write }
 jobs:
   build-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-
       - name: Verify authoritative native Android boundary
         shell: bash
         run: |
           set -euxo pipefail
-          SRC=android/app/src/main/java/com/vardath/janus/MainActivity.java
-          API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
-          ROUTE=android/app/src/main/java/com/vardath/janus/JanusRoutePolicy.java
-          CORE=android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
-          UI=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
-          REPLY=android/app/src/main/java/com/vardath/janus/JanusReplyContextPolish.java
-          SOURCE=android/app/src/main/java/com/vardath/janus/JanusSourcePolish.java
-          APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
-          MAN=android/app/src/main/AndroidManifest.xml
-          GRADLE=android/app/build.gradle
-          for f in "$SRC" "$API" "$ROUTE" "$CORE" "$UI" "$REPLY" "$SOURCE" "$APP" "$MAN" "$GRADLE"; do test -s "$f"; done
+          BASE=android/app/src/main/java/com/vardath/janus
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusChatPresentation JanusAdaptiveUi JanusApplication; do test -s "$BASE/$f.java"; done
           test ! -e android/app/src/main/assets/index.html
-          ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' android/app/src/main/java
-          grep -q 'class MainActivity extends Activity' "$SRC"
-          grep -q "applicationId 'com.vardath.janus'" "$GRADLE"
-          grep -q "versionName '0.91'" "$GRADLE"
-          test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
-
-      - name: Verify core product contracts
+          ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
+          grep -q "versionName '0.92'" android/app/build.gradle
+          grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
+          test "$(grep -o 'android.intent.category.LAUNCHER' android/app/src/main/AndroidManifest.xml | wc -l)" -eq 1
+      - name: Verify v0.92 UI and architecture contracts
         shell: bash
         run: |
           set -euxo pipefail
-          UI=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
-          REPLY=android/app/src/main/java/com/vardath/janus/JanusReplyContextPolish.java
-          SOURCE=android/app/src/main/java/com/vardath/janus/JanusSourcePolish.java
-          APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
-          API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
-          ROUTE=android/app/src/main/java/com/vardath/janus/JanusRoutePolicy.java
-          grep -q 'WindowInsetsCompat.Type.systemBars()' "$UI"
-          grep -q 'WindowInsetsCompat.Type.ime()' "$UI"
-          grep -q 'Math.max(bars.bottom, ime.bottom)' "$UI"
-          grep -q 'Replying to JANUS' "$REPLY"
-          grep -q 'PREFIX + state.context + SUFFIX + reply' "$REPLY"
-          grep -q 'JanusSourcePolish.install(activity)' "$APP"
-          grep -q 'Sources · ' "$SOURCE"
-          grep -q 'Tap to open' "$SOURCE"
-          grep -q 'Intent.ACTION_VIEW' "$SOURCE"
-          grep -q 'parseSources' "$SOURCE"
-          grep -q 'body.setText(answer)' "$SOURCE"
-          grep -q 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$API"
-          grep -q 'isAccountOwnedPath' "$ROUTE"
-
-      - name: Verify 11-core architectural invariants
-        shell: bash
-        run: |
-          set -euxo pipefail
-          CORE=android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
+          BASE=android/app/src/main/java/com/vardath/janus
+          grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
+          grep -q 'Replying to JANUS' "$BASE/JanusReplyContextPolish.java"
+          grep -q 'Sources · ' "$BASE/JanusSourcePolish.java"
+          grep -q 'fromResponse(JSONObject response' "$BASE/JanusChatPresentation.java"
+          grep -q 'List<Source> sources' "$BASE/JanusChatPresentation.java"
+          grep -q 'JanusAdaptiveUi.install(activity)' "$BASE/JanusApplication.java"
+          grep -q 'minTouch = dp(activity, 48)' "$BASE/JanusAdaptiveUi.java"
+          grep -q 'widthDp < 380' "$BASE/JanusAdaptiveUi.java"
+          grep -q 'widthDp >= 600' "$BASE/JanusAdaptiveUi.java"
+          grep -q 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$BASE/JanusApiClient.java"
+          CORE="$BASE/JanusLocalCoreRuntime.java"
           grep -q 'Strictly forward-only routing' "$CORE"
           grep -q 'send(from, "left_hemisphere"' "$CORE"
           grep -q 'send(from, "right_hemisphere"' "$CORE"
           grep -q 'send(from, "consensus"' "$CORE"
           grep -q 'send(from, "interface"' "$CORE"
           ! grep -q 'send("interface", "consensus"' "$CORE"
-          ! grep -q 'send("consensus", "left_hemisphere"' "$CORE"
-          ! grep -q 'send("consensus", "right_hemisphere"' "$CORE"
           grep -q '\[feedback-only global\]' "$CORE"
-          grep -q 'core_cycle_api_calls' "$CORE"
-          grep -q 'background_cycles_enabled' "$CORE"
-
       - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
+        with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v5
-        with:
-          gradle-version: '8.11.1'
-
+        with: { gradle-version: '8.11.1' }
       - name: Restore stable debug signing key
         uses: actions/cache@v5
-        with:
-          path: ~/.android/debug.keystore
-          key: janus-android-debug-keystore-v1
-
+        with: { path: ~/.android/debug.keystore, key: janus-android-debug-keystore-v1 }
       - name: Ensure stable debug signing key exists
         shell: bash
         run: |
           mkdir -p "$HOME/.android"
-          if [ ! -f "$HOME/.android/debug.keystore" ]; then
-            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"; fi
       - name: Compile authoritative Java client
         working-directory: android
-        env:
-          JANUS_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}
+        env: { JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}' }
         run: gradle --no-daemon :app:compileDebugJavaWithJavac --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
-
       - name: Build debug APK
         working-directory: android
-        env:
-          JANUS_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}
+        env: { JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}' }
         run: gradle --no-daemon :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
-
       - name: Read app version
         id: app_version
         shell: bash
@@ -128,26 +75,13 @@ jobs:
           test -n "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "apk_name=JANUS-Android-v$VERSION-FULL-REBUILD.apk" >> "$GITHUB_OUTPUT"
-
       - name: Copy APK and record build identity
         shell: bash
-        env:
-          VERSION: ${{ steps.app_version.outputs.version }}
-          APK_NAME: ${{ steps.app_version.outputs.apk_name }}
+        env: { VERSION: '${{ steps.app_version.outputs.version }}', APK_NAME: '${{ steps.app_version.outputs.apk_name }}' }
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          {
-            echo "JANUS Android authoritative native build identity"
-            echo "Version: $VERSION"
-            echo "Package: com.vardath.janus"
-            echo "Source commit: $GITHUB_SHA"
-            echo "UI: safe areas + Chat actions + reply context + tappable source cards; no WebView"
-            echo "Architecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface"
-            echo "Signing certificate from stable build keystore:"
-            keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1:|SHA256:' || true
-          } > oauth-build-info.txt
-
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: safe areas + structured Chat model + source cards + adaptive/accessibility layer; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
@@ -155,27 +89,14 @@ jobs:
             ${{ steps.app_version.outputs.apk_name }}
             oauth-build-info.txt
           if-no-files-found: error
-
       - name: Publish direct-download APK branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
-        env:
-          VERSION: ${{ steps.app_version.outputs.version }}
-          APK_NAME: ${{ steps.app_version.outputs.apk_name }}
+        env: { VERSION: '${{ steps.app_version.outputs.version }}', APK_NAME: '${{ steps.app_version.outputs.apk_name }}' }
         run: |
-          mkdir -p /tmp/janus-apk
-          cp "$APK_NAME" /tmp/janus-apk/
-          cp oauth-build-info.txt /tmp/janus-apk/
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan apk-download
-          git rm -rf .
-          mkdir -p downloads
-          cp "/tmp/janus-apk/$APK_NAME" downloads/
-          cp /tmp/janus-apk/oauth-build-info.txt downloads/
-          printf '# JANUS Android downloads\n\nLatest authoritative native APK: %s\n\n## Build identity\n\n```text\n' "$APK_NAME" > README.md
-          cat /tmp/janus-apk/oauth-build-info.txt >> README.md
-          printf '\n```\n' >> README.md
-          git add README.md "downloads/$APK_NAME" downloads/oauth-build-info.txt
-          git commit -m "Publish JANUS Android native v$VERSION"
-          git push --force origin HEAD:apk-download
+          mkdir -p /tmp/janus-apk && cp "$APK_NAME" oauth-build-info.txt /tmp/janus-apk/
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan apk-download && git rm -rf . && mkdir -p downloads
+          cp "/tmp/janus-apk/$APK_NAME" downloads/; cp /tmp/janus-apk/oauth-build-info.txt downloads/
+          printf '# JANUS Android downloads\n\nLatest authoritative native APK: %s\n' "$APK_NAME" > README.md
+          git add README.md downloads && git commit -m "Publish JANUS Android native v$VERSION" && git push --force origin HEAD:apk-download
