@@ -18,25 +18,26 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusChatPresentation JanusChatResponseRegistry JanusAdaptiveUi JanusApplication; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusUiPolish JanusReplyContextPolish JanusSourcePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusAdaptiveUi JanusApplication; do test -s "$BASE/$f.java"; done
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '0.94'" android/app/build.gradle
+          grep -q "versionName '0.95'" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
-      - name: Verify v0.94 live structured source handoff
+      - name: Verify v0.95 structured Chat persistence/controller contracts
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
           grep -q 'JanusChatResponseRegistry.capture(responseBody)' "$BASE/JanusApiClient.java"
-          grep -q '"/desktop/chat".equals(effectivePath)' "$BASE/JanusApiClient.java"
-          grep -q 'JanusChatPresentation.fromResponse' "$BASE/JanusChatResponseRegistry.java"
-          grep -q 'consumeForReply' "$BASE/JanusChatResponseRegistry.java"
-          grep -q 'JanusChatResponseRegistry.consumeForReply' "$BASE/JanusSourcePolish.java"
-          grep -q 'body.setText(p.reply)' "$BASE/JanusSourcePolish.java"
+          grep -q 'JanusChatResponseRegistry.init(this)' "$BASE/JanusApplication.java"
+          grep -q 'janus_chat_presentation_v095' "$BASE/JanusChatResponseRegistry.java"
+          grep -q 'prefs.edit().putString(KEY' "$BASE/JanusChatResponseRegistry.java"
+          grep -q 'JanusChatPresentation.fromStored' "$BASE/JanusChatResponseRegistry.java"
+          grep -q 'JSONObject toJson' "$BASE/JanusChatPresentation.java"
+          grep -q 'JanusChatPresentation fromStored' "$BASE/JanusChatPresentation.java"
+          grep -q 'class JanusChatController' "$BASE/JanusChatController.java"
+          grep -q 'RETRY_DELAYS_MS' "$BASE/JanusChatController.java"
           grep -q 'buildPanel(activity,p.sources)' "$BASE/JanusSourcePolish.java"
-          ! grep -q 'parseSources(String appendix)' "$BASE/JanusSourcePolish.java"
-          grep -q 'parseSources(JSONArray raw)' "$BASE/JanusChatPresentation.java"
           grep -q 'WindowInsetsCompat.Type.systemBars()' "$BASE/JanusUiPolish.java"
           grep -q 'Replying to JANUS' "$BASE/JanusReplyContextPolish.java"
           grep -q 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$BASE/JanusApiClient.java"
@@ -76,7 +77,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: live structured Chat source handoff + safe areas + accessibility; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: persistent structured Chat source/image metadata + controller extraction foundation + safe areas/accessibility; no WebView\nArchitecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
