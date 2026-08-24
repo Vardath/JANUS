@@ -10,7 +10,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 
 import androidx.annotation.NonNull;
-import androidx.core.app.ContextCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
@@ -36,9 +36,6 @@ public class JanusMessageWorker extends Worker {
         String token = ctx.getSharedPreferences("janus", Context.MODE_PRIVATE).getString("access_token", "");
         if (token == null || token.isEmpty()) return Result.success();
 
-        // First priority: deliver any user messages that were persisted while
-        // the phone/server connection was unavailable. Replies are retained in
-        // app-private storage and shown the next time the JANUS UI is active.
         JanusOfflineQueue.flush(ctx);
 
         HttpURLConnection c = null;
