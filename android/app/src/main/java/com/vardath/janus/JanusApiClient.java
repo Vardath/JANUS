@@ -44,7 +44,8 @@ public final class JanusApiClient {
     public Response request(String method, String path, String body, boolean auth) {
         HttpURLConnection c = null;
         try {
-            c = (HttpURLConnection) new URL(SERVER + path).openConnection();
+            String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
+            c = (HttpURLConnection) new URL(SERVER + effectivePath).openConnection();
             c.setRequestMethod(method);
             c.setConnectTimeout(20000);
             c.setReadTimeout(120000);
@@ -74,7 +75,8 @@ public final class JanusApiClient {
     public byte[] download(String path, boolean auth) throws Exception {
         HttpURLConnection c = null;
         try {
-            c = (HttpURLConnection) new URL(SERVER + path).openConnection();
+            String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
+            c = (HttpURLConnection) new URL(SERVER + effectivePath).openConnection();
             c.setRequestMethod("GET");
             c.setConnectTimeout(20000);
             c.setReadTimeout(120000);
@@ -86,8 +88,8 @@ public final class JanusApiClient {
             }
             int code = c.getResponseCode();
             if (code < 200 || code >= 300) {
-                String body = read(c.getErrorStream());
-                throw new IllegalStateException("HTTP " + code + (body.isEmpty() ? "" : " · " + body));
+                String responseBody = read(c.getErrorStream());
+                throw new IllegalStateException("HTTP " + code + (responseBody.isEmpty() ? "" : " · " + responseBody));
             }
             try (InputStream in = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[32768];
