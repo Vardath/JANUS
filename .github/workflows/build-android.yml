@@ -28,6 +28,7 @@ jobs:
           set -euxo pipefail
           SRC=android/app/src/main/java/com/vardath/janus/MainActivity.java
           API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
+          ROUTE=android/app/src/main/java/com/vardath/janus/JanusRoutePolicy.java
           CORE=android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
           POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
           PRODUCT=android/app/src/main/java/com/vardath/janus/JanusProductPolish.java
@@ -35,15 +36,15 @@ jobs:
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
           GRADLE=android/app/build.gradle
-          test -s "$SRC" && test -s "$API" && test -s "$CORE" && test -s "$POLISH" && test -s "$PRODUCT" && test -s "$MAP" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
+          test -s "$SRC" && test -s "$API" && test -s "$ROUTE" && test -s "$CORE" && test -s "$POLISH" && test -s "$PRODUCT" && test -s "$MAP" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' android/app/src/main/java
           grep -q 'class MainActivity extends Activity' "$SRC"
           grep -q "applicationId 'com.vardath.janus'" "$GRADLE"
-          grep -q "versionName '0.86'" "$GRADLE"
+          grep -q "versionName '0.87'" "$GRADLE"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
 
-      - name: Verify safe-area Chat Cores Observe and product readability contract
+      - name: Verify safe-area Chat Cores Observe and product usability contract
         shell: bash
         run: |
           set -euxo pipefail
@@ -87,6 +88,28 @@ jobs:
           grep -q 'Reduced capability' "$PRODUCT"
           grep -q 'Needs attention' "$PRODUCT"
           grep -q 'JANUS cannot edit its own source' "$PRODUCT"
+          grep -q 'Reply in Chat' "$PRODUCT"
+          grep -q 'Mark read' "$PRODUCT"
+          grep -q 'Continue your JANUS identity' "$PRODUCT"
+          grep -q 'temporarily unavailable' "$PRODUCT"
+          grep -q 'delete account' "$PRODUCT"
+
+      - name: Verify authenticated route hygiene
+        shell: bash
+        run: |
+          set -euxo pipefail
+          API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
+          ROUTE=android/app/src/main/java/com/vardath/janus/JanusRoutePolicy.java
+          grep -q 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$API"
+          test "$(grep -c 'JanusRoutePolicy.sanitizeAuthenticatedPath(path)' "$API")" -ge 2
+          grep -q 'isAccountOwnedPath' "$ROUTE"
+          grep -q '"username".equals(key)' "$ROUTE"
+          grep -q '"profile_id".equals(key)' "$ROUTE"
+          grep -q '/desktop/messages' "$ROUTE"
+          grep -q '/desktop/core-observe' "$ROUTE"
+          grep -q '/desktop/runtime-cores' "$ROUTE"
+          grep -q '/desktop/memory' "$ROUTE"
+          grep -q '/desktop/activity' "$ROUTE"
 
       - name: Verify complete product surface
         shell: bash
@@ -204,7 +227,7 @@ jobs:
             echo "Version: $VERSION"
             echo "Package: com.vardath.janus"
             echo "Source commit: $GITHUB_SHA"
-            echo "UI: native Android safe areas + Chat + Cores/Observe + product-surface readability; no WebView"
+            echo "UI: safe areas + Chat + Cores/Observe + product usability + authenticated route hygiene; no WebView"
             echo "Architecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface"
             echo "Signing certificate from stable build keystore:"
             keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1:|SHA256:' || true
