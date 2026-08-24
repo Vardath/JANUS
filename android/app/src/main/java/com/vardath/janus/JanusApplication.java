@@ -13,10 +13,6 @@ public class JanusApplication extends Application {
 
     @Override public void onCreate() {
         super.onCreate();
-
-        // The rebuilt client intentionally does not inherit local state from the
-        // broken WebView/patch-era applications. Server-owned account, memory and
-        // continuity are recovered only after the user signs in successfully.
         SharedPreferences boot = getSharedPreferences(BOOT_PREFS, Context.MODE_PRIVATE);
         if (!boot.getBoolean(CLEAN_MARKER, false)) {
             getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE).edit().clear().commit();
@@ -24,23 +20,18 @@ public class JanusApplication extends Application {
         }
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
-            @Override public void onActivityCreated(Activity activity, Bundle state) {
+            private void install(Activity activity) {
                 JanusUiPolish.install(activity);
                 JanusProductPolish.install(activity);
                 JanusScreenStatePolish.install(activity);
                 JanusFeaturePolish.install(activity);
                 JanusReplyContextPolish.install(activity);
                 JanusSourcePolish.install(activity);
+                JanusAdaptiveUi.install(activity);
             }
+            @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
-            @Override public void onActivityResumed(Activity activity) {
-                JanusUiPolish.install(activity);
-                JanusProductPolish.install(activity);
-                JanusScreenStatePolish.install(activity);
-                JanusFeaturePolish.install(activity);
-                JanusReplyContextPolish.install(activity);
-                JanusSourcePolish.install(activity);
-            }
+            @Override public void onActivityResumed(Activity activity) { install(activity); }
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
