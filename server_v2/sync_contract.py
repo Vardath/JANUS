@@ -15,9 +15,9 @@ def exchange(payload: dict[str, Any], authorization: Optional[str] = Header(defa
     result = mind.ingest_device(int(account["id"]), payload)
     status = mind.status(int(account["id"]))
     cores = status.get("cores") or {}
-    # This exact `server` envelope is the clean federation contract consumed by
-    # the native client. Remote material is feedback-only on the device and is
-    # reintroduced through specialist review there; it never overwrites local state.
+    # Android consumes consensus/interface from this envelope and re-enters them
+    # through local specialist review. iOS also consumes presence counts. Neither
+    # client receives authority to overwrite protected remote state.
     result["server"] = {
         "phase": status.get("phase"),
         "core_count": status.get("core_count"),
@@ -25,5 +25,10 @@ def exchange(payload: dict[str, Any], authorization: Optional[str] = Header(defa
         "interface": str((cores.get("interface") or {}).get("summary") or ""),
         "architecture": "7->2->1->1",
         "sync_policy": "selective-no-overwrite",
+    }
+    result["presence"] = {
+        "online": int(status.get("remote_clients") or 0),
+        "registered": int(status.get("registered_clients") or 0),
+        "clients": status.get("clients") or [],
     }
     return result
