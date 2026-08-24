@@ -23,14 +23,14 @@ final class JanusFanoPolicy {
 
     static String orientation(int direction) {
         switch (direction) {
-            case 1: return "evidence / truth / grounding";
-            case 2: return "safety / valence / welfare / boundary";
-            case 3: return "counterpoint / significance / consequence";
-            case 4: return "context / pattern / relationship";
-            case 5: return "logic / understanding / causal model";
-            case 6: return "novelty / possibility / imagination / direction";
-            case 7: return "memory / continuity / learned appraisal";
-            default: return "neutral / uncommitted reference";
+            case 1: return "evidence — truth/grounding";
+            case 2: return "safety — valence/welfare/boundary";
+            case 3: return "counterpoint — significance/conflict/consequence";
+            case 4: return "context — pattern/context/relationship";
+            case 5: return "logic — understanding/model/causality";
+            case 6: return "novelty — possibility/imagination/direction";
+            case 7: return "memory — continuity/experience/learned appraisal";
+            default: return "neutral/uncommitted reference";
         }
     }
 
