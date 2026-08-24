@@ -22,32 +22,31 @@ Implemented and published: native 7 -> 2 -> 1 -> 1 architecture map, Local/Globa
 Implemented and published: clearer Options hub, Memory tiers, Research headings, semantic System Status, background cadence labels, owner-gated Maintenance explanation.
 
 ## v0.87 — Messages/Auth usability + authenticated route hygiene
-Implemented and published:
-- `JanusRoutePolicy` centralizes account-owned path policy;
-- authenticated account-owned routes strip obsolete username/profile ownership hints while preserving operational filters;
-- clearer Messages categories and unread emphasis;
-- Reply in Chat / Mark read wording;
-- clearer authentication/account continuity copy and destructive-action treatment;
-- common loading/error copy improved.
+Implemented and published: centralized account-owned path policy, bearer-token ownership hygiene, clearer Messages categories, Reply in Chat / Mark read wording, cleaner auth/account continuity and common loading/error copy.
 
 ## v0.88 — screen-state and high-level presentation extraction
+Implemented and published:
+- `JanusScreenStatePolish` extracted consistent loading, empty, failure, inbox and account/session state presentation from `MainActivity`;
+- stable Observe and local-state-preserving failure wording retained;
+- CI gate corrected after a case-sensitive assertion error and the matching v0.88 APK was published.
+
+## v0.89 — Memory / Research / Account feature extraction
 Implemented on integration branch; release verification pending:
-- new `JanusScreenStatePolish` moves another cohesive presentation responsibility out of `MainActivity`;
-- loading/checking states become a consistent low-noise Working state;
-- empty Messages state explains that JANUS only surfaces worthwhile interruptions;
-- empty Observe state reinforces stable user-triggered snapshots and no auto-jump;
-- common remote-failure states explain that local JANUS state remains intact;
-- Messages is framed as a JANUS inbox rather than an internal telemetry dump;
-- auth copy now frames sign-in as reconnecting device-local JANUS with global continuity;
-- destructive account/session actions remain visually differentiated;
-- New inbox cards, delivery status, Healthy, Reduced capability and Needs attention retain consistent semantic accents;
-- v0.87 authenticated route hygiene and every earlier safe-area/Chat/Cores/Observe/product invariant remain gated in CI;
-- no cognition, federation or server_v2 behavior changed.
+- new `JanusFeaturePolish` contains feature-specific behavior with no networking or cognition logic;
+- Memory now gets client-side search across visible loaded memories;
+- Memory tier chips filter All / Trace / Working / Episodic / Core without another server request;
+- filter logic only hides recognized memory cards, preserving section/navigation structure;
+- Research evidence counts become compact human-readable evidence badges;
+- Research epistemic categories receive differentiated card accents while retaining established/hypothesis/negative/open/proposed separation;
+- Account gains a clearer `Session & security` section when session lifecycle actions are present;
+- sign-out controls distinguish `Sign out this device` from `Sign out all devices`;
+- v0.89 CI gates the new Memory filtering, Research evidence and Account/session behavior plus all prior Android invariants;
+- Messages reply transport is intentionally unchanged because the current implementation embeds quoted context in the composer; this will be changed only when reply context can remain in the sent payload without merely hiding it visually.
 
 ## Next intended passes
 
-1. Continue extracting feature-specific presentation and endpoint responsibility from `MainActivity` while preserving behavior.
-2. Improve true Messages reply-context behavior, source/evidence cards, Memory filtering/search and Research presentation where server contracts allow it safely.
-3. Consolidate repository continuity and CI after the Android UI settles.
+1. Extract true Messages reply-context state/payload so the surfaced message can appear as a quote card without dumping up to 500 characters into the composer.
+2. Add richer source/evidence presentation where server responses expose enough metadata safely.
+3. Continue moving endpoint and feature responsibilities out of `MainActivity`, then consolidate repository continuity/CI once the Android product UI settles.
 
 Release rule: do not mark an Android pass fully released until the `apk-download` branch publishes the matching version after CI compilation and APK assembly.
