@@ -9,12 +9,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-      - name: Verify RC1 upgrade, retry, voice and signing invariants
+      - name: Verify RC1 upgrade, identity, retry, voice and signing invariants
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
           APP="$BASE/JanusApplication.java"
+          API="$BASE/JanusApiClient.java"
+          ACCOUNT="$BASE/JanusAccountIsolation.java"
+          REGISTRY="$BASE/JanusChatResponseRegistry.java"
           QUEUE="$BASE/JanusOfflineQueue.java"
           MSG="$BASE/JanusMessageWorker.java"
           VOICE="$BASE/JanusDeviceVoice.java"
@@ -24,6 +27,17 @@ jobs:
 
           ! grep -q 'getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE).edit().clear()' "$APP"
           grep -q 'v109_rc1_nondestructive_migration' "$APP"
+
+          test -s "$ACCOUNT"
+          grep -q 'JanusAccountIsolation.beforeSaveSession' "$API"
+          grep -q 'JanusAccountIsolation.clearForSignOut' "$API"
+          grep -q '"/auth/me".equals(effectivePath).*isTransient' "$API" || grep -q 'offline_cached' "$API"
+          grep -q 'stopAndDetachLocalRuntime' "$ACCOUNT"
+          grep -q 'shutdownNow' "$ACCOUNT"
+          grep -q 'prefs.edit().clear().commit()' "$ACCOUNT"
+          grep -q 'JanusChatResponseRegistry.clear' "$ACCOUNT"
+          grep -q 'public static synchronized void clear' "$REGISTRY"
+
           grep -q 'enqueueUniqueWork("janus-offline-chat-retry-' "$QUEUE"
           grep -q 'ExistingWorkPolicy.REPLACE' "$QUEUE"
           grep -q 'notificationsAllowed' "$MSG"
