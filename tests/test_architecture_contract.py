@@ -44,13 +44,14 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertNotIn("python tools/rebuild_server.py", text)
         self.assertNotIn("uvicorn janus_app:app", text)
 
-    def test_docker_rebuilds_base_server_before_boot(self):
+    def test_docker_uses_same_clean_server_v2_entrypoint(self):
         text = (ROOT / "Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("RUN python tools/rebuild_server.py", text)
-        self.assertIn("uvicorn janus_app:app", text)
-        self.assertNotIn("patch_url_media_ingestion.py", text)
+        self.assertIn("uvicorn server_v2.entrypoint:app", text)
+        self.assertNotIn("tools/rebuild_server.py", text)
+        self.assertNotIn("janus_app:app", text)
+        self.assertNotIn("tools/patch_", text)
 
-    def test_server_fragments_exist_for_legacy_docker_compatibility(self):
+    def test_legacy_server_fragments_remain_archival_only(self):
         parts = sorted((ROOT / "src").glob("server.py.gz.b64.*"))
         self.assertGreaterEqual(len(parts), 1)
 
