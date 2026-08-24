@@ -23,6 +23,7 @@ public class JanusApplication extends Application {
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private void install(Activity activity) {
+                JanusChatHistoryBridge.prepare(activity);
                 JanusUiPolish.install(activity);
                 JanusProductPolish.install(activity);
                 JanusScreenStatePolish.install(activity);
@@ -31,14 +32,15 @@ public class JanusApplication extends Application {
                 JanusSourcePolish.install(activity);
                 JanusGeneratedImagePolish.install(activity);
                 JanusAdaptiveUi.install(activity);
+                JanusChatHistoryBridge.capture(activity);
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
             @Override public void onActivityResumed(Activity activity) { install(activity); }
-            @Override public void onActivityPaused(Activity activity) {}
-            @Override public void onActivityStopped(Activity activity) {}
-            @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
-            @Override public void onActivityDestroyed(Activity activity) {}
+            @Override public void onActivityPaused(Activity activity) { JanusChatHistoryBridge.capture(activity); }
+            @Override public void onActivityStopped(Activity activity) { JanusChatHistoryBridge.capture(activity); }
+            @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) { JanusChatHistoryBridge.capture(activity); }
+            @Override public void onActivityDestroyed(Activity activity) { JanusChatHistoryBridge.capture(activity); }
         });
 
         JanusLocalCoreRuntime.get(this).start();
