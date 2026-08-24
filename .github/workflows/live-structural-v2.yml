@@ -1,0 +1,82 @@
+name: Verify live JANUS v2 structure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/live-structural-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.13'}
+      - run: pip install requests
+      - shell: bash
+        run: |
+          set +e
+          python - <<'PY' > /tmp/structural.log 2>&1
+          import base64,json,random,string,time,requests
+          BASE='https://janus-global-core.onrender.com'; target='48ab80ccb752ae200a6ee47b49191d3bc231c7ed'
+          tests=[]; failures=[]
+          def rec(name,ok,detail=''):
+              tests.append({'test':name,'ok':bool(ok),'detail':str(detail)[:1000]})
+              if not ok: failures.append(name)
+          def g(p,**k): return requests.get(BASE+p,timeout=90,**k)
+          def p(path,**k): return requests.post(BASE+path,timeout=120,**k)
+          seen=''; stable=0
+          for _ in range(36):
+              try:
+                  c=g('/protocol/capabilities'); seen=str(c.json().get('deployed_commit','')) if c.status_code==200 else ''
+                  if seen==target: stable+=1
+                  else: stable=0
+                  if stable>=3: break
+              except Exception: stable=0
+              time.sleep(10)
+          rec('stable target deployment',stable>=3,{'seen':seen,'streak':stable})
+          if stable<3:
+              print(json.dumps({'tests':tests,'failures':failures},indent=2)); raise SystemExit(1)
+          s=''.join(random.choice(string.ascii_lowercase+string.digits) for _ in range(8)); u='struct-'+s; pw='JANUS-Struct-'+s+'-A8z2'; email=u+'@example.invalid'
+          reg=p('/auth/register',json={'username':u,'email':email,'password':pw}); rec('register',reg.status_code==200,reg.text)
+          if reg.status_code!=200:
+              print(json.dumps({'tests':tests,'failures':failures},indent=2)); raise SystemExit(1)
+          H={'Authorization':'Bearer '+reg.json()['access_token']}
+          try:
+              sync=p('/core-sync/exchange',headers=H,json={'device_id':'structure-check','client_version':'v0.82','phase':'wake','observe_events':[{'detail':'structural device evidence'}]}); sj=sync.json() if sync.status_code==200 else {}
+              rec('federation contract',sync.status_code==200 and sj.get('guidance',{}).get('sync_policy')=='selective-no-overwrite',sync.text)
+              data=base64.b64encode(b'clean structural file evidence').decode(); up=p('/files/upload',headers=H,json={'filename':'proof.txt','mime_type':'text/plain','data_base64':data}); fid=(up.json().get('file') or {}).get('id') if up.status_code==200 else None
+              rec('file upload',up.status_code==200 and bool(fid),up.text)
+              chat=p('/desktop/chat',headers=H,json={'message':'Assess attached evidence','attachment_ids':[fid] if fid else [],'client_message_id':'structural-chat'}); cj=chat.json() if chat.status_code==200 else {}
+              exact=['evidence','logic','counterpoint','context','memory','safety','novelty','left_hemisphere','right_hemisphere','consensus','interface']
+              rec('11-core grounded route',chat.status_code==200 and cj.get('route_trace')==exact and cj.get('attachment_grounding') is True,{'status':chat.status_code,'route':cj.get('route_trace'),'grounded':cj.get('attachment_grounding')})
+              obs=g('/desktop/core-observe?limit=250',headers=H); oi=obs.json().get('items',[]) if obs.status_code==200 else []; names={x.get('core_name') for x in oi}
+              rec('observe all cores',obs.status_code==200 and set(exact).issubset(names),sorted(x for x in names if x))
+              rt=g('/desktop/runtime-cores',headers=H); rj=(rt.json().get('runtime') or {}) if rt.status_code==200 else {}
+              rec('runtime state',rt.status_code==200 and rj.get('core_count')==11 and len(rj.get('core_reliability') or [])==11,{'core_count':rj.get('core_count'),'phase':rj.get('phase')})
+              seed=p('/research/workspace/seed',headers=H,json={}); ws=g('/research/workspace',headers=H); rec('research workspace',seed.status_code==200 and ws.status_code==200 and int(ws.json().get('count') or 0)>=3,{'seed':seed.status_code,'workspace':ws.status_code,'count':ws.json().get('count') if ws.status_code==200 else None})
+              art=p('/artifacts',headers=H,json={'kind':'continuity_report'}); aj=(art.json().get('artifact') or {}) if art.status_code==200 else {}; aid=aj.get('id'); info=g('/artifacts/'+str(aid),headers=H) if aid else None
+              rec('artifacts',art.status_code==200 and aid and info is not None and info.status_code==200,{'create':art.status_code,'read':info.status_code if info else None})
+              maint=g('/maintenance/status',headers=H); rec('maintenance',maint.status_code==200,maint.text)
+              msgs=g('/desktop/messages',headers=H); rec('messages',msgs.status_code==200 and isinstance(msgs.json().get('items'),list),msgs.text)
+              mem=g('/desktop/memory?username=forged',headers=H); rec('account-bound memory',mem.status_code==200 and mem.json().get('profile')==u,mem.text[:700])
+              health=g('/diagnostics/runtime-health'); rec('runtime health',health.status_code==200 and health.json().get('core_count')==11 and health.json().get('database_ok') is True,health.text)
+          finally:
+              d=requests.delete(BASE+'/auth/account',headers=H,json={'confirmation':'DELETE','current_password':pw},timeout=90); rec('cleanup',d.status_code==200,d.text)
+          print(json.dumps({'deployed_commit':target,'tests':tests,'failures':failures},indent=2)); raise SystemExit(1 if failures else 0)
+          PY
+          STATUS=$?
+          mkdir -p docs
+          { echo "JANUS V2 LIVE STRUCTURAL VERIFICATION"; echo "exit=${STATUS}"; echo; cat /tmp/structural.log; } > docs/SERVER_V2_LIVE_STRUCTURAL.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/SERVER_V2_LIVE_STRUCTURAL.txt
+          git commit -m "Record live JANUS v2 structural verification" || true
+          git push || true
+          exit "$STATUS"
