@@ -19,6 +19,7 @@ from .app import app  # noqa: E402
 from .advanced import router as advanced_router  # noqa: E402
 from .background import background  # noqa: E402
 from .chat import router as chat_router  # noqa: E402
+from .desktop import router as desktop_router  # noqa: E402
 from .identity_api import router as identity_router  # noqa: E402
 from .images import router as image_router  # noqa: E402
 from .maintenance import router as maintenance_router  # noqa: E402
@@ -28,6 +29,9 @@ from .sync_contract import router as sync_router  # noqa: E402
 # final reconstructed subsystem owns its endpoint exactly once.
 _FINAL_REPLACEMENTS = {
     ("/core-sync/exchange","POST"), ("/desktop/chat","POST"),
+    ("/desktop/runtime-cores","GET"), ("/desktop/cores","GET"), ("/desktop/memory","GET"),
+    ("/desktop/activity","GET"), ("/desktop/core-observe","GET"), ("/desktop/observe","GET"),
+    ("/desktop/home","GET"), ("/desktop/settings","GET"),
     ("/images/generate","POST"), ("/images/usage","GET"),
     ("/maintenance/status","GET"), ("/maintenance/reviews/{review_id}/decision","POST"),
 }
@@ -37,6 +41,7 @@ app.router.routes[:] = [
 ]
 app.include_router(chat_router)
 app.include_router(sync_router)
+app.include_router(desktop_router)
 app.include_router(image_router)
 app.include_router(maintenance_router)
 app.include_router(identity_router)
