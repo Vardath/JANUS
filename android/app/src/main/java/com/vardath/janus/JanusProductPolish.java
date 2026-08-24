@@ -1,6 +1,7 @@
 package com.vardath.janus;
 
 import android.app.Activity;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -12,14 +13,15 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Set;
 import java.util.WeakHashMap;
 
 /**
- * Product-surface readability layer for JANUS Android v0.86.
+ * Product-surface readability layer for JANUS Android v0.87.
  *
- * Keeps the stable v0.85 behavior/networking untouched while turning remaining
- * developer-oriented screens into clearer user-facing surfaces.
+ * Keeps cognition/network behavior stable while progressively moving visual and
+ * human-readable presentation policy out of MainActivity.
  */
 public final class JanusProductPolish {
     private static final Set<Activity> INSTALLED = Collections.newSetFromMap(new WeakHashMap<>());
@@ -47,22 +49,20 @@ public final class JanusProductPolish {
     private static void polishText(Activity activity, TextView t) {
         String s = String.valueOf(t.getText());
         if ("Device-local continuity".equals(s)) {
-            t.setText("This device · Local continuity");
-            sectionTitle(activity, t);
+            t.setText("This device · Local continuity"); sectionTitle(activity, t);
         } else if ("Server continuity".equals(s)) {
-            t.setText("Global JANUS · Durable continuity");
-            sectionTitle(activity, t);
+            t.setText("Global JANUS · Durable continuity"); sectionTitle(activity, t);
         } else if ("Research Workspace".equals(s)) {
-            t.setText("Research");
-            screenTitle(t);
+            t.setText("Research"); screenTitle(t);
         } else if ("Background Research".equals(s)) {
-            t.setText("Background research");
-            screenTitle(t);
+            t.setText("Background research"); screenTitle(t);
         } else if ("Maintenance Review".equals(s)) {
-            t.setText("Maintenance");
-            screenTitle(t);
+            t.setText("Maintenance"); screenTitle(t);
         } else if ("System Status".equals(s)) {
-            t.setText("System status");
+            t.setText("System status"); screenTitle(t);
+        } else if ("Messages".equals(s)) {
+            screenTitle(t);
+        } else if ("Account".equals(s)) {
             screenTitle(t);
         } else if (s.startsWith("ESTABLISHED / AUDITED")) {
             t.setText("Established / audited"); sectionTitle(activity, t);
@@ -74,12 +74,27 @@ public final class JanusProductPolish {
             t.setText("Open questions"); sectionTitle(activity, t);
         } else if (s.startsWith("PROPOSED TESTS")) {
             t.setText("Proposed tests"); sectionTitle(activity, t);
+        } else if (s.startsWith("Useful JANUS-originated questions")) {
+            t.setText("Questions, conclusions, warnings and follow-ups JANUS has chosen to surface. Routine internal processing stays in Observe.");
+            t.setTextSize(13);
+        } else if (s.startsWith("Sign in to continue your JANUS identity")) {
+            t.setText("Continue your JANUS identity, memory, conversations and research across devices.");
+            t.setTextSize(15);
+            t.setPadding(t.getPaddingLeft(), dp(activity, 4), t.getPaddingRight(), dp(activity, 14));
+        } else if (s.startsWith("Password and Google sign-in use the same JANUS account.")) {
+            t.setText("Password and Google sign-in lead to the same JANUS account. Google confirms identity; JANUS retains its own account continuity.");
+            t.setTextSize(12);
         } else if (s.startsWith("Deterministic local cycles use zero model/API calls.")) {
             t.setText("Local JANUS background cycles are deterministic and use no model/API calls. Paid background language reflection remains off by default. These controls affect this device only and cannot overwrite protected global identity or core state.");
             t.setTextSize(13);
         } else if (s.startsWith("JANUS may propose maintenance")) {
             t.setText("JANUS can recommend maintenance, but approval only authorizes manual work by you and ChatGPT. JANUS cannot edit its own source, install packages, switch models, change APIs, or deploy itself.");
             t.setTextSize(13);
+        } else if (s.startsWith("Loading")) {
+            t.setAlpha(.72f);
+        } else if (s.contains("could not be displayed") || s.contains("could not be loaded")) {
+            t.setText("This information is temporarily unavailable. You can retry without losing local JANUS state.");
+            t.setAlpha(.85f);
         }
     }
 
@@ -100,11 +115,24 @@ public final class JanusProductPolish {
         else if ("1m".equals(s)) b.setText("Balanced · 1m");
         else if ("2m".equals(s)) b.setText("Battery saver · 2m");
         else if ("5m".equals(s)) b.setText("Low activity · 5m");
+        else if ("Answer in Chat".equals(s)) b.setText("Reply in Chat");
+        else if ("Read".equals(s)) b.setText("Mark read");
 
-        if (s.contains("\n") || String.valueOf(b.getText()).contains("\n")) {
+        String label = String.valueOf(b.getText());
+        if (label.contains("\n")) {
             b.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             b.setTextSize(14);
             b.setMinHeight(dp(activity, 64));
+        }
+        if ("Sign in".equals(label) || "Create account".equals(label)) {
+            b.setMinHeight(dp(activity, 52));
+        } else if ("Continue with Google".equals(label)) {
+            b.setMinHeight(dp(activity, 52));
+        } else if (label.toLowerCase(Locale.ROOT).contains("delete account")) {
+            b.setTextColor(Color.rgb(183, 28, 28));
+            b.setBackgroundTintList(ColorStateList.valueOf(isDark(activity) ? Color.rgb(54, 37, 39) : Color.rgb(255, 238, 238)));
+        } else if (label.toLowerCase(Locale.ROOT).contains("sign out")) {
+            b.setMinHeight(dp(activity, 48));
         }
     }
 
@@ -120,8 +148,16 @@ public final class JanusProductPolish {
             accentCard(activity, card, Color.rgb(183, 28, 28));
         }
 
+        if (title.startsWith("New · ")) {
+            first.setText("New · " + humanMessageType(title.substring(6)));
+            accentCard(activity, card, Color.rgb(25, 118, 210));
+            card.setElevation(dp(activity, 2));
+        } else if (looksLikeMessageType(title)) {
+            first.setText(humanMessageType(title));
+        }
+
         if (title.matches("(?i)(trace|working|episodic|core)\\s*·.*")) {
-            String level = title.substring(0, title.indexOf('·')).trim().toLowerCase();
+            String level = title.substring(0, title.indexOf('·')).trim().toLowerCase(Locale.ROOT);
             String human;
             switch (level) {
                 case "core": human = "Core memory · protected continuity"; break;
@@ -131,6 +167,27 @@ public final class JanusProductPolish {
             }
             first.setText(human + title.substring(title.indexOf('·')));
         }
+    }
+
+    private static boolean looksLikeMessageType(String title) {
+        String s = title.toLowerCase(Locale.ROOT).trim();
+        return s.equals("question") || s.equals("conclusion") || s.equals("warning")
+                || s.equals("suggestion") || s.equals("maintenance") || s.equals("research")
+                || s.equals("research finding") || s.equals("follow-up") || s.equals("message");
+    }
+
+    private static String humanMessageType(String raw) {
+        String s = raw == null ? "Message" : raw.trim().replace('_', ' ');
+        if (s.isEmpty()) return "Message";
+        String lower = s.toLowerCase(Locale.ROOT);
+        if (lower.contains("question")) return "Question";
+        if (lower.contains("warning")) return "Warning";
+        if (lower.contains("conclusion")) return "Conclusion";
+        if (lower.contains("maintenance")) return "Maintenance";
+        if (lower.contains("research")) return "Research finding";
+        if (lower.contains("suggest")) return "Suggestion";
+        if (lower.contains("follow")) return "Follow-up";
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private static void screenTitle(TextView t) {
