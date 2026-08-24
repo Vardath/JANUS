@@ -23,23 +23,24 @@ Updated: 2026-08-24
 - v0.94: live structured source handoff captured at the API boundary and matched to rendered Chat responses.
 - v0.95: persistent structured reply/source/generated-image metadata and Chat controller foundation.
 - v0.96: controller-owned raw `/desktop/chat` transport primitive (`postRaw`) separated from the general API response-capture path.
+- v0.97: queued delivery moved onto the shared Chat controller/API stack; generated-image metadata restored after restart.
 
-## v0.97 — shared queued Chat delivery + persistent generated images
+## v0.98 — foreground controller boundary + structured history v2
 Implemented on integration branch; release verification pending:
-- `JanusChatController` now exposes `sendOnce()` for WorkManager/offline delivery while retaining its bounded foreground retry policy;
-- `JanusOfflineQueue` no longer maintains a second raw `HttpURLConnection` Chat client: queued messages now use `JanusApiClient` + `JanusChatController.sendOnce()`;
-- worker scheduling remains responsible for later queue retries, avoiding nested retry storms;
-- `JanusChatResponseRegistry` adds non-destructive `findForReply()` so source and image renderers can share the same persisted structured presentation;
-- new `JanusGeneratedImagePolish` restores generated images from persisted `generated_image.file_id` metadata, including after process/app restart, with accessibility descriptions and duplicate protection;
-- `JanusApplication` installs the generated-image restoration layer alongside structured sources, reply context, safe-area and adaptive UI layers;
+- ordinary authenticated `JanusApiClient.post("/desktop/chat", ...)` calls now cross `JanusChatController.sendOnce()` before returning to the foreground Activity, so foreground and queued Chat share the same response parsing/presentation-capture boundary;
+- the existing `MainActivity.sendChat()` outer retry loop is retained temporarily, avoiding nested retry storms while the giant Activity is progressively extracted;
+- new `JanusChatHistoryStore` maintains `chat_history_native_v2` structured records alongside the legacy visible history during migration;
+- the store listens for legacy Chat-history changes and immediately mirrors the last 80 records into schema-v2 entries;
+- JANUS records attach the matching serialized `JanusChatPresentation` when available, preserving sources and generated-image metadata directly with the saved message rather than only in a bounded side registry;
+- the visible body stored in v2 is the clean JANUS reply when structured presentation is available, not the old flattened `Sources:` appendix;
+- `JanusApplication` installs the structured history store at startup;
+- legacy `chat_history_native_v1` remains readable by `MainActivity` in this pass, so the migration is backward-compatible and does not risk blanking existing conversations;
 - no server, cognition, federation, auth ownership or 11-core routing contract changed;
-- the large foreground `MainActivity.sendChat()` method is still the remaining direct sender and is explicitly NOT claimed as migrated in this pass;
-- CI rejects a return of raw `HttpURLConnection` logic inside `JanusOfflineQueue` and verifies controller delivery, image restoration, structured sources, safe insets, reply context, route hygiene, forward-only core routing, Java compilation and APK assembly.
+- CI requires foreground Chat routing through the controller boundary, structured-history v2/listener/presentation metadata, queued controller delivery, persistent source/image rendering, safe insets, reply context, route hygiene, forward-only core routing, Java compilation and APK assembly.
 
 ## Next intended passes
-1. Replace the remaining foreground `MainActivity.sendChat()` networking/retry/parser block with `JanusChatController.send()` using a safe source-level edit, then remove the duplicate Activity retry policy.
-2. Remove the live Chat `formatSources()` compatibility append completely; retain/replace the separate Background Research formatter independently.
-3. Move Chat history from plain `who/body` records to structured message records so source/image/reply metadata is attached directly to each saved message rather than matched through a bounded registry.
-4. Continue separating Messages/Observe/Research surfaces and wider-screen layouts after the Chat boundary is clean.
+1. Switch `MainActivity` rendering/remembering to structured history v2 so the legacy `who/body` history can be retired after a compatibility window.
+2. Remove the Activity-local live `formatSources()` append and duplicate response parsing once a safe source-level edit path is used; keep Background Research source formatting independent.
+3. Continue separating Messages/Observe/Research surfaces and wider-screen layouts after the Chat boundary is clean.
 
 Release rule: do not mark a pass fully released until `apk-download` publishes the matching version after CI compilation and APK assembly.
