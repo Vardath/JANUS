@@ -25,7 +25,18 @@ public final class JanusApiClient {
     public void saveSession(String token, String profile) { prefs.edit().putString(TOKEN, token == null ? "" : token).putString(PROFILE, profile == null ? "" : profile).apply(); }
     public void clearSession() { prefs.edit().remove(TOKEN).remove(PROFILE).remove("last_notified_message").apply(); }
     public Response get(String path, boolean auth) { return request("GET", path, null, auth, true); }
-    public Response post(String path, String body, boolean auth) { return request("POST", path, body, auth, true); }
+
+    /**
+     * All ordinary foreground Chat POSTs cross the shared controller boundary.
+     * MainActivity may still own its outer retry loop during the incremental extraction,
+     * but transport parsing/capture is no longer a separate API-client side effect.
+     */
+    public Response post(String path, String body, boolean auth) {
+        String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
+        if (auth && "/desktop/chat".equals(effectivePath)) return JanusChatController.sendOnce(this, body).response;
+        return request("POST", path, body, auth, true);
+    }
+
     public Response delete(String path, String body, boolean auth) { return request("DELETE", path, body, auth, true); }
 
     /** Raw transport primitive for higher-level controllers. It deliberately performs no Chat presentation side effects. */
