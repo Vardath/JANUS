@@ -39,9 +39,6 @@ jobs:
           def get(path, **kw): return requests.get(BASE+path, timeout=90, **kw)
           def post(path, **kw): return requests.post(BASE+path, timeout=180, **kw)
 
-          # Wait for the same healthy v2 deployment commit to remain visible for
-          # three consecutive samples. This prevents a Render replacement in the
-          # middle of the test from being misdiagnosed as a JANUS route failure.
           stable=False; last=''; streak=0; stable_commit=None
           for _ in range(60):
               try:
@@ -91,8 +88,6 @@ jobs:
               model_ok=route_ok and reply and 'failed this turn' not in reply.lower() and 'not configured' not in reply.lower() and 'budget has been reached' not in reply.lower()
               note('external language model response', model_ok, {'status':chat.status_code,'reply':reply[:700],'model_policy':ch.get('model_policy')}, provider=True)
 
-              # Observe must show the whole deterministic society even if the paid
-              # Interface provider is temporarily rate-limited.
               obs=get('/desktop/core-observe?limit=250',headers=headers)
               items=obs.json().get('items',[]) if obs.status_code==200 else []; names={x.get('core_name') for x in items}
               note('observe covers all 11 cores', obs.status_code==200 and set(exact_route).issubset(names), {'cores':sorted(x for x in names if x),'status':obs.status_code})
@@ -140,8 +135,6 @@ jobs:
               note('smoke account cleanup', deleted, detail)
 
           print(json.dumps({'deployed_commit':stable_commit,'report':report,'structural_failures':structural_failures,'provider_failures':provider_failures},indent=2))
-          # Structural failures break the gate. Provider failures are recorded
-          # separately because they can be account quota/rate-limit configuration.
           raise SystemExit(1 if structural_failures else 0)
           PY
           STATUS=$?
@@ -159,3 +152,5 @@ jobs:
           git commit -m "Record stable JANUS server v2 live smoke result" || true
           git push || true
           exit "$STATUS"
+
+# manual retrigger: 2026-08-24T11:07+10:00
