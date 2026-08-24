@@ -1,10 +1,16 @@
 plugins { id 'com.android.application' }
 
 // v1.08: governed self-diagnosis, capability-request ledger and ChatGPT Supervisor handoff.
+// RC hardening adds release-signing preparation without changing the tested v1.08 product identity.
 // No WebView UI, no generated HTML, no composer/patch pipeline.
 android {
     namespace 'com.vardath.janus'
     compileSdk 36
+
+    def releaseStoreFile = project.findProperty('JANUS_RELEASE_STORE_FILE') ?: System.getenv('JANUS_RELEASE_STORE_FILE')
+    def releaseStorePassword = project.findProperty('JANUS_RELEASE_STORE_PASSWORD') ?: System.getenv('JANUS_RELEASE_STORE_PASSWORD')
+    def releaseKeyAlias = project.findProperty('JANUS_RELEASE_KEY_ALIAS') ?: System.getenv('JANUS_RELEASE_KEY_ALIAS')
+    def releaseKeyPassword = project.findProperty('JANUS_RELEASE_KEY_PASSWORD') ?: System.getenv('JANUS_RELEASE_KEY_PASSWORD')
 
     signingConfigs {
         debug {
@@ -12,6 +18,14 @@ android {
             storePassword 'android'
             keyAlias 'androiddebugkey'
             keyPassword 'android'
+        }
+        if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
 
@@ -25,7 +39,14 @@ android {
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
 
-    buildTypes { debug { signingConfig signingConfigs.debug } }
+    buildTypes {
+        debug { signingConfig signingConfigs.debug }
+        release {
+            minifyEnabled false
+            shrinkResources false
+            if (signingConfigs.findByName('release') != null) signingConfig signingConfigs.release
+        }
+    }
     buildFeatures { buildConfig true }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

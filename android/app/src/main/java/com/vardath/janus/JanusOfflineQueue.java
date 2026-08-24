@@ -3,6 +3,7 @@ package com.vardath.janus;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import androidx.work.ExistingWorkPolicy;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 
@@ -44,10 +45,11 @@ public final class JanusOfflineQueue {
 
     private static void scheduleFastRetries(Context context) {
         long[] delays = new long[]{8L, 25L, 60L};
+        WorkManager manager = WorkManager.getInstance(context.getApplicationContext());
         for (long delay : delays) {
             OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(JanusQueueRetryWorker.class)
                     .setInitialDelay(delay, TimeUnit.SECONDS).build();
-            WorkManager.getInstance(context.getApplicationContext()).enqueue(request);
+            manager.enqueueUniqueWork("janus-offline-chat-retry-" + delay, ExistingWorkPolicy.REPLACE, request);
         }
     }
 

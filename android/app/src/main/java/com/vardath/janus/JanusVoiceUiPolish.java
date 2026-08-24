@@ -58,6 +58,7 @@ final class JanusVoiceUiPolish {
                 voice = new JanusDeviceVoice(activity);
                 VOICE.put(activity, voice);
             }
+            final String originalDraft = composer.getText() == null ? "" : composer.getText().toString();
             mic.setEnabled(false);
             mic.setText("…");
             JanusDeviceVoice active = voice;
@@ -66,11 +67,12 @@ final class JanusVoiceUiPolish {
                     MAIN.post(() -> mic.setText(onDevice ? "Listen" : "Listen*"));
                 }
                 @Override public void onPartial(String text) {
-                    MAIN.post(() -> composer.setText(text));
+                    MAIN.post(() -> composer.setText(joinDraft(originalDraft, text)));
                 }
                 @Override public void onRecognized(String text, boolean onDevice) {
                     MAIN.post(() -> {
-                        composer.setText(text);
+                        String combined = joinDraft(originalDraft, text);
+                        composer.setText(combined);
                         composer.setSelection(composer.length());
                         mic.setEnabled(true);
                         mic.setText("Mic");
@@ -79,6 +81,8 @@ final class JanusVoiceUiPolish {
                 }
                 @Override public void onError(String message) {
                     MAIN.post(() -> {
+                        composer.setText(originalDraft);
+                        composer.setSelection(composer.length());
                         mic.setEnabled(true);
                         mic.setText("Mic");
                         if (message != null && !message.isBlank()) Toast.makeText(activity, message, Toast.LENGTH_SHORT).show();
@@ -91,6 +95,14 @@ final class JanusVoiceUiPolish {
     static void destroy(Activity activity) {
         JanusDeviceVoice voice = VOICE.remove(activity);
         if (voice != null) voice.destroy();
+    }
+
+    private static String joinDraft(String draft, String speech) {
+        String left = draft == null ? "" : draft.trim();
+        String right = speech == null ? "" : speech.trim();
+        if (left.isEmpty()) return right;
+        if (right.isEmpty()) return draft == null ? "" : draft;
+        return left + " " + right;
     }
 
     private static EditText findComposer(View view) {

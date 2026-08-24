@@ -1,0 +1,79 @@
+name: Test JANUS Android RC1 readiness
+on:
+  pull_request:
+    paths: ['android/**', '.github/workflows/test-android-rc1.yml']
+  workflow_dispatch:
+jobs:
+  rc1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify RC1 upgrade, identity, retry, privacy, voice and signing invariants
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=android/app/src/main/java/com/vardath/janus
+          APP="$BASE/JanusApplication.java"
+          API="$BASE/JanusApiClient.java"
+          ACCOUNT="$BASE/JanusAccountIsolation.java"
+          REGISTRY="$BASE/JanusChatResponseRegistry.java"
+          QUEUE="$BASE/JanusOfflineQueue.java"
+          MSG="$BASE/JanusMessageWorker.java"
+          VOICE="$BASE/JanusDeviceVoice.java"
+          VOICE_UI="$BASE/JanusVoiceUiPolish.java"
+          GRADLE=android/app/build.gradle
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+
+          ! grep -q 'getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE).edit().clear()' "$APP"
+          grep -q 'v109_rc1_nondestructive_migration' "$APP"
+
+          test -s "$ACCOUNT"
+          grep -q 'JanusAccountIsolation.beforeSaveSession' "$API"
+          grep -q 'JanusAccountIsolation.clearForSignOut' "$API"
+          grep -q 'offline_cached' "$API"
+          grep -q 'stopAndDetachLocalRuntime' "$ACCOUNT"
+          grep -q 'shutdownNow' "$ACCOUNT"
+          grep -q 'prefs.edit().clear().commit()' "$ACCOUNT"
+          grep -q 'JanusChatResponseRegistry.clear' "$ACCOUNT"
+          grep -q 'public static synchronized void clear' "$REGISTRY"
+
+          grep -q 'enqueueUniqueWork("janus-offline-chat-retry-' "$QUEUE"
+          grep -q 'ExistingWorkPolicy.REPLACE' "$QUEUE"
+          grep -q 'notificationsAllowed' "$MSG"
+          grep -q 'c.disconnect()' "$MSG"
+          grep -q 'code == 408 || code == 425 || code == 429 || code >= 500' "$MSG"
+
+          grep -q 'android:allowBackup="false"' "$MANIFEST"
+          grep -q 'android:fullBackupContent="false"' "$MANIFEST"
+          grep -q 'android:usesCleartextTraffic="false"' "$MANIFEST"
+          grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST"
+          ! grep -q 'android.permission.CAMERA' "$MANIFEST"
+          grep -q 'createOnDeviceSpeechRecognizer' "$VOICE"
+          grep -q 'startPushToTalk' "$VOICE_UI"
+          grep -q 'originalDraft' "$VOICE_UI"
+          ! grep -R -q 'MediaRecorder\|AudioRecord' "$BASE"
+
+          grep -q 'JANUS_RELEASE_STORE_FILE' "$GRADLE"
+          grep -q 'JANUS_RELEASE_STORE_PASSWORD' "$GRADLE"
+          grep -q 'JANUS_RELEASE_KEY_ALIAS' "$GRADLE"
+          grep -q 'JANUS_RELEASE_KEY_PASSWORD' "$GRADLE"
+          grep -q "versionName '1.08'" "$GRADLE"
+          grep -q "versionCode 108" "$GRADLE"
+          ! grep -q 'storePassword.*JANUS' "$GRADLE"
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v5
+        with: { gradle-version: '8.11.1' }
+      - name: Ensure debug signing key exists
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"; fi
+      - name: Compile and assemble RC audit APK
+        working-directory: android
+        env: { JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}' }
+        run: |
+          gradle --no-daemon :app:compileDebugJavaWithJavac --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
+          gradle --no-daemon :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
+          test -s app/build/outputs/apk/debug/app-debug.apk
