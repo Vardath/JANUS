@@ -3,11 +3,12 @@
 No legacy application modules are imported here. Persisted account/memory records
 are migrated as data only, then all runtime composition is provided by server_v2.
 """
-from . import governance, storage
+from . import governance, identity, storage
 from .migrate import migrate_persistent_data_once
 
 storage.init_schema()
 governance.init_schema()
+identity.init_schema()
 MIGRATION_RESULT = migrate_persistent_data_once()
 
 from .app import app  # noqa: E402
