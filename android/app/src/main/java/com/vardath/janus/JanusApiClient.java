@@ -61,7 +61,7 @@ public final class JanusApiClient {
 
     public Response delete(String path, String body, boolean auth) { return request("DELETE", path, body, auth, true); }
 
-    /** Raw Chat transport. Local thought context is injected here so UI/history retain only the user's visible message. */
+    /** Raw Chat transport. Hidden device context never replaces the exact visible user message. */
     Response postRaw(String path, String body, boolean auth) {
         String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
         String prepared = body;
@@ -77,7 +77,9 @@ public final class JanusApiClient {
             if (message.isBlank()) return body;
             j.put("user_visible_message", message);
             String augmented = JanusThoughtBridge.augment(JanusLocalCoreRuntime.get(appContext), message);
-            if (!augmented.equals(message)) j.put("message", augmented);
+            augmented = JanusLanguageSettings.augmentPrompt(appContext, augmented);
+            j.put("message", augmented);
+            j.put("preferred_language", JanusLanguageSettings.responseLocale(appContext).toLanguageTag());
             return j.toString();
         } catch (Exception ignored) {
             return body;
@@ -105,9 +107,7 @@ public final class JanusApiClient {
             InputStream in = code >= 200 && code < 400 ? c.getInputStream() : c.getErrorStream();
             String responseBody = read(in);
             if (code >= 200 && code < 300 && auth) senseCapability(method, effectivePath, body, responseBody);
-            if (captureChat && code >= 200 && code < 300 && "POST".equals(method) && "/desktop/chat".equals(effectivePath)) {
-                JanusChatResponseRegistry.capture(responseBody);
-            }
+            if (captureChat && code >= 200 && code < 300 && "POST".equals(method) && "/desktop/chat".equals(effectivePath)) JanusChatResponseRegistry.capture(responseBody);
             return new Response(code, responseBody, null);
         } catch (Exception e) {
             lastResponseCode = 0;
@@ -176,9 +176,7 @@ public final class JanusApiClient {
                 if (artifact != null) JanusLocalTypedSense.ingest(appContext, "action_result", "artifact", "Artifact created: " + artifact.optString("title", "JANUS artifact") + " (" + artifact.optString("kind", "artifact") + ").");
                 return;
             }
-            if ("POST".equals(method) && (path.startsWith("/claims") || path.startsWith("/desktop/continuity"))) {
-                JanusLocalTypedSense.ingest(appContext, "action_result", "workspace", "JANUS workspace state changed successfully at " + path + ".");
-            }
+            if ("POST".equals(method) && (path.startsWith("/claims") || path.startsWith("/desktop/continuity"))) JanusLocalTypedSense.ingest(appContext, "action_result", "workspace", "JANUS workspace state changed successfully at " + path + ".");
         } catch (Exception ignored) {}
     }
 

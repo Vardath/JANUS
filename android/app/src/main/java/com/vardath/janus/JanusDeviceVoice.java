@@ -2,7 +2,6 @@ package com.vardath.janus;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -21,14 +20,7 @@ import java.util.UUID;
 
 /**
  * Zero-OpenAI-cost device voice surface for JANUS.
- *
- * Recognition is push-to-talk only. On Android 12+ JANUS prefers the dedicated
- * on-device recognizer when the OS reports one is available. Otherwise it uses
- * the system speech-recognition service, which may be device-vendor/network
- * backed. This class never calls JANUS/OpenAI APIs itself.
- *
- * Text-to-speech uses the installed Android TTS engine and is presentation-only;
- * recognized text must still travel through the normal JANUS Chat/sensory path.
+ * Recognition is push-to-talk only; language follows JanusLanguageSettings.
  */
 final class JanusDeviceVoice {
     static final int REQUEST_RECORD_AUDIO = 731;
@@ -45,25 +37,12 @@ final class JanusDeviceVoice {
     private TextToSpeech tts;
     private boolean usingOnDevice;
 
-    JanusDeviceVoice(Activity activity) {
-        this.activity = activity;
-    }
+    JanusDeviceVoice(Activity activity) { this.activity = activity; }
 
-    boolean recognitionAvailable() {
-        return SpeechRecognizer.isRecognitionAvailable(activity);
-    }
-
-    boolean onDeviceRecognitionAvailable() {
-        return Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(activity);
-    }
-
-    boolean hasMicPermission() {
-        return ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    void requestMicPermission() {
-        ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_RECORD_AUDIO);
-    }
+    boolean recognitionAvailable() { return SpeechRecognizer.isRecognitionAvailable(activity); }
+    boolean onDeviceRecognitionAvailable() { return Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(activity); }
+    boolean hasMicPermission() { return ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED; }
+    void requestMicPermission() { ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_RECORD_AUDIO); }
 
     void startPushToTalk(Listener listener) {
         if (listener == null) return;
@@ -79,9 +58,7 @@ final class JanusDeviceVoice {
         stopRecognition();
         try {
             usingOnDevice = onDeviceRecognitionAvailable();
-            recognizer = usingOnDevice
-                    ? SpeechRecognizer.createOnDeviceSpeechRecognizer(activity)
-                    : SpeechRecognizer.createSpeechRecognizer(activity);
+            recognizer = usingOnDevice ? SpeechRecognizer.createOnDeviceSpeechRecognizer(activity) : SpeechRecognizer.createSpeechRecognizer(activity);
             recognizer.setRecognitionListener(new RecognitionListener() {
                 @Override public void onReadyForSpeech(Bundle params) { listener.onReady(usingOnDevice); }
                 @Override public void onBeginningOfSpeech() {}
@@ -102,9 +79,11 @@ final class JanusDeviceVoice {
                 }
                 @Override public void onEvent(int eventType, Bundle params) {}
             });
+            Locale speechLocale = JanusLanguageSettings.speechLocale(activity);
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag());
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, speechLocale.toLanguageTag());
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, speechLocale.toLanguageTag());
             intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
             recognizer.startListening(intent);
@@ -125,21 +104,25 @@ final class JanusDeviceVoice {
     void speak(String text) {
         String clean = clean(text, TextToSpeech.getMaxSpeechInputLength());
         if (clean.isEmpty()) return;
+        Locale requested = JanusLanguageSettings.speechLocale(activity);
         if (tts == null) {
             tts = new TextToSpeech(activity.getApplicationContext(), status -> {
-                if (status == TextToSpeech.SUCCESS && tts != null) {
-                    tts.setLanguage(Locale.getDefault());
-                    tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "janus-" + UUID.randomUUID());
-                }
+                if (status == TextToSpeech.SUCCESS && tts != null) speakWithLocale(clean, requested);
             });
             return;
         }
+        speakWithLocale(clean, requested);
+    }
+
+    private void speakWithLocale(String clean, Locale requested) {
+        if (tts == null) return;
+        int availability = tts.isLanguageAvailable(requested);
+        Locale actual = availability >= TextToSpeech.LANG_AVAILABLE ? requested : Locale.getDefault();
+        tts.setLanguage(actual);
         tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "janus-" + UUID.randomUUID());
     }
 
-    void stopSpeaking() {
-        if (tts != null) tts.stop();
-    }
+    void stopSpeaking() { if (tts != null) tts.stop(); }
 
     void destroy() {
         stopRecognition();
