@@ -18,6 +18,7 @@ public final class JanusChatPresentation {
             this.url = url == null ? "" : url.trim();
             this.domain = domainOf(this.url);
         }
+        JSONObject toJson() { JSONObject j=new JSONObject(); try{j.put("title",title);j.put("url",url);}catch(Exception ignored){} return j; }
     }
 
     public final String reply;
@@ -26,13 +27,23 @@ public final class JanusChatPresentation {
 
     private JanusChatPresentation(String reply, List<Source> sources, JSONObject generatedImage) {
         this.reply = reply == null ? "" : reply;
-        this.sources = Collections.unmodifiableList(sources);
+        this.sources = Collections.unmodifiableList(sources == null ? new ArrayList<>() : sources);
         this.generatedImage = generatedImage;
     }
 
     public static JanusChatPresentation fromResponse(JSONObject response, String fallback) {
         String reply = response.optString("reply", response.optString("response", fallback == null ? "" : fallback));
         return new JanusChatPresentation(reply, parseSources(response.optJSONArray("sources")), response.optJSONObject("generated_image"));
+    }
+
+    public static JanusChatPresentation fromStored(JSONObject stored) {
+        return new JanusChatPresentation(stored.optString("reply",""), parseSources(stored.optJSONArray("sources")), stored.optJSONObject("generated_image"));
+    }
+
+    public JSONObject toJson() {
+        JSONObject j=new JSONObject(); JSONArray a=new JSONArray();
+        try { j.put("reply",reply); for(Source s:sources)a.put(s.toJson()); j.put("sources",a); if(generatedImage!=null)j.put("generated_image",generatedImage); } catch(Exception ignored) {}
+        return j;
     }
 
     public static List<Source> parseSources(JSONArray raw) {
