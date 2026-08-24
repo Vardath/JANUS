@@ -30,22 +30,24 @@ jobs:
           API=android/app/src/main/java/com/vardath/janus/JanusApiClient.java
           CORE=android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
           POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
+          MAP=android/app/src/main/java/com/vardath/janus/JanusCoreMapView.java
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
           GRADLE=android/app/build.gradle
-          test -s "$SRC" && test -s "$API" && test -s "$CORE" && test -s "$POLISH" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
+          test -s "$SRC" && test -s "$API" && test -s "$CORE" && test -s "$POLISH" && test -s "$MAP" && test -s "$APP" && test -s "$MAN" && test -s "$GRADLE"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' android/app/src/main/java
           grep -q 'class MainActivity extends Activity' "$SRC"
           grep -q "applicationId 'com.vardath.janus'" "$GRADLE"
-          grep -q "versionName '0.84'" "$GRADLE"
+          grep -q "versionName '0.85'" "$GRADLE"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MAN" | wc -l)" -eq 1
 
-      - name: Verify safe-area and Chat polish contract
+      - name: Verify safe-area Chat Cores and Observe presentation contract
         shell: bash
         run: |
           set -euxo pipefail
           POLISH=android/app/src/main/java/com/vardath/janus/JanusUiPolish.java
+          MAP=android/app/src/main/java/com/vardath/janus/JanusCoreMapView.java
           APP=android/app/src/main/java/com/vardath/janus/JanusApplication.java
           MAN=android/app/src/main/AndroidManifest.xml
           grep -q 'WindowCompat.setDecorFitsSystemWindows(window, false)' "$POLISH"
@@ -58,8 +60,21 @@ jobs:
           grep -q 'Copied JANUS response' "$POLISH"
           grep -q 'Share JANUS response' "$POLISH"
           grep -q 'Delivery status' "$POLISH"
-          grep -q 'styleImage' "$POLISH"
           grep -q 'setTextIsSelectable(true)' "$POLISH"
+          grep -q 'injectArchitectureMap' "$POLISH"
+          grep -q 'JanusCoreMapView' "$POLISH"
+          grep -q 'Forward-only routing' "$MAP"
+          grep -q 'Evidence' "$MAP"
+          grep -q 'Left hemisphere' "$MAP"
+          grep -q 'Consensus' "$MAP"
+          grep -q 'Interface' "$MAP"
+          grep -q 'Grounding' "$POLISH"
+          grep -q 'Alternative / counterfactual' "$POLISH"
+          grep -q 'Boundary / uncertainty' "$POLISH"
+          grep -q 'THIS DEVICE · LOCAL JANUS' "$POLISH"
+          grep -q 'ONLINE · GLOBAL JANUS' "$POLISH"
+          grep -q 'Stable snapshot' "$POLISH"
+          grep -q 'Refresh only when you choose' "$POLISH"
 
       - name: Verify complete product surface
         shell: bash
@@ -177,7 +192,7 @@ jobs:
             echo "Version: $VERSION"
             echo "Package: com.vardath.janus"
             echo "Source commit: $GITHUB_SHA"
-            echo "UI: native Android safe areas + Chat readability/actions; no WebView"
+            echo "UI: native Android safe areas + Chat + Cores/Observe architecture presentation; no WebView"
             echo "Architecture: 7 specialists -> 2 hemispheres -> Consensus -> Interface"
             echo "Signing certificate from stable build keystore:"
             keytool -list -v -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1:|SHA256:' || true
