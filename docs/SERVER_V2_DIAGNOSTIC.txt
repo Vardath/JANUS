@@ -1,7 +1,8 @@
 JANUS SERVER V2 DIAGNOSTIC
-verified_sha=0dbcf1d1e2cece06fb7c19f006db053289f2da47
+verified_sha=1b8ae74fe7cfefb4030150c5aad7f90b90cef986
 compile_exit=0
 verify_exit=0
+session_cutover_exit=0
 legacy_from_grep_exit=1
 legacy_import_grep_exit=1
 
@@ -9,5 +10,8 @@ legacy_import_grep_exit=1
 
 --- verifier log ---
 JANUS server v2 verification passed: independent code, data migration, private durable 11-core routing, protected identity, adaptive calibration, model escalation, federation, files, continuity, research, artifacts and owner-gated maintenance.
+
+--- session cutover log ---
+JANUS server v2 session cutover verification passed: an already signed-in native client remains authenticated after data-only migration.
 
 --- legacy import matches ---
