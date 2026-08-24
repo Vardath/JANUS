@@ -24,7 +24,7 @@ public class JanusApplication extends Application {
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private void install(Activity activity) {
                 JanusUiPolish.install(activity);
-                JanusSystemChrome.apply(activity);
+                JanusSystemChrome.install(activity);
                 JanusProductPolish.install(activity);
                 JanusScreenStatePolish.install(activity);
                 JanusFeaturePolish.install(activity);
