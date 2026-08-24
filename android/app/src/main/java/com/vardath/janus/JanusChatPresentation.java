@@ -7,13 +7,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Immutable Chat response presentation model for JANUS Android v0.92. */
+/** Immutable Chat response model. Raw server sources stay structured end-to-end. */
 public final class JanusChatPresentation {
     public static final class Source {
         public final String title;
         public final String url;
         public final String domain;
-
         Source(String title, String url) {
             this.title = title == null || title.isBlank() ? "Source" : title.trim();
             this.url = url == null ? "" : url.trim();
@@ -33,21 +32,21 @@ public final class JanusChatPresentation {
 
     public static JanusChatPresentation fromResponse(JSONObject response, String fallback) {
         String reply = response.optString("reply", response.optString("response", fallback == null ? "" : fallback));
-        JSONArray raw = response.optJSONArray("sources");
+        return new JanusChatPresentation(reply, parseSources(response.optJSONArray("sources")), response.optJSONObject("generated_image"));
+    }
+
+    public static List<Source> parseSources(JSONArray raw) {
         List<Source> sources = new ArrayList<>();
-        if (raw != null) {
-            for (int i = 0; i < Math.min(8, raw.length()); i++) {
-                Object item = raw.opt(i);
-                if (item instanceof JSONObject) {
-                    JSONObject s = (JSONObject) item;
-                    String url = s.optString("url", "");
-                    sources.add(new Source(s.optString("title", url.isBlank() ? "Source" : url), url));
-                } else if (item != null) {
-                    sources.add(new Source(String.valueOf(item), ""));
-                }
-            }
+        if (raw == null) return sources;
+        for (int i = 0; i < Math.min(8, raw.length()); i++) {
+            Object item = raw.opt(i);
+            if (item instanceof JSONObject) {
+                JSONObject s = (JSONObject) item;
+                String url = s.optString("url", "");
+                sources.add(new Source(s.optString("title", url.isBlank() ? "Source" : url), url));
+            } else if (item != null) sources.add(new Source(String.valueOf(item), ""));
         }
-        return new JanusChatPresentation(reply, sources, response.optJSONObject("generated_image"));
+        return sources;
     }
 
     private static String domainOf(String url) {
