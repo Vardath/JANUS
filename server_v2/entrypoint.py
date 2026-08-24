@@ -4,6 +4,7 @@ No legacy application modules are imported here. Persisted account/memory record
 are migrated as data only, then all runtime composition is provided by server_v2.
 """
 from . import diagnostics, governance, identity, storage, visual_memory
+from .maintenance_seed import apply_pending_seed
 from .migrate import migrate_persistent_data_once
 from .runtime_persistence import runtime_persistence
 
@@ -14,6 +15,7 @@ visual_memory.init_schema()
 diagnostics.init_schema()
 runtime_persistence.init_schema()
 MIGRATION_RESULT = migrate_persistent_data_once()
+MAINTENANCE_SEED_RESULT = apply_pending_seed()
 RUNTIME_RESTORE_RESULT = runtime_persistence.restore_all()
 SUPERVISOR_DECISION_SYNC = diagnostics.apply_supervisor_decisions()
 
@@ -60,6 +62,7 @@ app.add_event_handler("shutdown", background.stop)
 
 app.state.server_generation = "v2-clean-reconstruction"
 app.state.persistence_migration = MIGRATION_RESULT
+app.state.maintenance_seed = MAINTENANCE_SEED_RESULT
 app.state.runtime_restore = RUNTIME_RESTORE_RESULT
 app.state.supervisor_decision_sync = SUPERVISOR_DECISION_SYNC
 app.state.legacy_application_modules_loaded = False
