@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 
 import java.util.Collections;
@@ -40,7 +41,7 @@ public final class JanusUiLocalizationPolish {
         CharSequence current = view.getText();
         if (!conversationBody && !TextUtils.isEmpty(current)) {
             String before = current.toString();
-            String after = JanusUiTranslations.translate(activity, before);
+            String after = translateVisibleControl(activity, view, before);
             if (!before.equals(after)) view.setText(after);
         }
         CharSequence hint = view.getHint();
@@ -51,6 +52,23 @@ public final class JanusUiLocalizationPolish {
         }
         view.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         view.setTextAlignment(JanusUiTranslations.isRightToLeft(activity) ? View.TEXT_ALIGNMENT_VIEW_END : View.TEXT_ALIGNMENT_INHERIT);
+    }
+
+    private static String translateVisibleControl(Activity activity, TextView view, String before) {
+        String direct = JanusUiTranslations.translate(activity, before);
+        if (!before.equals(direct)) return direct;
+        // Options rows are buttons whose first line is the actionable title and whose
+        // second line is explanatory prose. Translate the known title while retaining
+        // English fallback for uncurated prose.
+        if (view instanceof Button) {
+            int newline = before.indexOf('\n');
+            if (newline > 0) {
+                String title = before.substring(0, newline);
+                String translatedTitle = JanusUiTranslations.translate(activity, title);
+                if (!title.equals(translatedTitle)) return translatedTitle + before.substring(newline);
+            }
+        }
+        return before;
     }
 
     private static boolean isConversationBody(TextView view) {
