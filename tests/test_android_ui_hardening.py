@@ -8,7 +8,7 @@ def test_authoritative_build_is_native_and_patch_free():
     assert 'python tools/compose_android_phase3.py' not in workflow
     assert 'python tools/patch_android_' not in workflow
     assert 'Verify authoritative native Android boundary' in workflow
-    assert 'Verify v1.02 direct structured Chat ownership' in workflow
+    assert 'Verify v1.02 structured queued Chat + direct foreground ownership' in workflow
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
@@ -48,7 +48,7 @@ def test_fast_offline_chat_retry_is_complete_and_structured():
     worker_path = BASE / 'JanusQueueRetryWorker.java'
     assert worker_path.exists()
     worker = worker_path.read_text(encoding='utf-8')
-    for marker in ['scheduleFastRetries', '8L, 25L, 60L', 'JanusQueueRetryWorker.class', 'JanusChatPresentation.parse']:
+    for marker in ['scheduleFastRetries', '8L, 25L, 60L', 'JanusQueueRetryWorker.class', 'JanusChatPresentation.fromResponse']:
         assert marker in queue
     for marker in ['class JanusQueueRetryWorker', 'JanusOfflineQueue.flush', 'pendingCount']:
         assert marker in worker
