@@ -21,7 +21,7 @@ Implemented and published:
 
 ## v0.84 — Chat readability/actions
 
-Implemented and build-verified:
+Implemented and published:
 - selectable JANUS response text;
 - Copy and Share response actions while retaining Report;
 - delivery/offline System cards shown as delivery status;
@@ -32,22 +32,44 @@ Implemented and build-verified:
 
 ## v0.85 — Cores and Observe architecture presentation
 
-Implemented on `main`; publication verification pending at the time of this checkpoint:
+Implemented and published:
 - dedicated native `JanusCoreMapView` showing the permitted 7 -> 2 -> 1 -> 1 forward topology;
 - seven named specialist nodes, two hemispheres, Consensus and Interface;
 - Safety visibly advises both hemisphere paths;
 - explicit forward-only / feedback-through-specialist-review explanation;
 - Local JANUS and Global JANUS runtime cards are visually distinct;
-- Fano directions are translated to human-facing processing orientations: Neutral, Grounding, Structure, Synthesis, Alternative, Continuity, Novelty, Boundary;
+- Fano directions translated to human-facing processing orientations: Neutral, Grounding, Structure, Synthesis, Alternative, Continuity, Novelty, Boundary;
 - Fano orientation remains explicitly labelled as processing orientation, not a truth score;
 - Observe local/global records are visually distinguished;
-- Observe retains stable non-auto-jumping snapshots and explicitly tells the user refresh occurs only by choice;
-- CI gates the architecture map, Fano labels, local/global distinction, stable snapshot wording, prior Chat actions and safe-area invariants before compilation.
+- Observe retains stable non-auto-jumping snapshots and refreshes only by user choice.
+
+## v0.86 — product-surface readability
+
+Implemented and published:
+- Options entries reorganized into JANUS, Research, System, App and Account-oriented labels;
+- Memory distinguishes local continuity from durable global continuity and humanizes trace/working/episodic/core tiers;
+- Research category headings are human-readable while preserving epistemic separation;
+- System Status cards visually distinguish Healthy, Reduced capability and Needs attention;
+- local background cadence uses Active, Balanced, Battery saver and Low activity labels;
+- Maintenance clearly states that JANUS may recommend maintenance but cannot edit/deploy itself.
+
+## v0.87 — Messages/Auth usability + authenticated route hygiene
+
+Implemented on the v0.87 integration branch; release verification pending:
+- new `JanusRoutePolicy` centralizes account-owned Android API path policy;
+- authenticated requests strip obsolete `username`, `profile_id` and `user` query ownership hints for account-owned routes while preserving operational filters such as `limit` and `mode`;
+- `JanusApiClient` applies route sanitization consistently to authenticated JSON requests and downloads;
+- Messages uses clearer New-state emphasis and human-readable Question / Warning / Conclusion / Research finding / Maintenance / Suggestion / Follow-up labels;
+- `Answer in Chat` is presented as `Reply in Chat`, and `Read` as `Mark read`;
+- authentication copy is shorter and clearer while preserving the distinction between Google identity and JANUS-owned continuity;
+- destructive account actions are visually differentiated;
+- common loading/error text is made less developer-like;
+- CI now gates route hygiene, Messages/Auth presentation, all prior safe-area/Chat/Cores/Observe/product invariants, and Java/APK compilation.
 
 ## Next intended passes
 
-1. Options/navigation hub, Memory, Research, System Status and Maintenance human-readable cleanup.
-2. Internal code separation: progressively move screen/API responsibilities out of the monolithic MainActivity while preserving behavior.
-3. Repository continuity/CI consolidation once product UI is stable.
+1. Continue internal code separation: progressively move screen state, endpoint definitions and feature-specific presentation out of monolithic `MainActivity` while preserving behavior.
+2. Improve Messages reply context, Account/session presentation, Memory search/filtering and Research evidence/source cards where server contracts allow it safely.
+3. Repository continuity/CI consolidation once Android product UI is stable.
 
 Do not mark an Android pass fully released until the `apk-download` branch publishes the matching version after CI compilation and APK assembly.
