@@ -24,9 +24,15 @@ public class JanusApplication extends Application {
         }
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
-            @Override public void onActivityCreated(Activity activity, Bundle state) { JanusUiPolish.install(activity); }
+            @Override public void onActivityCreated(Activity activity, Bundle state) {
+                JanusUiPolish.install(activity);
+                JanusProductPolish.install(activity);
+            }
             @Override public void onActivityStarted(Activity activity) {}
-            @Override public void onActivityResumed(Activity activity) { JanusUiPolish.install(activity); }
+            @Override public void onActivityResumed(Activity activity) {
+                JanusUiPolish.install(activity);
+                JanusProductPolish.install(activity);
+            }
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
