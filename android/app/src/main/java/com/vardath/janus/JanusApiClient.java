@@ -23,14 +23,25 @@ public final class JanusApiClient {
     public static final String PROFILE = "profile_id";
     private final Context appContext;
     private final SharedPreferences prefs;
+    private volatile int lastResponseCode = 200;
+    private volatile String lastRequestPath = "";
+
     public JanusApiClient(Context context) {
         appContext = context.getApplicationContext();
         prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
     public String token() { return prefs.getString(TOKEN, ""); }
     public String profile() { return prefs.getString(PROFILE, ""); }
-    public void saveSession(String token, String profile) { prefs.edit().putString(TOKEN, token == null ? "" : token).putString(PROFILE, profile == null ? "" : profile).apply(); }
-    public void clearSession() { prefs.edit().remove(TOKEN).remove(PROFILE).remove("last_notified_message").apply(); }
+    public void saveSession(String token, String profile) {
+        JanusAccountIsolation.beforeSaveSession(appContext, profile);
+        prefs.edit().putString(TOKEN, token == null ? "" : token).putString(PROFILE, profile == null ? "" : profile).apply();
+    }
+    public void clearSession() {
+        // Startup validation must not turn a transient network/Render wake failure into
+        // a destructive logout. Explicit logout/delete requests still clear locally.
+        if ("/auth/me".equals(lastRequestPath) && isTransient(lastResponseCode)) return;
+        JanusAccountIsolation.clearForSignOut(appContext);
+    }
     public Response get(String path, boolean auth) { return request("GET", path, null, auth, true); }
 
     public Response post(String path, String body, boolean auth) {
@@ -71,8 +82,9 @@ public final class JanusApiClient {
 
     private Response request(String method, String path, String body, boolean auth, boolean captureChat) {
         HttpURLConnection c = null;
+        String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
+        lastRequestPath = effectivePath == null ? "" : effectivePath;
         try {
-            String effectivePath = auth ? JanusRoutePolicy.sanitizeAuthenticatedPath(path) : path;
             c = (HttpURLConnection) new URL(SERVER + effectivePath).openConnection();
             c.setRequestMethod(method); c.setConnectTimeout(20000); c.setReadTimeout(120000);
             c.setRequestProperty("Accept", "application/json"); c.setRequestProperty("Connection", "close");
@@ -83,6 +95,7 @@ public final class JanusApiClient {
                 try (OutputStream out = c.getOutputStream()) { out.write(body.getBytes(StandardCharsets.UTF_8)); }
             }
             int code = c.getResponseCode();
+            lastResponseCode = code;
             InputStream in = code >= 200 && code < 400 ? c.getInputStream() : c.getErrorStream();
             String responseBody = read(in);
             if (code >= 200 && code < 300 && auth) senseCapability(method, effectivePath, body, responseBody);
@@ -90,8 +103,15 @@ public final class JanusApiClient {
                 JanusChatResponseRegistry.capture(responseBody);
             }
             return new Response(code, responseBody, null);
-        } catch (Exception e) { return new Response(0, "", e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage())); }
+        } catch (Exception e) {
+            lastResponseCode = 0;
+            return new Response(0, "", e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage()));
+        }
         finally { if (c != null) c.disconnect(); }
+    }
+
+    private static boolean isTransient(int code) {
+        return code == 0 || code == 408 || code == 425 || code == 429 || code == 502 || code == 503 || code == 504 || code >= 500;
     }
 
     /**
