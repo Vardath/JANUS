@@ -43,11 +43,12 @@ jobs:
           MAIN=android/app/src/main/java/com/vardath/janus/MainActivity.java
           test -s "$MAIN"
           test ! -e android/app/src/main/assets/index.html
-          grep -q 'Maintenance review' "$MAIN"
+          grep -q 'Maintenance Review' "$MAIN"
           grep -q 'Research workspace' "$MAIN"
           grep -q '/maintenance/status' "$MAIN"
           grep -q 'approved_for_manual_work' "$MAIN"
-          grep -q 'will not make or deploy any changes automatically' "$MAIN"
+          grep -q 'No automatic changes will be made.' "$MAIN"
+          grep -q 'It never authorizes JANUS to edit code, install packages, change models/APIs or deploy itself.' "$MAIN"
       - name: Verify bootstrap maintenance API patch composes
         run: |
           python tools/patch_maintenance_owner_api.py
