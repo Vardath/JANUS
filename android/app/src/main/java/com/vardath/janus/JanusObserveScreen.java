@@ -40,7 +40,7 @@ public final class JanusObserveScreen {
         LinearLayout filters = horizontal(a);
         for (String mode : new String[]{"all", "thoughts", "interactions"}) {
             Button b = button(a, mode.equals("all") ? "All" : capitalize(mode));
-            b.setAlpha(mode.equals(host.observeMode()) ? 1f : .62f);
+            if (mode.equals(host.observeMode())) JanusTheme.applyAccentButton(a, b);
             b.setOnClickListener(v -> { host.setObserveMode(mode); host.rerenderObserve(); });
             filters.addView(b, weight());
         }
@@ -73,7 +73,7 @@ public final class JanusObserveScreen {
         card.addView(text(a,route+" · "+pretty(eventType),13,true));
         String provenance=provenance(x,source);
         if(!provenance.isBlank()) card.addView(text(a,provenance,12,true));
-        card.addView(text(a,x.optString("detail",x.optString("summary","")),15,false));
+        card.addView(text(a,JanusHumanText.summarize(x.optString("detail",x.optString("summary",""))),15,false));
         card.addView(text(a,formatTime(x.opt("created_at"))+" · "+source,12,false));
         String raw=x.optString("raw_detail","");
         if(!raw.isBlank()&&!raw.equals(x.optString("detail",""))){ Button tech=button(a,"Technical details"); tech.setOnClickListener(v->new AlertDialog.Builder(a).setTitle(route).setMessage(raw).setPositiveButton("Close",null).show()); card.addView(tech,wrap()); }
@@ -110,10 +110,11 @@ public final class JanusObserveScreen {
         return x.isBlank()?"unknown":x;
     }
 
-    private static LinearLayout vertical(Activity a){LinearLayout x=new LinearLayout(a);x.setOrientation(LinearLayout.VERTICAL);return x;} private static LinearLayout horizontal(Activity a){LinearLayout x=new LinearLayout(a);x.setOrientation(LinearLayout.HORIZONTAL);return x;}
-    private static LinearLayout card(Activity a){LinearLayout x=vertical(a);int p=dp(a,12);x.setPadding(p,p,p,p);LinearLayout.LayoutParams lp=full();lp.setMargins(0,dp(a,6),0,dp(a,6));x.setLayoutParams(lp);x.setBackgroundColor(0x181C8CFF);return x;}
-    private static TextView text(Activity a,String s,int sp,boolean bold){TextView v=new TextView(a);v.setText(s);v.setTextSize(sp);v.setTextColor(0xffe8eef7);if(bold)v.setTypeface(Typeface.DEFAULT_BOLD);v.setPadding(dp(a,4),dp(a,5),dp(a,4),dp(a,5));return v;}
-    private static Button button(Activity a,String s){Button b=new Button(a);b.setText(s);b.setAllCaps(false);b.setGravity(Gravity.CENTER);return b;}
+    private static LinearLayout vertical(Activity a){LinearLayout x=new LinearLayout(a);x.setOrientation(LinearLayout.VERTICAL);JanusTheme.applyRoot(a,x);return x;}
+    private static LinearLayout horizontal(Activity a){LinearLayout x=new LinearLayout(a);x.setOrientation(LinearLayout.HORIZONTAL);return x;}
+    private static LinearLayout card(Activity a){LinearLayout x=vertical(a);int p=dp(a,12);x.setPadding(p,p,p,p);LinearLayout.LayoutParams lp=full();lp.setMargins(0,dp(a,6),0,dp(a,6));x.setLayoutParams(lp);JanusTheme.applyCard(a,x);return x;}
+    private static TextView text(Activity a,String s,int sp,boolean bold){TextView v=new TextView(a);v.setText(s);v.setTextSize(sp);JanusTheme.applyText(a,v,false);if(bold)v.setTypeface(Typeface.DEFAULT_BOLD);v.setPadding(dp(a,4),dp(a,5),dp(a,4),dp(a,5));return v;}
+    private static Button button(Activity a,String s){Button b=new Button(a);b.setText(s);b.setAllCaps(false);b.setGravity(Gravity.CENTER);JanusTheme.applyButton(a,b);return b;}
     private static LinearLayout.LayoutParams full(){return new LinearLayout.LayoutParams(-1,-2);} private static LinearLayout.LayoutParams wrap(){return new LinearLayout.LayoutParams(-2,-2);} private static LinearLayout.LayoutParams weight(){return new LinearLayout.LayoutParams(0,-2,1);} private static int dp(Activity a,int n){return Math.round(n*a.getResources().getDisplayMetrics().density);}
     private static String enc(String s){try{return java.net.URLEncoder.encode(s==null?"":s,"UTF-8");}catch(Exception e){return "";}} private static String capitalize(String s){return s==null||s.isEmpty()?"":s.substring(0,1).toUpperCase(Locale.ROOT)+s.substring(1);} private static String pretty(String s){return capitalize((s==null?"":s).replace('_',' '));}
     private static String formatTime(Object raw){if(raw==null)return "";if(raw instanceof Number){long n=((Number)raw).longValue();if(n<100000000000L)n*=1000L;return DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT).format(new Date(n));}return String.valueOf(raw);}

@@ -18,14 +18,14 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusLocalTypedSense JanusFanoPolicy JanusSensePolicy JanusUiPolish JanusSystemChrome JanusCoreMapView JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge JanusClientDiagnostics JanusMaintenanceSupervisorPolish; do test -s "$BASE/$f.java"; done
+          for f in MainActivity JanusApiClient JanusRoutePolicy JanusLocalCoreRuntime JanusLocalTypedSense JanusFanoPolicy JanusSensePolicy JanusUiPolish JanusSystemChrome JanusCoreMapView JanusReplyContextPolish JanusSourcePolish JanusGeneratedImagePolish JanusChatPresentation JanusChatResponseRegistry JanusChatController JanusChatHistoryStore JanusAdaptiveUi JanusApplication JanusOfflineQueue JanusMessagesScreen JanusObserveScreen JanusNavigationPolish JanusThoughtBridge JanusClientDiagnostics JanusMaintenanceSupervisorPolish JanusTheme JanusHumanText; do test -s "$BASE/$f.java"; done
           test ! -e "$BASE/JanusChatV2Surface.java"
           test ! -e "$BASE/JanusChatHistoryBridge.java"
           test ! -e "$BASE/JanusThoughtContextPolish.java"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '1.10'" android/app/build.gradle
-          grep -q "versionCode 110" android/app/build.gradle
+          grep -q "versionName '1.11'" android/app/build.gradle
+          grep -q "versionCode 111" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
           grep -q 'resetContentSurface' "$BASE/MainActivity.java"
       - name: Verify v1.08 governed self-diagnosis and Supervisor handoff
@@ -70,13 +70,15 @@ jobs:
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          CHROME="$BASE/JanusSystemChrome.java"; MAP="$BASE/JanusCoreMapView.java"; NAV="$BASE/JanusNavigationPolish.java"; APP="$BASE/JanusApplication.java"; MAIN="$BASE/MainActivity.java"; MANIFEST=android/app/src/main/AndroidManifest.xml
+          CHROME="$BASE/JanusSystemChrome.java"; MAP="$BASE/JanusCoreMapView.java"; NAV="$BASE/JanusNavigationPolish.java"; APP="$BASE/JanusApplication.java"; MAIN="$BASE/MainActivity.java"; THEME="$BASE/JanusTheme.java"; MANIFEST=android/app/src/main/AndroidManifest.xml
           grep -q 'enableOnBackInvokedCallback="true"' "$MANIFEST"
           grep -q 'getOnBackInvokedDispatcher' "$NAV"
           grep -q 'parent.performClick()' "$NAV"
           grep -q 'JanusSystemChrome.install(activity)' "$APP"
           grep -q 'putString("theme_mode",mode)' "$MAIN"
           grep -q 'putString("accent",accent)' "$MAIN"
+          grep -q 'JanusTheme.applyAccentButton(this, b)' "$MAIN"
+          ! grep -q 'setStatusBarColor\|setNavigationBarColor' "$THEME"
           ! grep -q 'theme_mode' "$CHROME"
           ! grep -q 'accent' "$CHROME"
           ! grep -q 'registerOnSharedPreferenceChangeListener' "$CHROME"
@@ -167,7 +169,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.10 app-only theme isolation on the v1.09 stability shell; JANUS appearance no longer drives Android system chrome\nArchitecture migration: conceptual 1-3-7; mechanical 7 subconscious -> 2 hemispheres -> Front -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.11 app-local colour themes + human-readable telemetry/log presentation; Android system chrome remains device-owned\nArchitecture migration: conceptual 1-3-7; mechanical 7 subconscious -> 2 hemispheres -> Front -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD
