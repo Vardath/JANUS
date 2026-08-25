@@ -45,17 +45,26 @@ jobs:
           assert s.quiescent_count >= 1
           print('loop quiescence OK')
           PY
-      - name: Verify Android route and rest contracts
+      - name: Verify Android route, rest and explicit Stream ownership contracts
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
+          MAIN="$BASE/MainActivity.java"
+          STREAM="$BASE/JanusStreamScreen.java"
+          APP="$BASE/JanusApplication.java"
+          NAV="$BASE/JanusNavigationPolish.java"
           grep -q 'Foreground route is strict: seven -> hemispheres -> Front -> Interface' "$BASE/JanusRecursiveCoreEngine.java"
           grep -q 'interface_input_source' "$BASE/JanusRecursiveCoreEngine.java"
           grep -q 'quiescent_count' "$BASE/JanusRecursiveCoreEngine.java"
           grep -q 'foreground can rouse' "$BASE/JanusRecursiveCoreEngine.java" || grep -q 'foreground_can_rouse' "$BASE/JanusRecursiveCoreEngine.java"
-          grep -q 'Stream of Consciousness' "$BASE/JanusStreamObservePolish.java"
-          grep -q 'JanusStreamObservePolish.install' "$BASE/JanusApplication.java"
+          grep -q 'JanusStreamScreen.render' "$MAIN"
+          grep -q 'else if (page.equals("Stream")) showStream()' "$MAIN"
+          grep -q '"Chat", "Messages", "Observe", "Stream", "Options"' "$MAIN"
+          grep -q '"Chat", "Messages", "Observe", "Stream", "Options"' "$NAV"
+          grep -q '/desktop/stream-observe?limit=160' "$STREAM"
+          ! grep -q 'getDeclaredField\|findButton\|postDelayed\|OnGlobalLayoutListener' "$STREAM"
+          ! grep -q 'JanusStreamObservePolish.install' "$APP"
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v5
