@@ -46,7 +46,7 @@ Search selection deliberately mixes:
 - a dedicated YouTube/video/transcript-lead discovery mode through governed web research;
 - occasional exploratory/random observation even when no core has a pressing request.
 
-A successful outside observation is not treated as truth. It returns as a typed `web` sense and is projected through all seven specialists, both hemispheres, Front and Interface. Every core therefore gets a chance to weigh evidence, risk, contradictions, context, logic, novelty and continuity before the society changes its retained state. The finding also starts as a low-rung `trace` autonomous-research memory with bounded source provenance; normal memory consolidation and retrieval determine whether it later becomes working/episodic/core material.
+A successful outside observation is not treated as truth. It returns through the runtime sensory ingestion hook as a typed `web` sense. Production entrypoint wiring replaces the base sensory function with the recursive wrapper, so the finding reaches the outer seven specialists, both hemispheres, Front and Interface and the nested recursive state inside each global top-level core. The finding starts as a low-rung `trace` autonomous-research memory with bounded source provenance; normal memory consolidation and retrieval determine whether it later becomes working/episodic/core material.
 
 The persistent global society can continue acquiring digital input without an open phone client as long as the server is executing. Android local cores remain constrained by Android background/suspension rules. When the local app is executing, its existing senses and recursive cores continue to process local material and selectively federate bounded state; when it resumes after suspension, relevant global observations return through the existing peer/sensory federation rather than overwriting local state. This architecture gives the full federated JANUS access to the shared research capability without falsely claiming that a killed Android process remains awake.
 
@@ -163,17 +163,17 @@ Preserve:
 - Single Front stream, sleep/wake behavior, persistent interaction-memory reconsideration and loop quiescence merged in PR #36.
 - PR #36 passed clean server, protocol, recursive-core, conscious-stream, authoritative APK, RC1, UI, localization and maintenance gates.
 - Append-only persistent maintenance request ledger and mandatory Supervisor maintenance runbook are the current maintenance-hardening milestone.
-- PR #52 continuing-input/autonomous-observation implementation passed clean server, recursive-core, conscious-stream, maintenance and Android APK CI on its validated head before merge.
+- PR #52 continuing-input/autonomous-observation implementation passed clean server, recursive-core, conscious-stream, maintenance and Android APK CI on a validated implementation head; the final recursive-sensory re-entry adjustment requires the same relevant checks before merge.
 
 ## Immediate plans
 
 ### 1. Production/device validation of PR #52 autonomous observation
 
-Prove after merge/deploy:
+After merge/deploy prove:
 
 - every changed global recursive core can form a curiosity intention with zero model calls;
 - quiescent unchanged state does not generate an endless new-intent/search loop;
-- selected research results re-enter through the typed full-society sensory route;
+- selected research results re-enter through the typed recursive full-society sensory route;
 - autonomous findings enter low-rung memory with provenance;
 - relevant/adjacent/random/YouTube-oriented discovery modes are reachable;
 - background research cannot exceed its US$10 monthly portion;
