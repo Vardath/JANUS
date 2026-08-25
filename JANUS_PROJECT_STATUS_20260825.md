@@ -34,7 +34,7 @@ Memory currently includes account-bound conversation/history plus the promotion 
 
 ## Continuing digital observation and curiosity
 
-PR #52 adds a governed outside-input loop intended to make JANUS less dependent on direct user messages for new material.
+PR #52 implements a governed outside-input loop intended to make JANUS less dependent on direct user messages for new material.
 
 Every materially changed global wake can produce one bounded research/observation intention from each top-level core after it reviews retained state, relevant interaction memories and peer conclusions. These intentions are local deterministic state and cost nothing. A shared research scheduler then chooses only a small subset for external searching, so every core can ask for more information without multiplying paid calls by eleven or twenty-two.
 
@@ -117,7 +117,7 @@ The server currently provides:
 - chat orchestration and model escalation/cost governance;
 - relevant-memory retrieval;
 - optional foreground web/research retrieval;
-- governed autonomous digital observation/research (PR #52 pending merge/validation);
+- governed autonomous digital observation/research through PR #52;
 - file/document/image/audio processing paths;
 - visual memory and image generation;
 - messages and observable core events;
@@ -163,13 +163,13 @@ Preserve:
 - Single Front stream, sleep/wake behavior, persistent interaction-memory reconsideration and loop quiescence merged in PR #36.
 - PR #36 passed clean server, protocol, recursive-core, conscious-stream, authoritative APK, RC1, UI, localization and maintenance gates.
 - Append-only persistent maintenance request ledger and mandatory Supervisor maintenance runbook are the current maintenance-hardening milestone.
-- PR #52 is the active continuing-input/autonomous-observation change under CI review.
+- PR #52 continuing-input/autonomous-observation implementation passed clean server, recursive-core, conscious-stream, maintenance and Android APK CI on its validated head before merge.
 
 ## Immediate plans
 
-### 1. Validate PR #52 autonomous observation
+### 1. Production/device validation of PR #52 autonomous observation
 
-Prove:
+Prove after merge/deploy:
 
 - every changed global recursive core can form a curiosity intention with zero model calls;
 - quiescent unchanged state does not generate an endless new-intent/search loop;
