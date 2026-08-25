@@ -1,0 +1,66 @@
+name: Test JANUS Conscious Stream Cycle
+
+on:
+  pull_request:
+    paths:
+      - 'server_v2/**'
+      - 'android/**'
+      - '.github/workflows/test-conscious-stream-cycle.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server_v2/**'
+      - 'android/**'
+      - '.github/workflows/test-conscious-stream-cycle.yml'
+
+jobs:
+  conscious-stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify server conscious stream, memory and loop guards
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -q 'Interface receives Front only' server_v2/conscious_mind.py
+          grep -q 'register_user_input' server_v2/conscious_mind.py
+          grep -q 'foreground_rouse' server_v2/conscious_mind.py
+          grep -q 'memory_maintenance.maintain' server_v2/conscious_mind.py
+          grep -q 'quiescent_count' server_v2/recursive_core.py
+          grep -q 'changed == 0' server_v2/recursive_background.py
+          grep -q 'recalled interaction memory' server_v2/recursive_background.py
+          grep -q '/desktop/stream-observe' server_v2/stream_api.py
+          python -m py_compile server_v2/conscious_mind.py server_v2/memory_maintenance.py server_v2/recursive_core.py server_v2/recursive_background.py server_v2/stream_api.py server_v2/entrypoint.py
+          python - <<'PY'
+          from server_v2.recursive_core import RecursiveCoreProcessor, RecursiveCoreState
+          from server_v2.senses import Appraisal
+          p=RecursiveCoreProcessor(); s=RecursiveCoreState('evidence')
+          p.register_user_input(s,'hello again')
+          a=p.think(s,'same retained state',Appraisal(),'evidence',[])
+          b=p.think(s,'same retained state',Appraisal(),'evidence',[])
+          assert a['changed'] is True
+          assert b['changed'] is False and b['quiescent'] is True
+          assert s.quiescent_count >= 1
+          print('loop quiescence OK')
+          PY
+      - name: Verify Android route and rest contracts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=android/app/src/main/java/com/vardath/janus
+          grep -q 'Foreground route is strict: seven -> hemispheres -> Front -> Interface' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'interface_input_source' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'quiescent_count' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'foreground can rouse' "$BASE/JanusRecursiveCoreEngine.java" || grep -q 'foreground_can_rouse' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'Stream of Consciousness' "$BASE/JanusStreamObservePolish.java"
+          grep -q 'JanusStreamObservePolish.install' "$BASE/JanusApplication.java"
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v5
+        with: { gradle-version: '8.11.1' }
+      - name: Compile Android
+        working-directory: android
+        env:
+          JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}'
+        run: gradle --no-daemon :app:compileDebugJavaWithJavac :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
