@@ -1,0 +1,69 @@
+name: Test JANUS Maintenance Request Ledger
+
+on:
+  pull_request:
+    paths:
+      - 'server_v2/maintenance_request_file.py'
+      - 'server_v2/maintenance_ledger_integration.py'
+      - 'server_v2/entrypoint.py'
+      - 'MAINTENANCE_PROCESS.md'
+      - '.github/workflows/test-maintenance-request-ledger.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server_v2/maintenance_request_file.py'
+      - 'server_v2/maintenance_ledger_integration.py'
+      - 'server_v2/entrypoint.py'
+      - 'MAINTENANCE_PROCESS.md'
+      - '.github/workflows/test-maintenance-request-ledger.yml'
+
+jobs:
+  maintenance-ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - name: Verify append-only generation and closed-request reconciliation
+        shell: bash
+        run: |
+          set -euxo pipefail
+          export JANUS_MAINTENANCE_REQUEST_FILE="$RUNNER_TEMP/janus_maintenance_requests.jsonl"
+          python -m py_compile server_v2/maintenance_request_file.py server_v2/maintenance_ledger_integration.py server_v2/entrypoint.py
+          grep -q 'append-only' MAINTENANCE_PROCESS.md
+          grep -q 'implemented.*disapproved' MAINTENANCE_PROCESS.md
+          grep -q 'maintenance_ledger_integration.install' server_v2/entrypoint.py
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from server_v2 import maintenance_request_file as ledger
+
+          p = Path(os.environ['JANUS_MAINTENANCE_REQUEST_FILE'])
+          ledger.append_observation({
+              'id': 1, 'account_id': 1, 'fingerprint': 'a', 'capability': 'alpha',
+              'title': 'first', 'detail': 'first detail', 'severity': 'normal',
+              'state': 'awaiting_supervisor_review', 'occurrence_count': 1,
+          }, created=True)
+          ledger.append_observation({
+              'id': 2, 'account_id': 1, 'fingerprint': 'b', 'capability': 'beta',
+              'title': 'second', 'detail': 'second detail', 'severity': 'high',
+              'state': 'deferred', 'occurrence_count': 1,
+          }, created=True)
+          assert len(p.read_text(encoding='utf-8').splitlines()) == 2
+
+          original_rows = ledger.storage.rows
+          ledger.storage.rows = lambda *a, **k: [
+              {'id': 1, 'fingerprint': 'a', 'state': 'implemented'},
+              {'id': 2, 'fingerprint': 'b', 'state': 'deferred'},
+          ]
+          try:
+              result = ledger.reconcile_closed()
+          finally:
+              ledger.storage.rows = original_rows
+          assert result['removed'] == 1
+          remaining = ledger.read_entries()
+          assert len(remaining) == 1 and remaining[0]['request_id'] == 2
+          assert 'Do not overwrite' in ledger.instructions()
+          print('append-only maintenance ledger contract OK')
+          PY

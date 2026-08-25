@@ -2,6 +2,7 @@
 from . import diagnostics, governance, identity, storage, visual_memory
 from . import mind as base_mind_module
 from . import runtime_persistence as runtime_persistence_module
+from . import maintenance_ledger_integration
 from .maintenance_seed import apply_pending_seed
 from .migrate import migrate_persistent_data_once
 from .conscious_mind import mind as recursive_mind
@@ -16,6 +17,7 @@ identity.init_schema()
 visual_memory.init_schema()
 diagnostics.init_schema()
 runtime_persistence.init_schema()
+maintenance_ledger_integration.install()
 MIGRATION_RESULT = migrate_persistent_data_once()
 MAINTENANCE_SEED_RESULT = apply_pending_seed()
 RUNTIME_RESTORE_RESULT = runtime_persistence.restore_all()
@@ -91,3 +93,4 @@ app.state.recursive_core_engine = True
 app.state.recursive_core_count = 11
 app.state.local_recursive_core_count = 11
 app.state.outward_route = "7 specialists -> left/right -> front -> interface"
+app.state.maintenance_request_generation = "append_only_persistent_ledger"

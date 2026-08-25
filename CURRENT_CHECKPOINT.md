@@ -2,6 +2,10 @@
 
 **Current authoritative continuation:** `JANUS_CONSCIOUS_STREAM_MEMORY_CYCLE_CHECKPOINT_20260825.md`
 
+**Current project status:** `JANUS_PROJECT_STATUS_20260825.md`
+
+**Mandatory maintenance runbook:** `MAINTENANCE_PROCESS.md`
+
 Updated: 2026-08-25
 
 ## Critical architecture rules
@@ -32,6 +36,22 @@ Do not restore the first prototype's unconditional peer rebroadcast behavior. Cu
 
 A dedicated native Android **Stream** surface and server `/desktop/stream-observe` endpoint expose bounded externalizable Front activity/state only. They may show Fano orientation, cycle/revision/peer/quiescence counters, integrated summaries, rousing and Front events. Never expose hidden chain-of-thought.
 
+## Maintenance request persistence
+
+JANUS-generated maintenance/capability observations must be preserved rather than regenerated over one another.
+
+- Structured request state remains in SQLite `v2_capability_requests`.
+- A chronological JSONL request ledger is stored on persistent server storage alongside the database (`janus_maintenance_requests.jsonl`).
+- JANUS generation is append-only; each generated/repeated observation is appended and never overwrites older entries.
+- A Supervisor maintenance pass records decisions in `server_v2/supervisor_decisions.json`.
+- After those decisions are consumed, reconciliation removes only entries whose request state is `implemented` or `disapproved`.
+- Deferred, pending, repeated and unresolved entries remain.
+- The exact procedure is mandatory in `MAINTENANCE_PROCESS.md` and is injected into every Supervisor handoff packet so the owner does not need to restate it.
+- Built-in procedure command: `python -m server_v2.maintenance_request_file instructions`.
+- Built-in cleanup command for a mounted maintenance environment: `python -m server_v2.maintenance_request_file reconcile`.
+
+Do not replace the ledger with a newly generated snapshot. Do not delete unresolved requests because they are old or duplicated.
+
 ## Current implementation
 
 Recursive-core architecture: PR #35, merge `a129e5c4974f785f0ea014d958b8d2102666c61f`.
@@ -39,6 +59,8 @@ Recursive-core architecture: PR #35, merge `a129e5c4974f785f0ea014d958b8d2102666
 Conscious-stream / memory / sleep-wake / loop-quiescence behavior: PR #36, merge `bdc77124213e3ddd7495f043d09d380ab7b3bdf3`.
 
 PR #36 passed clean server v2, protocol, recursive-core, conscious-stream cycle, authoritative APK, RC1, UI, localization and maintenance gates before merge.
+
+Current maintenance hardening adds the append-only persistent request ledger, automatic closed-request reconciliation after Supervisor decisions, mandatory `MAINTENANCE_PROCESS.md`, and the comprehensive `JANUS_PROJECT_STATUS_20260825.md` continuation record.
 
 ## Active release scope
 
@@ -59,6 +81,8 @@ Diagnostics must prove rather than merely label:
 7. rest memory maintenance protects core/episodic memory and prunes only eligible low-value memory;
 8. seven -> Left/Right -> Front -> Interface is the actual outward route with no Interface shortcut;
 9. Front stream observer shows externalizable evidence without hidden reasoning;
-10. background recursive model-call count remains zero.
+10. background recursive model-call count remains zero;
+11. maintenance request generation appends rather than overwrites;
+12. maintenance reconciliation removes only implemented/disapproved requests and preserves unresolved work.
 
-Continue to distinguish PASS / WARN / FAIL / UNVERIFIED / NOT_APPLICABLE and architecture presence vs runtime/live-deployment evidence. Then proceed to real-device soak testing, specifically watching runaway counters/repeated peer events, sleep/wake responsiveness, battery/background scheduling, memory growth/pruning and Stream observer behavior.
+Continue to distinguish PASS / WARN / FAIL / UNVERIFIED / NOT_APPLICABLE and architecture presence vs runtime/live-deployment evidence. Then proceed to real-device soak testing, specifically watching runaway counters/repeated peer events, sleep/wake responsiveness, battery/background scheduling, memory growth/pruning, maintenance-ledger growth/reconciliation and Stream observer behavior.
