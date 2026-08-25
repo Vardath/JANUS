@@ -21,11 +21,14 @@ public class JanusApplication extends Application {
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private void install(Activity activity) {
-                JanusUiPolish.install(activity); JanusSystemChrome.install(activity); JanusProductPolish.install(activity);
-                JanusScreenStatePolish.install(activity); JanusFeaturePolish.install(activity); JanusLanguagePolish.install(activity);
-                JanusReplyContextPolish.install(activity); JanusSourcePolish.install(activity); JanusGeneratedImagePolish.install(activity);
-                JanusAdaptiveUi.install(activity); JanusNavigationPolish.install(activity); JanusMaintenanceSupervisorPolish.install(activity);
-                JanusVoiceUiPolish.install(activity); JanusUiLocalizationPolish.install(activity); JanusStreamObservePolish.install(activity);
+                // Stability-first shell. The native MainActivity already owns all product screens.
+                // Global-layout polishers previously walked and sometimes mutated the same live
+                // hierarchy concurrently, which could terminate the Activity when detail screens
+                // such as Cores, Memory and Settings were created. Keep only non-mutating chrome,
+                // Back navigation and diagnostics until decoration is reintroduced through an
+                // explicit render pass rather than ViewTreeObserver mutation.
+                JanusSystemChrome.install(activity);
+                JanusNavigationPolish.install(activity);
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
@@ -33,7 +36,7 @@ public class JanusApplication extends Application {
             @Override public void onActivityPaused(Activity activity) {}
             @Override public void onActivityStopped(Activity activity) {}
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
-            @Override public void onActivityDestroyed(Activity activity) { JanusVoiceUiPolish.destroy(activity); }
+            @Override public void onActivityDestroyed(Activity activity) {}
         });
 
         JanusLocalCoreRuntime runtime = JanusLocalCoreRuntime.get(this);
