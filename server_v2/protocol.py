@@ -11,7 +11,8 @@ def capabilities():
     return {
         "ok": True,
         "protocol_version": 3,
-        "server_generation": "v2-recursive-core-reconstruction",
+        "server_generation": "v2-clean-reconstruction",
+        "cognitive_engine_generation": "recursive-v1",
         "deployed_commit": os.getenv("RENDER_GIT_COMMIT", "unknown")[:40],
         "architecture": "recursive 1-3-7 JANUS core society",
         "conceptual_topology": "1|3|7",
