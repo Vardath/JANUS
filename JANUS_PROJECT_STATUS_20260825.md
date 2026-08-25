@@ -32,6 +32,41 @@ Rest does not initiate thought. State remains loaded and responsive, persistence
 
 Memory currently includes account-bound conversation/history plus the promotion ladder `trace -> working -> episodic -> core`. Repeated exact memories consolidate rather than duplicate. Retrieval can promote memories. Core memory is protected from ordinary demotion/deletion. Automatic rest cleanup is conservative: core and episodic memories are protected; only stale, low-value trace/working memories are candidates for automatic pruning.
 
+## Continuing digital observation and curiosity
+
+PR #52 implements a governed outside-input loop intended to make JANUS less dependent on direct user messages for new material.
+
+Every materially changed global wake can produce one bounded research/observation intention from each top-level core after it reviews retained state, relevant interaction memories and peer conclusions. These intentions are local deterministic state and cost nothing. A shared research scheduler then chooses only a small subset for external searching, so every core can ask for more information without multiplying paid calls by eleven or twenty-two.
+
+Search selection deliberately mixes:
+
+- core-requested/relevant research;
+- adjacent/associative research;
+- web/current-development/counterexample searches;
+- a dedicated YouTube/video/transcript-lead discovery mode through governed web research;
+- occasional exploratory/random observation even when no core has a pressing request.
+
+A successful outside observation is not treated as truth. It returns through the runtime sensory ingestion hook as a typed `web` sense. Production entrypoint wiring replaces the base sensory function with the recursive wrapper, so the finding reaches the outer seven specialists, both hemispheres, Front and Interface and the nested recursive state inside each global top-level core. The finding starts as a low-rung `trace` autonomous-research memory with bounded source provenance; normal memory consolidation and retrieval determine whether it later becomes working/episodic/core material.
+
+The persistent global society can continue acquiring digital input without an open phone client as long as the server is executing. Android local cores remain constrained by Android background/suspension rules. When the local app is executing, its existing senses and recursive cores continue to process local material and selectively federate bounded state; when it resumes after suspension, relevant global observations return through the existing peer/sensory federation rather than overwriting local state. This architecture gives the full federated JANUS access to the shared research capability without falsely claiming that a killed Android process remains awake.
+
+This does **not** enable ambient microphone or camera capture. Physical-world sensing remains explicit/user-initiated unless deliberately designed later. Continuing observation currently means digital-world research plus the existing explicit file/image/audio/action senses.
+
+### Research budget
+
+Owner policy is currently:
+
+- default maximum planned web-research allowance: **US$20 per account per month**;
+- autonomous/background portion: **US$10 per month maximum/target**;
+- remaining allowance reserved for user-directed web research;
+- background research cannot consume the reserved user portion;
+- autonomous and user web research share the same persistent monthly cost ledger;
+- search execution is paced separately from frequent zero-cost wake/review cycles;
+- occasional random search remains enabled within the autonomous allowance;
+- these defaults must not be raised unless the owner explicitly requests it.
+
+A configurable per-call planning estimate converts search calls into application-budget usage. Production diagnostics/maintenance must compare the estimate with real provider billing and increase the estimate if search pricing or model-token overhead rises. Provider billing can change independently, so the application governor should not be described as an external-invoice guarantee; the owner-set $20 application ceiling itself remains fixed unless explicitly changed.
+
 ## Loop prevention
 
 The first recursive/sleep-wake prototype could sustain peer echo loops because retained peer output was repeatedly treated as fresh input. That behavior must not return.
@@ -43,6 +78,8 @@ Current mandatory safeguards:
 - changed peer processing is bounded and terminates;
 - background counters/events should stabilize when no new material exists;
 - dedicated diagnostics/soak testing must watch for runaway peer/revision/cycle counters.
+
+Autonomous observation does not bypass these guards: an external finding counts as genuinely new sensory input, while unchanged retained state does not repeatedly generate fresh peer work or paid searches merely to keep activity alive.
 
 ## Stream observation
 
@@ -80,6 +117,7 @@ The server currently provides:
 - chat orchestration and model escalation/cost governance;
 - relevant-memory retrieval;
 - optional foreground web/research retrieval;
+- governed autonomous digital observation/research through PR #52;
 - file/document/image/audio processing paths;
 - visual memory and image generation;
 - messages and observable core events;
@@ -125,10 +163,25 @@ Preserve:
 - Single Front stream, sleep/wake behavior, persistent interaction-memory reconsideration and loop quiescence merged in PR #36.
 - PR #36 passed clean server, protocol, recursive-core, conscious-stream, authoritative APK, RC1, UI, localization and maintenance gates.
 - Append-only persistent maintenance request ledger and mandatory Supervisor maintenance runbook are the current maintenance-hardening milestone.
+- PR #52 continuing-input/autonomous-observation implementation passed clean server, recursive-core, conscious-stream, maintenance and Android APK CI on a validated implementation head; the final recursive-sensory re-entry adjustment requires the same relevant checks before merge.
 
 ## Immediate plans
 
-### 1. Diagnostic System v2 — behavioral proof
+### 1. Production/device validation of PR #52 autonomous observation
+
+After merge/deploy prove:
+
+- every changed global recursive core can form a curiosity intention with zero model calls;
+- quiescent unchanged state does not generate an endless new-intent/search loop;
+- selected research results re-enter through the typed recursive full-society sensory route;
+- autonomous findings enter low-rung memory with provenance;
+- relevant/adjacent/random/YouTube-oriented discovery modes are reachable;
+- background research cannot exceed its US$10 monthly portion;
+- autonomous + foreground web research cannot exceed the configured US$20 monthly planning ceiling;
+- cost telemetry reports current monthly use;
+- no ambient microphone/camera capability is accidentally enabled.
+
+### 2. Diagnostic System v2 — behavioral proof
 
 Diagnostics should prove runtime behavior rather than merely restate architecture labels. Required checks include:
 
@@ -142,12 +195,13 @@ Diagnostics should prove runtime behavior rather than merely restate architectur
 - Interface receives Front only;
 - Stream events correspond to real Front activity;
 - recursive background model-call count remains zero;
+- autonomous outside-input calls are separately counted/governed;
 - local/global state remains separate and account-bound;
 - maintenance ledger appends and closed-request reconciliation does not remove unresolved items.
 
 Diagnostics should distinguish `PASS`, `WARN`, `FAIL`, `UNVERIFIED`, and `NOT_APPLICABLE`, and distinguish source/architecture presence from runtime evidence and live-deployment evidence.
 
-### 2. Real-device soak testing
+### 3. Real-device soak testing
 
 Once diagnostics are useful, run extended Android tests watching:
 
@@ -155,6 +209,7 @@ Once diagnostics are useful, run extended Android tests watching:
 - battery use and Android background scheduling;
 - rest/wake timing and user rousing latency;
 - memory growth, consolidation and pruning;
+- autonomous research volume/quality/cost;
 - Stream/Observe stability/readability;
 - local/global sync under intermittent connectivity;
 - offline retry behavior;
@@ -164,7 +219,7 @@ Once diagnostics are useful, run extended Android tests watching:
 
 Fix observed release blockers before adding broad new features.
 
-### 3. Android release candidate
+### 4. Android release candidate
 
 After soak testing, stabilize signing/distribution, confirm Google auth configuration against the final signing identity, lock migration/account-state behavior, and prepare a release candidate.
 
@@ -174,6 +229,7 @@ After soak testing, stabilize signing/distribution, confirm Google auth configur
 - Richer background multi-core image conversation remains deferred until income comfortably exceeds cost.
 - Additional model/provider upgrades should be proposed through the maintenance process rather than silently changed.
 - Broader autonomous maintenance is not planned; JANUS should request and explain upgrades, while owner/Supervisor controls implementation.
+- Ambient continuous microphone/camera sensing is not part of PR #52 and requires a separate privacy/battery/product decision.
 
 ## Continuation rule
 

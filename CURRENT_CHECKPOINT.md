@@ -24,6 +24,34 @@ Wake and rest alternate. Wake may perform bounded deterministic peer processing 
 
 Loop guards remain mandatory: identical per-core signatures become quiescent; unchanged whole-society retained state does not restart an all-peer wake pass; changed wake processing is bounded and terminates.
 
+## Autonomous observation / continuing input
+
+PR #52 implements a governed digital-world observation layer so JANUS does not depend on user messages as its only source of new input.
+
+- On every materially changed wake cycle, each of the 11 persistent global top-level cores may form its own bounded `curiosity_intent` after reviewing retained state, interaction memory and peer conclusions. Forming intentions is deterministic and makes zero model/API calls.
+- A shared research gateway selects only a small subset of those intentions for paid outside observation. Duplicate/core-level curiosity therefore does not create 11 simultaneous paid searches.
+- Search selection favors core-requested/relevant material, also explores adjacent material, and deliberately includes occasional exploratory/random observation so JANUS can encounter information that neither the user nor its current thread explicitly requested.
+- Internet research includes a dedicated autonomous YouTube/video discovery mode alongside ordinary web/current-development/counterexample research. YouTube discovery currently uses the governed web-research route to find credible videos or transcript leads; richer transcript ingestion remains governed by the existing media/transcript capability when a usable video source is available.
+- Successful external findings re-enter JANUS through the runtime typed `web` sensory hook. Production entrypoint wiring replaces the base ingestion function with the recursive sensory wrapper, so each finding reaches the outer seven specialists -> hemispheres -> Front -> Interface route and the nested recursive JANUS state inside every global top-level core. No search result jumps directly into Front or Interface.
+- Findings begin as low-rung `trace` autonomous-research memories with source provenance. Existing consolidation/retrieval rules decide whether useful repeated material is promoted. Each core therefore appraises the same outside observation according to its own disposition/state rather than receiving a pre-approved belief.
+- The persistent global society can continue this process while no client is open, subject to host/server execution. Local Android cores remain subject to Android execution/suspension limits; global findings return to local JANUS through the existing selective federation when the client reconnects. Do not claim a suspended/killed phone process is continuously executing.
+- Ambient microphone and camera capture remain disabled. “Continuing observation” currently means governed digital information acquisition plus user-selected/device-explicit senses, not covert physical-world recording.
+
+### Research budget invariant
+
+The default per-account research policy is owner-set and must remain unchanged unless the owner explicitly changes it:
+
+- **US$20/month maximum planned web-research allowance** shared by autonomous and user-directed web research.
+- **US$10/month autonomous/background target and ceiling** inside that total.
+- The remaining allowance is reserved for user-directed research; autonomous research may not consume it.
+- Both `background_research` and `foreground_web` pass through the same persistent cost ledger and monthly governor.
+- Background searches are separately paced across the month and have a daily safety cap; wake/review/peer processing does not consume this paid-search allowance.
+- A configurable per-call planning estimate translates calls into the application budget. Because provider search prices and model-token overhead can change independently of this repository, this is a conservative application governor rather than an absolute external-invoice guarantee. Production telemetry and quarterly maintenance must compare real provider cost against the estimate and raise the estimate if necessary; the owner-set $20 application ceiling itself must not be raised without explicit owner instruction.
+
+### PR #52 verification
+
+Relevant CI must be green on the final source-bearing head before merge. An earlier validated implementation head passed clean server-v2 test/proof/diagnostic, recursive-core engine, conscious-stream cycle, Android maintenance and full Android APK build. The recursive-core regression explicitly proves 11 research intentions on a changed global wake with zero model calls. Production deployment and real unattended accumulation remain separate post-merge verification steps.
+
 ## Stream observer
 
 The server `/desktop/stream-observe` endpoint and Android Stream surface expose bounded externalizable Front activity/state only. They may show Fano orientation, cycle/revision/peer/quiescence counters, integrated summaries, rousing and Front events. Never expose hidden chain-of-thought.
@@ -93,6 +121,4 @@ Android remains the active release target. Windows and iOS remain deferred.
 
 ## Next engineering task
 
-The immediate next task is **real-device validation of the refreshed v1.11 full-interface accent behaviour** using the APK republished after PR #51. Fix any remaining device-specific contrast, theme refresh or log-layout defect from exact device evidence. If a detail screen closes, use `JanusClientDiagnostics` rather than speculative layout changes.
-
-After Android UI stability, continue the broader **Diagnostic System v2 behavioral proof phase**: prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count and append-only maintenance behavior.
+After PR #52 merges, verify the live server is running its revision and let the global JANUS accumulate real autonomous observations within budget. Then continue the broader **Diagnostic System v2 behavioral proof phase**: prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count, autonomous research cost accounting and append-only maintenance behavior.

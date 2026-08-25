@@ -11,14 +11,30 @@ def _fingerprint(parts: list[str]) -> str:
     return hashlib.sha256("\n".join(parts).encode("utf-8", errors="ignore")).hexdigest()[:24]
 
 
+def _research_intent(core_name: str, conclusion: str, purpose: str) -> str:
+    material = " ".join((conclusion or "").split())[:900]
+    if not material:
+        material = f"retained state for {core_name}"
+    return (
+        f"{core_name} noticed material that may benefit from new outside input. "
+        f"Core disposition: {purpose}. Candidate research direction: {material}"
+    )[:1400]
+
+
 def tick(mind: Any, account_id: int) -> dict[str, int]:
-    """Run one bounded all-11 peer cycle only when retained inputs materially changed."""
+    """Run one bounded all-11 peer cycle when retained inputs materially change.
+
+    Every changed wake also lets every top-level core form a bounded, zero-cost
+    research intention. Those intentions are observations/questions, not external
+    calls. The shared background coordinator may later execute a small governed subset.
+    """
     if getattr(mind, "phase", "wake") != "wake":
-        return {"cores": 0, "peer_revisions": 0, "model_calls": 0}
+        return {"cores": 0, "peer_revisions": 0, "research_intentions": 0, "model_calls": 0}
     if not hasattr(mind, "_recursive_states") or not hasattr(mind, "_processor"):
-        return {"cores": 0, "peer_revisions": 0, "model_calls": 0}
+        return {"cores": 0, "peer_revisions": 0, "research_intentions": 0, "model_calls": 0}
     aid = int(account_id)
-    outer = mind._states(aid); nested = mind._recursive_states(aid)
+    outer = mind._states(aid)
+    nested = mind._recursive_states(aid)
     try:
         remembered = storage.list_memories(aid, 6)
     except Exception:
@@ -28,28 +44,65 @@ def tick(mind: Any, account_id: int) -> dict[str, int]:
     fp = _fingerprint(retained + [memory_digest])
     fingerprints = getattr(mind, "_background_fingerprints", None)
     if fingerprints is None:
-        fingerprints = {}; setattr(mind, "_background_fingerprints", fingerprints)
+        fingerprints = {}
+        setattr(mind, "_background_fingerprints", fingerprints)
     if fingerprints.get(aid) == fp:
-        return {"cores": len(CORE_NAMES), "peer_revisions": 0, "model_calls": 0}
+        return {"cores": len(CORE_NAMES), "peer_revisions": 0, "research_intentions": 0, "model_calls": 0}
     fingerprints[aid] = fp
 
     first: dict[str, str] = {}
     for name in CORE_NAMES:
         outer_state = outer[name]
         stimulus = outer_state.last_public_summary or f"retained background state for {name}"
-        if memory_digest: stimulus += " | recalled interaction memory: " + memory_digest
-        result = mind._processor.think(nested[name], stimulus, outer_state.appraisal, mind._purpose(name), [], force=True)
+        if memory_digest:
+            stimulus += " | recalled interaction memory: " + memory_digest
+        result = mind._processor.think(
+            nested[name], stimulus, outer_state.appraisal, mind._purpose(name), [], force=True
+        )
         first[name] = result.get("conclusion", "")
 
     revisions = 0
+    revised: dict[str, str] = {}
     for name in CORE_NAMES:
         peers = [(peer, summary) for peer, summary in first.items() if peer != name and summary]
-        result = mind._processor.think(nested[name], "background peer revision", outer[name].appraisal, mind._purpose(name), peers, force=True)
-        if result.get("changed"): revisions += len(peers)
+        result = mind._processor.think(
+            nested[name], "background peer revision", outer[name].appraisal, mind._purpose(name), peers, force=True
+        )
+        revised[name] = result.get("conclusion", "") or first.get(name, "")
+        if result.get("changed"):
+            revisions += len(peers)
+
+    intentions = 0
+    for name in CORE_NAMES:
+        try:
+            detail = _research_intent(name, revised.get(name) or first.get(name, ""), mind._purpose(name))
+            storage.add_event(
+                aid,
+                name,
+                "curiosity_intent",
+                detail,
+                detail,
+                "background",
+            )
+            intentions += 1
+        except Exception:
+            pass
+
     try:
-        storage.add_event(aid, FRONT_CORE, "recursive_peer_exchange",
-            f"Wake cycle: {len(CORE_NAMES)} recursive cores processed changed retained input; {revisions} bounded peer-revision links processed; recent user interaction memory was {'recalled' if memory_digest else 'not available'}; model calls=0.",
-            mode="background")
+        storage.add_event(
+            aid,
+            FRONT_CORE,
+            "recursive_peer_exchange",
+            f"Wake cycle: {len(CORE_NAMES)} recursive cores processed changed retained input; "
+            f"{revisions} bounded peer-revision links processed; {intentions} bounded research intentions formed; "
+            f"recent user interaction memory was {'recalled' if memory_digest else 'not available'}; model calls=0.",
+            mode="background",
+        )
     except Exception:
         pass
-    return {"cores": len(CORE_NAMES), "peer_revisions": revisions, "model_calls": 0}
+    return {
+        "cores": len(CORE_NAMES),
+        "peer_revisions": revisions,
+        "research_intentions": intentions,
+        "model_calls": 0,
+    }

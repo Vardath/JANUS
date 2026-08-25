@@ -7,6 +7,8 @@ It supersedes the old stopping-state language at the end of `JANUS_137_SENSORY_I
 
 Windows and iOS work is intentionally deferred until the Android version is ready for release and its setup/release process is understood end-to-end.
 
+PR #52 adds the continuing-input/autonomous-observation layer. Its implementation includes per-core zero-cost curiosity intentions, governed outside research, recursive sensory re-entry, trace-memory provenance and the shared monthly research governor. Live deployment and unattended runtime behavior must still be verified separately after merge.
+
 ## Current product state
 Android currently has:
 - two independent 11-core societies: 11 local + 11 global;
@@ -31,7 +33,7 @@ Android currently has:
 ## What the latest real-device diagnostic taught us
 A user-requested full diagnostic produced a very large wall of diagnostic prose inside the Chat surface. The content indicates that the major architecture is present and substantially healthier than earlier builds, but the presentation and verification model are now the weak point.
 
-This changes the release plan. The next priority is not another broad feature expansion. It is to make diagnostics trustworthy, readable and useful for Android RC testing.
+This changes the release plan. The next priority is not another broad feature expansion. It is to make diagnostics trustworthy, readable and useful for Android RC testing, including the new continuing-input behavior.
 
 ## New immediate priority: Diagnostic System v2
 
@@ -74,12 +76,15 @@ The diagnostic engine/report should separate at least:
    - local memory persistence;
    - global/account memory retrieval;
    - no cross-account local leakage;
-   - upgrade persistence marker intact.
+   - upgrade persistence marker intact;
+   - autonomous research findings start at a low memory tier and preserve bounded provenance.
 5. Sensory/capability health
    - text;
    - files/documents;
    - images/vision;
    - web/research;
+   - autonomous web observations through the recursive full-society sensory route;
+   - YouTube/video-oriented discovery through governed research;
    - audio attachment understanding;
    - push-to-talk recognition availability/permission state;
    - action-result sensing.
@@ -96,14 +101,25 @@ The diagnostic engine/report should separate at least:
    - offline queue count;
    - connectivity/reconnect state;
    - recent worker failures/retries;
-   - no claim of continuous execution while Android has suspended/killed the process.
-8. Localization/voice health
+   - no claim of continuous execution while Android has suspended/killed the process;
+   - unchanged recursive state becomes quiescent;
+   - changed global wake cycles may form bounded curiosity intentions with zero model calls;
+   - autonomous paid research remains separately paced and governed.
+8. Research-cost health
+   - configured monthly total research ceiling;
+   - configured autonomous portion;
+   - current month autonomous calls/estimated spend;
+   - current month foreground-web calls/estimated spend;
+   - total monthly planned spend;
+   - denied calls after a cap is reached;
+   - prove autonomous research cannot consume the user-reserved portion.
+9. Localization/voice health
    - selected JANUS language;
    - speech locale;
    - recognizer availability/on-device/fallback state;
    - translation-shell coverage vs English fallback;
    - RTL mode where applicable.
-9. Release health
+10. Release health
    - app version/build identity;
    - debug vs release signing state;
    - server build identity if verifiable;
@@ -139,18 +155,20 @@ Do not expose private hidden chain-of-thought. Show only bounded externalizable 
 - Diagnostics should state the age/timestamp of evidence where practical.
 - Self-reported JANUS prose is not itself evidence that a subsystem works.
 - Diagnostic checks should be deterministic/low-cost and should not invoke paid model calls merely to test themselves.
+- Autonomous observation must be proven from persisted intent/search/sensory-route/cost events rather than prose claiming that JANUS was “thinking”.
 
 ## Android RC1 plan — adjusted order
 
-### Phase A — Diagnostic System v2 [NEXT]
+### Phase A — Diagnostic System v2 [NEXT after PR #52 production validation]
 1. Audit every current diagnostic check and identify static/shallow/self-reported checks.
 2. Introduce PASS/WARN/FAIL/UNVERIFIED/NOT-APPLICABLE result schema.
 3. Add category summaries and an overall health posture.
 4. Add evidence/timestamp/source fields.
-5. Build dedicated native full-diagnostic screen.
-6. Make Chat diagnostic response concise with a `View full diagnostic` action.
-7. Preserve Copy/Share-to-Supervisor handoff.
-8. Add CI regression gates for diagnostic schema and no giant Chat dump.
+5. Add continuing-input checks for curiosity intentions, recursive sensory integration and monthly budget accounting.
+6. Build dedicated native full-diagnostic screen.
+7. Make Chat diagnostic response concise with a `View full diagnostic` action.
+8. Preserve Copy/Share-to-Supervisor handoff.
+9. Add CI regression gates for diagnostic schema and no giant Chat dump.
 
 ### Phase B — Android real-device soak
 After Diagnostic v2 is available, test the actual device rather than adding major architecture:
@@ -165,6 +183,8 @@ After Diagnostic v2 is available, test the actual device rather than adding majo
 - image generation/research;
 - notification allowed/denied;
 - local/global sync after disconnect/reconnect;
+- leave JANUS without user interaction and verify autonomous global observations accumulate within budget;
+- ask `anything new?` and verify the answer is grounded in persisted research/observations rather than fabricated activity;
 - sign out -> second account -> prove first account local state absent;
 - sign back into first account -> prove global/account continuity returns without inheriting second-account local state;
 - extended background/sleep/wake use looking for spam, duplicate thought/messages, battery drain, worker storms, crashes or state corruption.
@@ -176,10 +196,11 @@ Prioritize:
 1. crashes/data loss/privacy/account leakage;
 2. authentication/session/reconnect failures;
 3. duplicate delivery/background/battery problems;
-4. core/sync continuity failures;
-5. voice/permission failures;
-6. localization/RTL/readability problems;
-7. cosmetic debt.
+4. core/sync/continuity and autonomous-observation failures;
+5. cost-governor failures;
+6. voice/permission failures;
+7. localization/RTL/readability problems;
+8. cosmetic debt.
 
 Do not add speculative major features during this phase unless required to fix a release blocker.
 
@@ -198,6 +219,8 @@ Before public release:
 Before calling Android released:
 - verify the live Render server is actually running the intended current server-v2 revision;
 - verify production auth, chat, sync, files/images/research/audio against the release-signed build;
+- verify autonomous observation uses the intended live revision and persistent disk;
+- verify monthly research telemetry and cap behavior in production;
 - distinguish live-deployment evidence from repository CI;
 - verify graceful degradation when the server is sleeping/unreachable;
 - verify maintenance/Supervisor handoff remains owner-governed.
@@ -211,8 +234,6 @@ Before calling Android released:
 - broad new architectural features unrelated to Android RC blockers.
 
 ## Next-session instruction
-Resume with **Diagnostic System v2, Phase A**.
+Resume by verifying PR #52 merge/deploy state and unattended runtime evidence, then continue **Diagnostic System v2, Phase A**.
 
 Do not begin by redesigning the 1-3-7 architecture again. Treat the current 11-local + 11-global Fano/sensory architecture as the active implementation unless a concrete diagnostic or soak-test failure disproves part of it.
-
-Start by reviewing the current Android/server diagnostic code and the screenshot-driven problem: full diagnostics are too verbose in Chat and mix architecture claims with runtime verification. Refactor diagnostics into structured evidence-backed checks and a dedicated report surface, then build/test the APK before proceeding to the device soak.

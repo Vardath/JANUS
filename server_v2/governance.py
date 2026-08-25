@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import calendar
 import json
 import os
+import time
 from typing import Any
 
 from . import storage
 
 CORE_NAMES = ("evidence","logic","counterpoint","context","memory","safety","novelty","left_hemisphere","right_hemisphere","consensus","interface")
+RESEARCH_SCOPES = ("background_research", "foreground_web")
 
 
 def init_schema() -> None:
@@ -122,7 +125,8 @@ def record_consistency(account_id: int, core_names: list[str], consistent: bool,
     with storage.db() as c:
         for core in core_names:
             row = c.execute("SELECT consistency_score,observations FROM v2_core_reliability WHERE account_id=? AND core_name=?", (int(account_id), core)).fetchone()
-            if not row: continue
+            if not row:
+                continue
             old = float(row["consistency_score"])
             new = max(0.05, min(0.95, old + alpha * (target - old)))
             c.execute("UPDATE v2_core_reliability SET consistency_score=?,observations=observations+1,updated_at=? WHERE account_id=? AND core_name=?", (new, ts, int(account_id), core))
@@ -132,9 +136,50 @@ def adapt_bridge(account_id: int, specialist: str, hemisphere: str, direction: f
     ensure_account(account_id)
     with storage.db() as c:
         row = c.execute("SELECT weight FROM v2_bridge_authority WHERE account_id=? AND specialist=? AND hemisphere=?", (int(account_id), specialist, hemisphere)).fetchone()
-        if not row: return
+        if not row:
+            return
         new = max(0.2, min(0.8, float(row["weight"]) + max(-0.02, min(0.02, direction))))
         c.execute("UPDATE v2_bridge_authority SET weight=?,updated_at=? WHERE account_id=? AND specialist=? AND hemisphere=?", (new, storage.now(), int(account_id), specialist, hemisphere))
+
+
+def _month_window(now: int) -> tuple[int, int]:
+    t = time.gmtime(now)
+    start = calendar.timegm((t.tm_year, t.tm_mon, 1, 0, 0, 0, 0, 0, 0))
+    if t.tm_mon == 12:
+        end = calendar.timegm((t.tm_year + 1, 1, 1, 0, 0, 0, 0, 0, 0))
+    else:
+        end = calendar.timegm((t.tm_year, t.tm_mon + 1, 1, 0, 0, 0, 0, 0, 0))
+    return start, end
+
+
+def _research_plan(account_id: int, now: int | None = None) -> dict[str, float]:
+    now = storage.now() if now is None else int(now)
+    start, end = _month_window(now)
+    per_call = max(0.001, float(os.getenv("JANUS_RESEARCH_ESTIMATED_USD_PER_CALL", "0.01")))
+    total_cap = max(0.0, float(os.getenv("JANUS_RESEARCH_MONTHLY_MAX_USD", "20")))
+    autonomous_cap = min(total_cap, max(0.0, float(os.getenv("JANUS_AUTONOMOUS_RESEARCH_TARGET_USD", "10"))))
+    rows = storage.rows(
+        "SELECT scope,coalesce(sum(calls),0) calls FROM v2_cost_ledger WHERE account_id=? AND allowed=1 AND created_at>=? AND created_at<? AND scope IN ('background_research','foreground_web') GROUP BY scope",
+        (int(account_id), start, end),
+    )
+    calls = {str(r["scope"]): int(r["calls"] or 0) for r in rows}
+    background_calls = calls.get("background_research", 0)
+    foreground_calls = calls.get("foreground_web", 0)
+    background_usd = background_calls * per_call
+    foreground_usd = foreground_calls * per_call
+    total_usd = background_usd + foreground_usd
+    return {
+        "per_call_usd": per_call,
+        "monthly_max_usd": total_cap,
+        "autonomous_target_usd": autonomous_cap,
+        "background_calls": float(background_calls),
+        "foreground_calls": float(foreground_calls),
+        "background_estimated_usd": background_usd,
+        "foreground_estimated_usd": foreground_usd,
+        "total_estimated_usd": total_usd,
+        "remaining_total_usd": max(0.0, total_cap - total_usd),
+        "remaining_autonomous_usd": max(0.0, autonomous_cap - background_usd),
+    }
 
 
 def cost_status(account_id: int) -> dict[str, Any]:
@@ -144,33 +189,57 @@ def cost_status(account_id: int) -> dict[str, Any]:
     return {
         "mode": os.getenv("JANUS_COMPUTE_BUDGET", "balanced"),
         "today": scopes,
+        "research_month": _research_plan(account_id),
         "background_daily_call_cap": int(os.getenv("JANUS_BACKGROUND_DAILY_CALL_CAP", "12")),
         "background_daily_token_cap": int(os.getenv("JANUS_BACKGROUND_DAILY_TOKEN_CAP", "20000")),
-        "curiosity_daily_search_cap": int(os.getenv("JANUS_CURIOSITY_DAILY_SEARCH_CAP", "4")),
+        "curiosity_daily_search_cap": int(os.getenv("JANUS_CURIOSITY_DAILY_SEARCH_CAP", "40")),
         "background_multi_core_image_generation": False,
     }
 
 
 def permit(account_id: int, scope: str, estimated_usd: float = 0.0) -> bool:
-    start = storage.now() - 86400
-    if scope == "background_research":
-        cap = int(os.getenv("JANUS_CURIOSITY_DAILY_SEARCH_CAP", "4"))
-    elif scope == "background_model":
+    now = storage.now()
+    day_start = now - 86400
+
+    if scope in RESEARCH_SCOPES:
+        plan = _research_plan(account_id, now)
+        normalized_cost = float(plan["per_call_usd"])
+        total_ok = plan["total_estimated_usd"] + normalized_cost <= plan["monthly_max_usd"] + 1e-9
+        background_ok = True
+        if scope == "background_research":
+            background_ok = plan["background_estimated_usd"] + normalized_cost <= plan["autonomous_target_usd"] + 1e-9
+            cap = int(os.getenv("JANUS_CURIOSITY_DAILY_SEARCH_CAP", "40"))
+        else:
+            cap = int(os.getenv("JANUS_FOREGROUND_DAILY_CALL_CAP", "500"))
+        row = storage.one(
+            "SELECT coalesce(sum(calls),0) n FROM v2_cost_ledger WHERE account_id=? AND scope=? AND allowed=1 AND created_at>?",
+            (int(account_id), scope, day_start),
+        )
+        daily_ok = int(row["n"] if row else 0) < cap
+        allowed = bool(total_ok and background_ok and daily_ok)
+        storage.execute(
+            "INSERT INTO v2_cost_ledger(account_id,scope,calls,estimated_usd,allowed,created_at) VALUES(?,?,?,?,?,?)",
+            (int(account_id), scope, 1, normalized_cost, int(allowed), now),
+        )
+        return allowed
+
+    if scope == "background_model":
         cap = int(os.getenv("JANUS_BACKGROUND_DAILY_CALL_CAP", "12"))
     elif scope == "image":
         cap = int(os.getenv("JANUS_IMAGE_DAILY_CAP", "20"))
     else:
         cap = int(os.getenv("JANUS_FOREGROUND_DAILY_CALL_CAP", "500"))
-    row = storage.one("SELECT coalesce(sum(calls),0) n FROM v2_cost_ledger WHERE account_id=? AND scope=? AND allowed=1 AND created_at>?", (int(account_id), scope, start))
+    row = storage.one("SELECT coalesce(sum(calls),0) n FROM v2_cost_ledger WHERE account_id=? AND scope=? AND allowed=1 AND created_at>?", (int(account_id), scope, day_start))
     allowed = int(row["n"] if row else 0) < cap
-    storage.execute("INSERT INTO v2_cost_ledger(account_id,scope,calls,estimated_usd,allowed,created_at) VALUES(?,?,?,?,?,?)", (int(account_id), scope, 1, float(estimated_usd), int(allowed), storage.now()))
+    storage.execute("INSERT INTO v2_cost_ledger(account_id,scope,calls,estimated_usd,allowed,created_at) VALUES(?,?,?,?,?,?)", (int(account_id), scope, 1, float(estimated_usd), int(allowed), now))
     return allowed
 
 
 def continuity_list(account_id: int, open_only: bool = False, limit: int = 100) -> list[dict[str, Any]]:
     where = "account_id=?" + (" AND state IN ('open','active','blocked')" if open_only else "")
     items = storage.rows(f"SELECT id,kind,state,priority,title,detail,tags_json,created_at,updated_at FROM v2_continuity WHERE {where} ORDER BY priority DESC,updated_at DESC LIMIT ?", (int(account_id), max(1,min(200,limit))))
-    for x in items: x["tags"] = json.loads(x.pop("tags_json") or "[]")
+    for x in items:
+        x["tags"] = json.loads(x.pop("tags_json") or "[]")
     return items
 
 
@@ -183,14 +252,17 @@ def continuity_create(account_id: int, title: str, detail: str = "", kind: str =
 
 def continuity_get(account_id: int, item_id: int) -> dict[str, Any]:
     row = storage.one("SELECT id,kind,state,priority,title,detail,tags_json,created_at,updated_at FROM v2_continuity WHERE account_id=? AND id=?", (int(account_id),int(item_id)))
-    if not row: raise KeyError(item_id)
-    d = dict(row); d["tags"] = json.loads(d.pop("tags_json") or "[]")
+    if not row:
+        raise KeyError(item_id)
+    d = dict(row)
+    d["tags"] = json.loads(d.pop("tags_json") or "[]")
     return d
 
 
 def continuity_state(account_id: int, item_id: int, new_state: str, note: str = "") -> dict[str, Any]:
     allowed = {"open","active","blocked","deferred","done","closed"}
-    if new_state not in allowed: raise ValueError("invalid continuity state")
+    if new_state not in allowed:
+        raise ValueError("invalid continuity state")
     old = continuity_get(account_id,item_id)["state"]
     ts = storage.now()
     with storage.db() as c:
