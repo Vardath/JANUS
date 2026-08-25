@@ -14,14 +14,7 @@ import org.json.JSONObject;
 import java.text.DateFormat;
 import java.util.Date;
 
-/**
- * Explicit, read-only owner for the JANUS Front/stream surface.
- *
- * This renderer does not search or rewrite the live Android view tree, does not
- * reflect private Activity fields and does not install delayed/global-layout
- * callbacks. The hosting Activity supplies the content container and runtime
- * dependencies directly.
- */
+/** Explicit, read-only owner for the JANUS Front/stream surface. */
 public final class JanusStreamScreen {
     private JanusStreamScreen() {}
 
@@ -36,10 +29,10 @@ public final class JanusStreamScreen {
     public static void render(Host host, LinearLayout content) {
         if (host == null || content == null) return;
         Activity a = host.activity();
-        content.addView(text(a, "Stream", 28, true), full());
+        content.addView(text(a, "Stream", 28, true, false), full());
         content.addView(text(a,
-                "Read-only externalizable activity from JANUS Front, the single integrated stream that receives Left and Right before Interface. Hidden chain-of-thought is never exposed.",
-                13, false), full());
+                "A readable snapshot of JANUS Front: the integrated state that receives Left and Right before Interface. Technical machine detail stays secondary.",
+                13, false, true), full());
 
         LinearLayout list = vertical(a);
         ScrollView scroll = new ScrollView(a);
@@ -47,6 +40,7 @@ public final class JanusStreamScreen {
         content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
         Button refresh = button(a, "Refresh stream snapshot");
+        JanusTheme.applyAccentButton(a, refresh);
         refresh.setOnClickListener(v -> load(host, list));
         content.addView(refresh, full());
         load(host, list);
@@ -55,7 +49,7 @@ public final class JanusStreamScreen {
     private static void load(Host host, LinearLayout list) {
         Activity a = host.activity();
         list.removeAllViews();
-        list.addView(text(a, "Loading Front stream…", 14, false));
+        list.addView(text(a, "Loading Front stream…", 14, false, true));
         host.runIo(() -> {
             JSONObject local = new JSONObject();
             try {
@@ -75,12 +69,12 @@ public final class JanusStreamScreen {
     private static void renderSnapshot(Activity a, LinearLayout list, JSONObject local, JSONObject server, boolean serverOk) {
         list.removeAllViews();
         JSONObject localFront = local.optJSONObject("cores") == null ? null : local.optJSONObject("cores").optJSONObject("front");
-        if (localFront != null) addStateCard(a, list, "This device · Front", localFront, "Local recursive Front state");
+        if (localFront != null) addStateCard(a, list, "This device · Front", localFront, "Local integrated state");
 
         JSONObject current = server.optJSONObject("current");
         JSONObject globalFront = current == null ? null : current.optJSONObject("recursive_janus");
         if (globalFront != null) addStateCard(a, list, "Global JANUS · Front", globalFront,
-                "Server recursive Front state · phase " + server.optString("phase", "unknown"));
+                "Online integrated state · " + pretty(server.optString("phase", "unknown")));
 
         JSONArray items = server.optJSONArray("items");
         if (items != null) {
@@ -88,39 +82,41 @@ public final class JanusStreamScreen {
                 JSONObject x = items.optJSONObject(i);
                 if (x == null) continue;
                 LinearLayout card = card(a);
-                card.addView(text(a, "Front · " + pretty(x.optString("event_type", "event")), 13, true));
-                card.addView(text(a, x.optString("detail", ""), 15, false));
-                card.addView(text(a, formatTime(x.opt("created_at")) + " · " + x.optString("mode", "foreground"), 12, false));
+                card.addView(text(a, "Front · " + pretty(x.optString("event_type", "event")), 13, true, false));
+                String raw = x.optString("detail", "");
+                card.addView(text(a, JanusHumanText.summarize(raw), 15, false, false));
+                card.addView(text(a, formatTime(x.opt("created_at")) + " · " + pretty(x.optString("mode", "foreground")), 12, false, true));
                 list.addView(card, full());
             }
         }
 
         if (!serverOk) {
-            list.addView(text(a, "Global stream is temporarily unavailable. Local Front state remains readable.", 13, false));
+            list.addView(text(a, "Global stream is temporarily unavailable. Local Front state remains readable.", 13, false, true));
         } else if (list.getChildCount() == 0) {
-            list.addView(text(a, "No stream activity retained yet.", 15, false));
+            list.addView(text(a, "No stream activity retained yet.", 15, false, true));
         }
     }
 
     private static void addStateCard(Activity a, LinearLayout list, String title, JSONObject x, String subtitle) {
         LinearLayout card = card(a);
-        card.addView(text(a, title, 14, true));
-        card.addView(text(a, subtitle, 12, false));
-        card.addView(text(a,
-                "Fano: d" + x.optInt("active_direction", 0) + " " + x.optString("active_faculty", "reference")
-                        + " · cycles " + x.optLong("cycles", 0)
-                        + " · revisions " + x.optLong("revision_count", 0)
-                        + " · peer turns " + x.optLong("peer_turn_count", 0)
-                        + " · quiescent " + x.optLong("quiescent_count", 0),
-                13, false));
+        card.addView(text(a, title, 16, true, false));
+        card.addView(text(a, subtitle, 12, false, true));
+        String faculty = pretty(x.optString("active_faculty", "reference"));
+        String metrics = "Focus: d" + x.optInt("active_direction", 0) + " · " + faculty
+                + "\nCycles: " + x.optLong("cycles", 0)
+                + " · revisions: " + x.optLong("revision_count", 0)
+                + " · peer turns: " + x.optLong("peer_turn_count", 0)
+                + " · quiescent: " + x.optLong("quiescent_count", 0);
+        card.addView(text(a, metrics, 13, false, false));
         String conclusion = x.optString("conclusion", "");
-        if (!conclusion.isBlank()) card.addView(text(a, conclusion, 14, false));
+        if (!conclusion.isBlank()) card.addView(text(a, JanusHumanText.summarize(conclusion), 14, false, false));
         list.addView(card, full());
     }
 
     private static LinearLayout vertical(Activity a) {
         LinearLayout x = new LinearLayout(a);
         x.setOrientation(LinearLayout.VERTICAL);
+        JanusTheme.applyRoot(a, x);
         return x;
     }
 
@@ -131,14 +127,15 @@ public final class JanusStreamScreen {
         LinearLayout.LayoutParams lp = full();
         lp.setMargins(0, dp(a, 6), 0, dp(a, 6));
         x.setLayoutParams(lp);
-        x.setBackgroundColor(0x181C8CFF);
+        JanusTheme.applyCard(a, x);
         return x;
     }
 
-    private static TextView text(Activity a, String s, int sp, boolean bold) {
+    private static TextView text(Activity a, String s, int sp, boolean bold, boolean muted) {
         TextView v = new TextView(a);
         v.setText(s);
         v.setTextSize(sp);
+        JanusTheme.applyText(a, v, muted);
         if (bold) v.setTypeface(Typeface.DEFAULT_BOLD);
         v.setPadding(dp(a, 4), dp(a, 5), dp(a, 4), dp(a, 5));
         return v;
@@ -149,12 +146,13 @@ public final class JanusStreamScreen {
         b.setText(s);
         b.setAllCaps(false);
         b.setGravity(Gravity.CENTER);
+        JanusTheme.applyButton(a, b);
         return b;
     }
 
     private static LinearLayout.LayoutParams full() { return new LinearLayout.LayoutParams(-1, -2); }
     private static int dp(Activity a, int n) { return Math.round(n * a.getResources().getDisplayMetrics().density); }
-    private static String pretty(String s) { return s == null ? "" : s.replace('_', ' '); }
+    private static String pretty(String s) { return JanusHumanText.pretty(s); }
 
     private static String formatTime(Object raw) {
         if (raw instanceof Number) {
