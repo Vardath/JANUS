@@ -96,3 +96,4 @@ app.state.recursive_core_count = 11
 app.state.local_recursive_core_count = 11
 app.state.outward_route = "7 specialists -> left/right -> front -> interface"
 app.state.maintenance_request_generation = "append_only_persistent_ledger"
+app.state.live_chat_recovery_diagnostic = True
