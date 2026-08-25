@@ -1,0 +1,31 @@
+name: Maintenance v1.11 Stream privacy wording
+on:
+  push:
+    branches: [android-v111-theme-human-logs]
+    paths: ['.github/workflows/maintenance-v111-stream-boundary.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: android-v111-theme-human-logs
+      - shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/java/com/vardath/janus/JanusStreamScreen.java')
+          s=p.read_text(encoding='utf-8')
+          old='A readable snapshot of JANUS Front: the integrated state that receives Left and Right before Interface. Technical machine detail stays secondary.'
+          new='A readable snapshot of JANUS Front: the integrated state that receives Left and Right before Interface. Hidden chain-of-thought is never exposed. Technical machine detail stays secondary.'
+          assert old in s
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/maintenance-v111-stream-boundary.yml
+          git add android/app/src/main/java/com/vardath/janus/JanusStreamScreen.java
+          git commit -m "Restore explicit Stream privacy boundary [skip ci]"
+          git push origin HEAD:android-v111-theme-human-logs
