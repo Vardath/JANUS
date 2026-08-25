@@ -6,8 +6,10 @@ from . import maintenance_ledger_integration
 from .maintenance_seed import apply_pending_seed
 from .migrate import migrate_persistent_data_once
 from .conscious_mind import mind as recursive_mind
+from .front_serialization_guard import install as install_front_serialization_guard
 from .runtime_persistence import runtime_persistence
 
+install_front_serialization_guard()
 base_mind_module.mind = recursive_mind
 runtime_persistence_module.mind = recursive_mind
 
@@ -97,3 +99,4 @@ app.state.local_recursive_core_count = 11
 app.state.outward_route = "7 specialists -> left/right -> front -> interface"
 app.state.maintenance_request_generation = "append_only_persistent_ledger"
 app.state.live_chat_recovery_diagnostic = True
+app.state.front_appraisal_json_safe = True
