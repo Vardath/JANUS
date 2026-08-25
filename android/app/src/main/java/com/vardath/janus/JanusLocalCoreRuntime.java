@@ -123,6 +123,7 @@ public final class JanusLocalCoreRuntime {
         String clean = clip(text, 1200);
         if (clean.isEmpty()) return;
         remember("user: " + clean);
+        if ("sleep".equals(phase)) record("interface", "", "foreground_rouse", "Foreground user input roused local JANUS from passive rest for this interaction.", clean);
         record("interface", "", "user_topic", "Local JANUS sensed the current user topic: " + clip(clean, 600), clean);
         broadcastSense("user topic: " + clean, "interface", "text");
         serviceBurst(true);
@@ -175,7 +176,7 @@ public final class JanusLocalCoreRuntime {
             JSONObject x = new JSONObject();
             x.put("awake", started);
             x.put("available", started);
-            x.put("processing_mode", "interface".equals(c.name) ? "continuous" : ("wake".equals(phase) ? "full-rate" : "low-duty"));
+            x.put("processing_mode", "wake".equals(phase) ? "full-rate" : "passive-rest");
             x.put("cycle_count", c.cycles);
             x.put("pending_messages", c.inbox.size());
             x.put("last_output", c.last);
@@ -203,17 +204,15 @@ public final class JanusLocalCoreRuntime {
         long elapsed = now - phaseStarted;
         if ("wake".equals(phase) && elapsed >= 5 * 60_000L) {
             phase = "sleep"; phaseStarted = now;
-            record("interface", "", "phase", "Local JANUS entered low-duty mode; all cores remain available for foreground sensing.", "");
+            record("interface", "", "phase", "Local JANUS entered passive rest; scheduled cognition is suspended while all cores remain available for foreground sensing.", "");
         } else if ("sleep".equals(phase) && elapsed >= 10 * 60_000L) {
             phase = "wake"; phaseStarted = now;
             record("interface", "", "phase", "Local JANUS entered full-rate deterministic processing.", "");
         }
-        if (!cores.get("interface").inbox.isEmpty()) cycle("interface");
-        if (prefs.getBoolean("background_cycles_enabled", true)) {
-            if ("wake".equals(phase) || now - lastBackgroundAt >= backgroundIntervalMs()) {
+        if (prefs.getBoolean("background_cycles_enabled", true) && "wake".equals(phase)) {
+            if (now - lastBackgroundAt >= backgroundIntervalMs()) {
                 serviceBurst(false);
                 lastBackgroundAt = now;
-                if ("sleep".equals(phase)) record("interface", "", "maintenance", "Low-duty local maintenance pass completed with zero model/API calls.", "");
             }
             if (now - lastAutonomousAt >= Math.max(60_000L, backgroundIntervalMs())) {
                 autonomousPulse();
