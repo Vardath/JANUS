@@ -3,46 +3,19 @@ package com.vardath.janus;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.graphics.Typeface;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
-import java.util.WeakHashMap;
 
-/** Injects broad device-local language controls into the existing Settings screen. */
+/** Explicit Settings-owned JANUS language controls; no view-tree injection. */
 public final class JanusLanguagePolish {
-    private static final Set<Activity> INSTALLED = Collections.newSetFromMap(new WeakHashMap<>());
-    private static final int TAG_LANGUAGE_CARD = 0x4A7310;
-
     private JanusLanguagePolish() {}
 
-    public static void install(Activity activity) {
-        if (activity == null || INSTALLED.contains(activity)) return;
-        INSTALLED.add(activity);
-        activity.getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-            View root = activity.findViewById(android.R.id.content);
-            if (root != null) walk(activity, root);
-        });
-    }
-
-    private static void walk(Activity activity, View view) {
-        if (view instanceof LinearLayout) maybeInject(activity, (LinearLayout) view);
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) walk(activity, group.getChildAt(i));
-        }
-    }
-
-    private static void maybeInject(Activity activity, LinearLayout group) {
-        if (group.getTag(TAG_LANGUAGE_CARD) != null) return;
-        if (!containsExact(group, "Settings")) return;
-        if (!containsText(group, "Appearance") && !containsText(group, "Local JANUS background operation")) return;
+    public static void renderSettingsCard(Activity activity, LinearLayout settingsList) {
+        if (activity == null || settingsList == null) return;
 
         LinearLayout card = new LinearLayout(activity);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -80,9 +53,7 @@ public final class JanusLanguagePolish {
         coverage.setPadding(0, dp(activity, 6), 0, 0);
         card.addView(coverage, full());
 
-        int insertAt = Math.min(3, group.getChildCount());
-        group.addView(card, insertAt, full());
-        group.setTag(TAG_LANGUAGE_CARD, Boolean.TRUE);
+        settingsList.addView(card, full());
     }
 
     private static void showPicker(Activity activity, boolean speech, Button target, String filter) {
@@ -104,8 +75,6 @@ public final class JanusLanguagePolish {
                         updateSpeechLabel(activity, target);
                     } else {
                         JanusLanguageSettings.setLanguageTag(activity, choice.tag);
-                        // Rebuild from canonical English source text before applying the new
-                        // locale. This prevents mixed-language screens after switching twice.
                         activity.recreate();
                     }
                 })
@@ -121,23 +90,6 @@ public final class JanusLanguagePolish {
 
     private static void updateSpeechLabel(Activity activity, Button button) {
         button.setText("Speech recognition & voice\n" + JanusLanguageSettings.speechLanguageName(activity));
-    }
-
-    private static boolean containsExact(ViewGroup group, String exact) {
-        for (int i = 0; i < group.getChildCount(); i++) {
-            View v = group.getChildAt(i);
-            if (v instanceof TextView && exact.equals(String.valueOf(((TextView) v).getText()).trim())) return true;
-        }
-        return false;
-    }
-
-    private static boolean containsText(ViewGroup group, String fragment) {
-        for (int i = 0; i < group.getChildCount(); i++) {
-            View v = group.getChildAt(i);
-            if (v instanceof TextView && String.valueOf(((TextView) v).getText()).contains(fragment)) return true;
-            if (v instanceof ViewGroup && containsText((ViewGroup) v, fragment)) return true;
-        }
-        return false;
     }
 
     private static LinearLayout.LayoutParams full() { return new LinearLayout.LayoutParams(-1, -2); }
