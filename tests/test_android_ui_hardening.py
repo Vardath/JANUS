@@ -12,10 +12,10 @@ def test_authoritative_build_is_native_and_patch_free():
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
-def test_android_v110_is_direct_native_product():
+def test_android_v111_is_direct_native_product():
     text = Path('android/app/build.gradle').read_text(encoding='utf-8')
-    assert "versionCode 110" in text
-    assert "versionName '1.10'" in text
+    assert "versionCode 111" in text
+    assert "versionName '1.11'" in text
     assert 'app-only appearance isolation' in text
     main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
     assert 'android.webkit.WebView' not in main
@@ -66,11 +66,15 @@ def test_navigation_system_chrome_and_core_map_are_hardened():
 def test_janus_theme_preferences_are_app_view_only():
     main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
     chrome = (BASE / 'JanusSystemChrome.java').read_text(encoding='utf-8')
+    theme = (BASE / 'JanusTheme.java').read_text(encoding='utf-8')
     assert 'putString("theme_mode",mode)' in main
     assert 'putString("accent",accent)' in main
-    assert 'backgroundColor()' in main
-    assert 'surfaceColor()' in main
-    assert 'accentColor()' in main
+    assert 'JanusTheme.background(this)' in main
+    assert 'JanusTheme.surface(this)' in main
+    assert 'JanusTheme.accent(this)' in main
+    assert 'applyAccentButton' in theme
+    assert 'setStatusBarColor' not in theme
+    assert 'setNavigationBarColor' not in theme
     assert 'theme_mode' not in chrome
     assert 'accent' not in chrome
 
