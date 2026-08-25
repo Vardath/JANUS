@@ -9,7 +9,7 @@ import time
 from . import governance, mailer, storage
 from .mind import mind
 from .recursive_background import tick as recursive_tick
-from .sensory_bus import ingest as ingest_sense
+from . import sensory_bus as sensory_bus_module
 
 
 class BackgroundCoordinator:
@@ -295,7 +295,10 @@ class BackgroundCoordinator:
             "sources": source_labels,
             "autonomous": True,
         }
-        integrated = ingest_sense(
+        # entrypoint.py replaces sensory_bus_module.ingest with recursive_sensory.ingest,
+        # so autonomous web findings update both the outer 1|3|7 society and every
+        # nested recursive JANUS core rather than bypassing the recursive wrapper.
+        integrated = sensory_bus_module.ingest(
             aid,
             "web",
             "autonomous_research",
@@ -329,7 +332,7 @@ class BackgroundCoordinator:
                 aid,
                 "front",
                 "autonomous_observation_integrated",
-                "A new autonomous web observation was projected through all seven specialists, both hemispheres, Front and Interface; no automatic outward action was taken.",
+                "A new autonomous web observation was projected through all seven specialists, both hemispheres, Front and Interface, including nested recursive core sensing; no automatic outward action was taken.",
                 mode="background",
             )
 
