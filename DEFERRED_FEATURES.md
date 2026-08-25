@@ -22,7 +22,7 @@ The following are no longer deferred:
 - background-usefulness suppression and cost/failure degradation;
 - owner-facing server observability.
 
-PR #52 implements governed continuing digital observation/autonomous web research, subject to post-merge production validation. It is not ambient physical-world sensing.
+PR #52 implements governed continuing digital observation/autonomous web research. Production behavior still requires post-merge validation. It is not ambient physical-world sensing.
 
 ## Remaining Android product integration
 
