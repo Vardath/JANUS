@@ -1,0 +1,1 @@
+This branch intentionally changes CI/release verification only; it does not alter Android product runtime or server business logic.

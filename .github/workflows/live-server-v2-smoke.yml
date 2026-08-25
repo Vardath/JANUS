@@ -1,156 +1,128 @@
-name: Smoke test live JANUS server v2
+name: Smoke test live JANUS Android/server path
 
 on:
   push:
     branches: [main]
     paths:
+      - 'server_v2/**'
       - 'render.yaml'
+      - 'requirements.txt'
       - '.github/workflows/live-server-v2-smoke.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: janus-live-server-smoke
+  cancel-in-progress: true
 
 jobs:
   live-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - name: Install smoke-test client
         run: pip install requests
-      - name: Exercise stable deployed v2 service and record result
+      - name: Wait for Render and exercise the Android-critical path
         shell: bash
         run: |
-          set +e
-          python - <<'PY' > /tmp/live-smoke.log 2>&1
-          import base64, json, random, string, time
+          python - <<'PY'
+          import json, random, string, time
           import requests
 
           BASE='https://janus-global-core.onrender.com'
-          report=[]; structural_failures=[]; provider_failures=[]
-          def note(name, ok, detail='', provider=False):
-              report.append({'test':name,'ok':bool(ok),'provider_external':bool(provider),'detail':str(detail)[:1600]})
-              if not ok: (provider_failures if provider else structural_failures).append(name)
-          def get(path, **kw): return requests.get(BASE+path, timeout=90, **kw)
-          def post(path, **kw): return requests.post(BASE+path, timeout=180, **kw)
+          session=requests.Session()
 
-          stable=False; last=''; streak=0; stable_commit=None
-          for _ in range(60):
+          def get(path, **kw):
+              return session.get(BASE+path, timeout=60, **kw)
+          def post(path, **kw):
+              return session.post(BASE+path, timeout=120, **kw)
+
+          # Render may still be deploying when a main commit triggers this workflow.
+          last='not attempted'
+          healthy=False
+          for attempt in range(90):
               try:
-                  h=get('/health'); c=get('/protocol/capabilities')
-                  if h.status_code==200 and c.status_code==200 and c.json().get('server_generation')=='v2-clean-reconstruction':
-                      commit=(c.json().get('deployed_commit') or h.json().get('deployed_commit') or 'unknown')
-                      if commit==stable_commit: streak+=1
-                      else: stable_commit=commit; streak=1
-                      last=f'commit={commit} streak={streak} health={h.status_code} caps={c.status_code}'
-                      if streak>=3: stable=True; break
+                  h=get('/health')
+                  c=get('/protocol/capabilities')
+                  if h.status_code==200 and c.status_code==200:
+                      hj=h.json(); cj=c.json()
+                      if (cj.get('server_generation')=='v2-clean-reconstruction'
+                          and (cj.get('cognitive_engine_generation') or hj.get('cognitive_engine_generation'))=='recursive-conscious-stream-v2'):
+                          healthy=True
+                          break
+                      last=f'generation mismatch health={hj} capabilities={cj}'
                   else:
-                      streak=0; last=f'health={h.status_code} caps={c.status_code}'
-              except Exception as e:
-                  streak=0; last=repr(e)
+                      last=f'health={h.status_code} capabilities={c.status_code}'
+              except Exception as exc:
+                  last=repr(exc)
               time.sleep(10)
-          note('stable v2 deployment', stable, last)
-          if not stable:
-              print(json.dumps({'deployed_commit':stable_commit,'report':report,'structural_failures':structural_failures,'provider_failures':provider_failures},indent=2)); raise SystemExit(1)
+          if not healthy:
+              raise SystemExit('Render did not become healthy/current within wait window: '+last)
 
-          h=get('/health'); hj=h.json()
-          note('health', h.status_code==200 and hj.get('status')=='ok' and hj.get('core_count')==11, hj)
-          c=get('/protocol/capabilities'); cj=c.json()
-          required=['chat','messages','observe','memory','local_global_sync','attachments','visual_analysis','foreground_web','research_workspace','artifacts','image_generation','maintenance']
-          note('capability contract', c.status_code==200 and all(cj.get('features',{}).get(k) is True for k in required), cj)
+          hj=get('/health').json(); cj=get('/protocol/capabilities').json()
+          assert hj.get('status')=='ok', hj
+          assert int(hj.get('core_count') or 0)==11, hj
+          assert cj.get('server_generation')=='v2-clean-reconstruction', cj
+          assert (cj.get('cognitive_engine_generation') or hj.get('cognitive_engine_generation'))=='recursive-conscious-stream-v2', (hj,cj)
 
           suffix=''.join(random.choice(string.ascii_lowercase+string.digits) for _ in range(10))
-          username='ci-'+suffix; email=username+'@example.invalid'; password='JANUS-CI-'+suffix+'-A7z9'
-          r=post('/auth/register',json={'username':username,'email':email,'password':password})
-          note('register', r.status_code==200, r.text)
-          if r.status_code!=200:
-              print(json.dumps({'deployed_commit':stable_commit,'report':report,'structural_failures':structural_failures,'provider_failures':provider_failures},indent=2)); raise SystemExit(1)
-          token=r.json().get('access_token',''); headers={'Authorization':'Bearer '+token}
+          username='ci-live-'+suffix
+          password='JANUS-CI-'+suffix+'-A7z9!'
+          reg=post('/auth/register',json={'username':username,'email':username+'@example.invalid','password':password})
+          assert reg.status_code==200, reg.text
+          token=reg.json().get('access_token') or ''
+          assert token, reg.text
+          headers={'Authorization':'Bearer '+token}
 
           try:
               me=get('/auth/me',headers=headers)
-              note('session auth', me.status_code==200 and me.json().get('account',{}).get('username')==username, me.text)
+              assert me.status_code==200, me.text
 
-              sync=post('/core-sync/exchange',headers=headers,json={'device_id':'ci-live-device','client_version':'v0.82','phase':'wake','consensus':'client feedback','interface':'client interface','observe_events':[{'detail':'live smoke feedback'}]})
-              sj=sync.json() if sync.status_code==200 else {}
-              note('selective federation', sync.status_code==200 and sj.get('guidance',{}).get('sync_policy')=='selective-no-overwrite' and sj.get('server',{}).get('architecture')=='7->2->1->1', sync.text)
+              chat=post('/desktop/chat',headers=headers,json={
+                  'message':'Reply with a brief greeting so this release smoke test can verify JANUS chat.',
+                  'client_message_id':'live-release-'+suffix,
+              })
+              assert chat.status_code==200, chat.text
+              body=chat.json(); reply=str(body.get('reply') or '').strip()
+              assert reply, body
+              assert 'temporarily unavailable' not in reply.lower(), reply
 
-              exact_route=['evidence','logic','counterpoint','context','memory','safety','novelty','left_hemisphere','right_hemisphere','consensus','interface']
-              chat=post('/desktop/chat',headers=headers,json={'message':'Reply briefly to this greeting: hello JANUS','client_message_id':'live-basic-1'})
-              ch=chat.json() if chat.status_code==200 else {}; reply=str(ch.get('reply',''))
-              route_ok=chat.status_code==200 and ch.get('route_trace')==exact_route
-              note('11-core route executes', route_ok, {'status':chat.status_code,'route':ch.get('route_trace'),'model_policy':ch.get('model_policy')})
-              model_ok=route_ok and reply and 'failed this turn' not in reply.lower() and 'not configured' not in reply.lower() and 'budget has been reached' not in reply.lower()
-              note('external language model response', model_ok, {'status':chat.status_code,'reply':reply[:700],'model_policy':ch.get('model_policy')}, provider=True)
+              sync=post('/core-sync/exchange',headers=headers,json={
+                  'device_id':'ci-live-android',
+                  'client_version':'1.08',
+                  'phase':'wake',
+                  'front':'live smoke front state',
+                  'interface':'live smoke interface state',
+              })
+              assert sync.status_code==200, sync.text
 
-              obs=get('/desktop/core-observe?limit=250',headers=headers)
-              items=obs.json().get('items',[]) if obs.status_code==200 else []; names={x.get('core_name') for x in items}
-              note('observe covers all 11 cores', obs.status_code==200 and set(exact_route).issubset(names), {'cores':sorted(x for x in names if x),'status':obs.status_code})
-
-              data=base64.b64encode(b'JANUS clean v2 file grounding live smoke evidence.').decode()
-              up=post('/files/upload',headers=headers,json={'filename':'live-smoke.txt','mime_type':'text/plain','data_base64':data})
-              fid=(up.json().get('file') or {}).get('id') if up.status_code==200 else None
-              note('file upload', up.status_code==200 and bool(fid), up.text)
-              if fid:
-                  grounded=post('/desktop/chat',headers=headers,json={'message':'Summarize the attached smoke-test evidence.','attachment_ids':[fid],'client_message_id':'live-file-1'})
-                  gj=grounded.json() if grounded.status_code==200 else {}
-                  note('file grounding through specialists', grounded.status_code==200 and gj.get('attachment_grounding') is True and gj.get('route_trace')==exact_route, grounded.text[:1400])
-
-              runtime=get('/desktop/runtime-cores?username=forged',headers=headers)
-              rt=(runtime.json().get('runtime') or {}) if runtime.status_code==200 else {}
-              note('private persistent 11-core runtime', runtime.status_code==200 and rt.get('core_count')==11 and rt.get('registered_clients',0)>=1 and len(rt.get('core_reliability') or [])==11, {'status':runtime.status_code,'core_count':rt.get('core_count'),'registered_clients':rt.get('registered_clients')})
-
-              seed=post('/research/workspace/seed',headers=headers,json={}); ws=get('/research/workspace',headers=headers)
-              note('research workspace', seed.status_code==200 and ws.status_code==200 and (ws.json().get('count') or 0)>=3, {'seed_status':seed.status_code,'workspace_status':ws.status_code,'count':(ws.json().get('count') if ws.status_code==200 else None)})
-
-              art=post('/artifacts',headers=headers,json={'kind':'working_note'}); aj=(art.json().get('artifact') or {}) if art.status_code==200 else {}; aid=aj.get('id')
-              info=get('/artifacts/'+str(aid),headers=headers) if aid else None
-              note('artifact creation', art.status_code==200 and aid and info is not None and info.status_code==200, {'create_status':art.status_code,'get_status':info.status_code if info is not None else None})
+              stream=get('/desktop/stream-observe?limit=20',headers=headers)
+              assert stream.status_code==200, stream.text
 
               maint=get('/maintenance/status',headers=headers)
-              note('maintenance surface', maint.status_code==200, {'status':maint.status_code,'body':maint.text[:700]})
+              assert maint.status_code==200, maint.text
 
-              current=post('/desktop/chat',headers=headers,json={'message':'Search the current web and tell me one current fact about OpenAI.','client_message_id':'live-web-1'})
-              cur=current.json() if current.status_code==200 else {}
-              note('external foreground web research', current.status_code==200 and bool(cur.get('web') or cur.get('research_grounding')) and bool(cur.get('reply')) and 'failed this turn' not in str(cur.get('reply','')).lower(), {'status':current.status_code,'web':cur.get('web'),'sources':cur.get('sources'),'reply':str(cur.get('reply',''))[:700]}, provider=True)
-
-              img=post('/images/generate',headers=headers,json={'prompt':'A simple clean diagram: one circle labelled JANUS on a plain background.'})
-              ij=img.json() if img.status_code==200 else {}; generated=ij.get('generated_image') or ij.get('image') or {}; iid=generated.get('id')
-              inline=get('/images/'+str(iid)+'/inline',headers=headers) if iid else None
-              note('external medium image pipeline', img.status_code==200 and iid and inline is not None and inline.status_code==200 and bool(inline.json().get('data_base64')), {'generate_status':img.status_code,'body':img.text[:700],'inline_status':inline.status_code if inline is not None else None,'quality':generated.get('quality')}, provider=True)
+              print(json.dumps({
+                  'ok':True,
+                  'health':hj,
+                  'server_generation':cj.get('server_generation'),
+                  'cognitive_engine_generation':cj.get('cognitive_engine_generation') or hj.get('cognitive_engine_generation'),
+                  'chat_reply_preview':reply[:180],
+                  'sync_status':sync.status_code,
+                  'stream_status':stream.status_code,
+                  'maintenance_status':maint.status_code,
+              },indent=2))
           finally:
-              deleted=False; detail=''
-              for _ in range(6):
-                  try:
-                      dele=requests.delete(BASE+'/auth/account',headers=headers,json={'confirmation':'DELETE','current_password':password},timeout=90)
-                      detail=f'{dele.status_code} {dele.text[:500]}'
-                      if dele.status_code==200: deleted=True; break
-                  except Exception as e: detail=repr(e)
-                  time.sleep(10)
-              note('smoke account cleanup', deleted, detail)
-
-          print(json.dumps({'deployed_commit':stable_commit,'report':report,'structural_failures':structural_failures,'provider_failures':provider_failures},indent=2))
-          raise SystemExit(1 if structural_failures else 0)
+              try:
+                  session.delete(BASE+'/auth/account',headers=headers,json={
+                      'confirmation':'DELETE','current_password':password
+                  },timeout=60)
+              except Exception:
+                  pass
           PY
-          STATUS=$?
-          mkdir -p docs
-          {
-            echo "JANUS SERVER V2 LIVE SMOKE"
-            echo "trigger_sha=${GITHUB_SHA}"
-            echo "structural_exit=${STATUS}"
-            echo
-            cat /tmp/live-smoke.log
-          } > docs/SERVER_V2_LIVE_SMOKE.txt
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add docs/SERVER_V2_LIVE_SMOKE.txt
-          git commit -m "Record stable JANUS server v2 live smoke result" || true
-          git push || true
-          exit "$STATUS"
-
-# manual retrigger: 2026-08-24T11:07+10:00

@@ -1,0 +1,1 @@
+After merge: wait for the updated live Android/server smoke workflow. Do not declare the real-device outage resolved until that workflow passes against Render, then retry Chat on the installed Android APK.
