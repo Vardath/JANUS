@@ -15,7 +15,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/** Recursive cognition inside each local top-level core with one outward Front stream. */
+/**
+ * Recursive cognition inside each local top-level core with one outward Front stream.
+ * Every outer core still owns an internal seven-position JANUS/Fano processor.
+ */
 public final class JanusRecursiveCoreEngine {
     private static final String PREFS = "janus_recursive_core_engine_v1";
     private static final String STATE_KEY = "states";
@@ -62,7 +65,7 @@ public final class JanusRecursiveCoreEngine {
     synchronized void applyAiCounsel(JSONObject counsel){
         if(counsel==null)return;
         for(String name:NAMES){
-            if("interface".equals(name)) continue; // Interface only receives Front on outward turns.
+            if("interface".equals(name)) continue;
             String text=counsel.optString(name,"").trim(); if(text.isEmpty())continue;
             Node n=nodes.get(name); if(!text.equals(n.aiCounsel)){ n.aiCounsel=clip(text,900); n.revisions++; }
         }
@@ -103,6 +106,11 @@ public final class JanusRecursiveCoreEngine {
         Map<String,String> initial=new LinkedHashMap<>(); int changed=0;
         for(Node n:nodes.values()){ if(think(n,n.conclusion.isBlank()?"retained background state":n.conclusion,"",false))changed++; initial.put(n.name,n.conclusion); }
         if(changed==0)return;
+        processPeerRevision(initial);
+    }
+
+    /** Compatibility-named bounded peer pass; unlike the first implementation it never self-sustains unchanged traffic. */
+    private void processPeerRevision(Map<String,String> initial){
         for(Node n:nodes.values()){ String peers=peerDigestFrom(initial,n.name); if(think(n,"background peer revision",peers,false)){ n.peerTurns+=Math.max(0,initial.size()-1); n.revisions++; } }
     }
 
