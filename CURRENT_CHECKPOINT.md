@@ -62,27 +62,35 @@ PR #36 passed clean server v2, protocol, recursive-core, conscious-stream cycle,
 
 Current maintenance hardening adds the append-only persistent request ledger, automatic closed-request reconciliation after Supervisor decisions, mandatory `MAINTENANCE_PROCESS.md`, and the comprehensive `JANUS_PROJECT_STATUS_20260825.md` continuation record.
 
+### Android UI stability checkpoint — 2026-08-25
+
+The real-device crash affecting several detail screens persisted after the earlier navigation/surface reset changes. Investigation identified a plausible shared risk: multiple independent Android `OnGlobalLayoutListener`/UI-polish layers were walking and sometimes modifying the same live view hierarchy while detail screens were being laid out.
+
+A stability-first v1.09 build was therefore produced that disables the competing cosmetic/runtime view-tree injection layers while preserving the native screen implementations, system chrome, Back handling, crash diagnostics and governed maintenance handoff. The authoritative Java compile and APK build passed and the APK was published. This build is intentionally plainer and exists primarily to isolate the crash source.
+
+Important newly observed real-device bug: the current colour/theme controls are affecting the **Android phone/system theme/chrome rather than JANUS app-only colours**. This is incorrect behavior and must be fixed before further visual polish.
+
+The menus are now usable enough to continue development from within the app.
+
 ## Active release scope
 
 Android remains the active release target. Windows and iOS remain deferred.
 
 ## Next engineering task
 
-**Diagnostic System v2 — behavioral proof phase.**
+**Next session starts with Android UI rebuild and the newly exposed theme bug.**
 
-Diagnostics must prove rather than merely label:
+Priority order:
 
-1. all 22 top-level cores have recursive JANUS state;
-2. actual peer exchange occurs when input changes;
-3. unchanged peer traffic becomes quiescent instead of looping;
-4. wake vs passive rest is correctly enforced;
-5. foreground input rouses processing during rest;
-6. user-interaction memory is stored/retrieved/reconsidered appropriately;
-7. rest memory maintenance protects core/episodic memory and prunes only eligible low-value memory;
-8. seven -> Left/Right -> Front -> Interface is the actual outward route with no Interface shortcut;
-9. Front stream observer shows externalizable evidence without hidden reasoning;
-10. background recursive model-call count remains zero;
-11. maintenance request generation appends rather than overwrites;
-12. maintenance reconciliation removes only implemented/disapproved requests and preserves unresolved work.
+1. Fix colour/theme settings so they modify JANUS app appearance only and never alter the host Android phone theme/system appearance.
+2. Rework the Android UI for readability, clarity and simpler navigation.
+3. Move JANUS interaction surfaces away from native Android control styling/layout assumptions wherever practical so JANUS controls and Android/system controls can coexist safely.
+4. Ensure both sets of controls/buttons remain usable with no JANUS element hidden behind, overlapped by, or confused with system/native Android buttons.
+5. Replace fragile runtime view-tree decoration/injection patterns with explicit screen-owned layouts and deterministic rendering.
+6. Preserve safe areas, predictive/system Back behavior, accessibility, system chrome compatibility and existing functional menus while doing the rebuild.
+7. Re-test Cores, Memory, Settings, Stream, Messages, Observe and Options on the real Samsung device after each major UI step.
+8. If any detail screen still closes in the stability path, expose the stored `JanusClientDiagnostics` crash report directly in-app with copy/share support and fix from the exact stack trace rather than further speculative UI changes.
 
-Continue to distinguish PASS / WARN / FAIL / UNVERIFIED / NOT_APPLICABLE and architecture presence vs runtime/live-deployment evidence. Then proceed to real-device soak testing, specifically watching runaway counters/repeated peer events, sleep/wake responsiveness, battery/background scheduling, memory growth/pruning, maintenance-ledger growth/reconciliation and Stream observer behavior.
+The earlier broader **Diagnostic System v2 — behavioral proof phase** remains required after the Android UI is stable. It must still prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count, and append-only maintenance behavior.
+
+Do not resume cosmetic polishing on top of the current global-layout injection stack. The next UI pass should simplify ownership and rendering first.
