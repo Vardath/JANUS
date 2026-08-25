@@ -61,6 +61,10 @@ PR #49, merge `23553c5683e50e37f1a963237de1aabc4b231675`, completed the next saf
 
 The safe UI baseline is now **explicit screen/component ownership and deterministic rendering**. Do not restore the former global-layout polish/injection stack merely to regain cosmetics.
 
+## Device-validation handoff
+
+The authoritative v1.10 Android build for the next real-device test is `JANUS-Android-v1.10-FULL-REBUILD.apk`, published on the `apk-download` branch. This is the build to install before reporting any remaining Cores, Memory, Settings, Stream, Messages, Observe, Options, keyboard or Back/navigation behavior. Do not diagnose an older installed APK as the current v1.10 baseline.
+
 ## Maintenance request persistence
 
 JANUS-generated maintenance/capability observations remain append-only and governed.
