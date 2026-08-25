@@ -28,14 +28,15 @@ jobs:
           python-version: '3.13'
       - name: Install smoke-test client
         run: pip install requests
-      - name: Wait for Render and exercise the Android-critical path
+      - name: Wait for exact Render deployment and exercise Android-critical path
         shell: bash
         run: |
           python - <<'PY'
-          import json, random, string, time
+          import json, os, random, string, time
           import requests
 
           BASE='https://janus-global-core.onrender.com'
+          EXPECTED=os.environ.get('GITHUB_SHA','').strip()
           session=requests.Session()
 
           def get(path, **kw):
@@ -51,22 +52,28 @@ jobs:
                   c=get('/protocol/capabilities')
                   if h.status_code==200 and c.status_code==200:
                       hj=h.json(); cj=c.json()
-                      if (cj.get('server_generation')=='v2-clean-reconstruction'
-                          and (cj.get('cognitive_engine_generation') or hj.get('cognitive_engine_generation'))=='recursive-conscious-stream-v2'):
+                      deployed=str(hj.get('deployed_commit') or '')
+                      current_generation=(
+                          cj.get('server_generation')=='v2-clean-reconstruction'
+                          and (cj.get('cognitive_engine_generation') or hj.get('cognitive_engine_generation'))=='recursive-conscious-stream-v2'
+                      )
+                      exact_commit=(not EXPECTED) or deployed==EXPECTED
+                      if current_generation and exact_commit:
                           healthy=True
                           break
-                      last=f'generation mismatch health={hj} capabilities={cj}'
+                      last=f'waiting for exact deploy expected={EXPECTED} deployed={deployed} health={hj} capabilities={cj}'
                   else:
                       last=f'health={h.status_code} capabilities={c.status_code}'
               except Exception as exc:
                   last=repr(exc)
               time.sleep(10)
           if not healthy:
-              raise SystemExit('Render did not become healthy/current within wait window: '+last)
+              raise SystemExit('Render did not reach the exact tested commit within wait window: '+last)
 
           hj=get('/health').json(); cj=get('/protocol/capabilities').json()
           assert hj.get('status')=='ok', hj
           assert int(hj.get('core_count') or 0)==11, hj
+          assert not EXPECTED or hj.get('deployed_commit')==EXPECTED, (EXPECTED,hj)
           assert cj.get('server_generation')=='v2-clean-reconstruction', cj
           assert (cj.get('cognitive_engine_generation') or hj.get('cognitive_engine_generation'))=='recursive-conscious-stream-v2', (hj,cj)
 
@@ -110,7 +117,7 @@ jobs:
 
               print(json.dumps({
                   'ok':True,
-                  'health':hj,
+                  'deployed_commit':hj.get('deployed_commit'),
                   'server_generation':cj.get('server_generation'),
                   'cognitive_engine_generation':cj.get('cognitive_engine_generation') or hj.get('cognitive_engine_generation'),
                   'chat_reply_preview':reply[:180],
