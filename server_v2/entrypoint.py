@@ -1,12 +1,19 @@
-"""Production entrypoint for the clean JANUS server reconstruction.
+"""Production entrypoint for the clean recursive JANUS server.
 
-No legacy application modules are imported here. Persisted account/memory records
-are migrated as data only, then all runtime composition is provided by server_v2.
+Persisted account/memory records are migrated as data only. Runtime composition uses
+one RecursiveJanusMind instance so Chat, sensing, sync, diagnostics, persistence and
+background coordination cannot accidentally split between different societies.
 """
 from . import diagnostics, governance, identity, storage, visual_memory
+from . import runtime_persistence as runtime_persistence_module
 from .maintenance_seed import apply_pending_seed
 from .migrate import migrate_persistent_data_once
+from .recursive_mind import mind as recursive_mind
 from .runtime_persistence import runtime_persistence
+
+# Runtime persistence must restore into the recursive mind, not the compatibility
+# base mind imported by the historical module.
+runtime_persistence_module.mind = recursive_mind
 
 storage.init_schema()
 governance.init_schema()
@@ -18,6 +25,25 @@ MIGRATION_RESULT = migrate_persistent_data_once()
 MAINTENANCE_SEED_RESULT = apply_pending_seed()
 RUNTIME_RESTORE_RESULT = runtime_persistence.restore_all()
 SUPERVISOR_DECISION_SYNC = diagnostics.apply_supervisor_decisions()
+
+# Import final subsystems as modules so their historical `mind` globals can all be
+# rebound to the one recursive production mind before the routers handle requests.
+from . import architecture_api as architecture_module  # noqa: E402
+from . import background as background_module  # noqa: E402
+from . import chat as chat_module  # noqa: E402
+from . import desktop as desktop_module  # noqa: E402
+from . import sensory_bus as sensory_bus_module  # noqa: E402
+from . import sync_contract as sync_module  # noqa: E402
+from . import recursive_sensory  # noqa: E402
+
+architecture_module.mind = recursive_mind
+background_module.mind = recursive_mind
+chat_module.mind = recursive_mind
+desktop_module.mind = recursive_mind
+sync_module.mind = recursive_mind
+sensory_bus_module.mind = recursive_mind
+# All capability/file/image/audio/web/action senses now use recursive cognition too.
+sensory_bus_module.ingest = recursive_sensory.ingest
 
 from .app import app  # noqa: E402
 from .advanced import router as advanced_router  # noqa: E402
@@ -60,13 +86,18 @@ app.include_router(identity_router)
 app.include_router(advanced_router)
 app.add_event_handler("startup", background.start)
 app.add_event_handler("startup", runtime_persistence.start)
+app.add_event_handler("startup", recursive_mind.start)
+app.add_event_handler("shutdown", recursive_mind.stop)
 app.add_event_handler("shutdown", runtime_persistence.stop)
 app.add_event_handler("shutdown", background.stop)
 
-app.state.server_generation = "v2-clean-reconstruction"
+app.state.server_generation = "v2-recursive-core-reconstruction"
 app.state.persistence_migration = MIGRATION_RESULT
 app.state.maintenance_seed = MAINTENANCE_SEED_RESULT
 app.state.runtime_restore = RUNTIME_RESTORE_RESULT
 app.state.supervisor_decision_sync = SUPERVISOR_DECISION_SYNC
 app.state.legacy_application_modules_loaded = False
 app.state.background_multi_core_image_generation_enabled = False
+app.state.recursive_core_engine = True
+app.state.recursive_core_count = 11
+app.state.local_recursive_core_count = 11
