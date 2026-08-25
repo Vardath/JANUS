@@ -22,8 +22,8 @@ jobs:
           BASE=android/app/src/main/java/com/vardath/janus
           MAIN="$BASE/MainActivity.java"; THEME="$BASE/JanusTheme.java"; HUMAN="$BASE/JanusHumanText.java"; STREAM="$BASE/JanusStreamScreen.java"
           test -s "$THEME"; test -s "$HUMAN"; test -s "$STREAM"
-          grep -q 'versionCode 112' android/app/build.gradle
-          grep -q "versionName '1.12'" android/app/build.gradle
+          grep -q 'versionCode 111' android/app/build.gradle
+          grep -q "versionName '1.11'" android/app/build.gradle
           grep -q 'putString("theme_mode",mode)' "$MAIN"
           grep -q 'putString("accent",accent)' "$MAIN"
           grep -q 'JanusTheme.applyAccentButton(this, b)' "$MAIN"
