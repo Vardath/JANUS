@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import diagnostics, maintenance_request_file
+from . import diagnostics, maintenance_issue_mirror, maintenance_request_file
 
 _INSTALLED = False
 
@@ -10,9 +10,10 @@ _INSTALLED = False
 def install() -> None:
     """Install the persistent append-ledger contract around diagnostics.
 
-    Kept as a small integration layer so the diagnostics/request schema stays focused on
-    structured state while the human/Supervisor JSONL ledger remains independently
-    testable. Module-global function lookups inside diagnostics see these replacements.
+    Render SQLite remains authoritative. The JSONL ledger is the durable local
+    Supervisor record. When explicitly configured, a private GitHub Issue receives a
+    sanitized append-only mirror so ChatGPT Supervisor can retrieve requests through
+    the connected GitHub account without giving JANUS source-code authority.
     """
     global _INSTALLED
     if _INSTALLED:
@@ -22,6 +23,8 @@ def install() -> None:
     original_record = diagnostics.record_request
     original_handoff = diagnostics.handoff_packet
     original_apply = diagnostics.apply_supervisor_decisions
+
+    maintenance_issue_mirror.init_schema()
 
     def record_request(*args: Any, **kwargs: Any) -> dict[str, Any]:
         request = original_record(*args, **kwargs)
@@ -33,6 +36,12 @@ def install() -> None:
         except Exception:
             # The SQLite request is authoritative; a ledger I/O problem must not prevent
             # JANUS from recording or surfacing a maintenance request.
+            pass
+        try:
+            maintenance_issue_mirror.mirror_request(request)
+        except Exception:
+            # The private issue mirror is convenience/visibility only. It must never
+            # become a dependency for JANUS request persistence or runtime operation.
             pass
         return request
 
@@ -54,6 +63,7 @@ def install() -> None:
         packet["maintenance_runbook"] = "MAINTENANCE_PROCESS.md"
         packet["request_generation_mode"] = "append_only"
         packet["closed_request_cleanup"] = "remove implemented/disapproved only after Supervisor decisions"
+        packet["private_supervisor_issue_mirror"] = maintenance_issue_mirror.status()
         return packet
 
     def apply_supervisor_decisions() -> dict[str, int]:
@@ -69,3 +79,10 @@ def install() -> None:
     diagnostics.record_request = record_request
     diagnostics.handoff_packet = handoff_packet
     diagnostics.apply_supervisor_decisions = apply_supervisor_decisions
+
+    # If the mirror was enabled after requests already existed, backfill every still-open
+    # request once. Per-fingerprint occurrence tracking prevents restart spam.
+    try:
+        maintenance_issue_mirror.mirror_open_requests()
+    except Exception:
+        pass
