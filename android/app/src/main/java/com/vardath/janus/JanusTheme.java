@@ -11,7 +11,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
-/** App-local JANUS palette. Never changes Android system/theme colours. */
+/** App-local high-contrast JANUS palette. Never changes Android system/theme colours. */
 public final class JanusTheme {
     private JanusTheme() {}
 
