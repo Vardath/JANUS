@@ -16,6 +16,7 @@ import java.util.concurrent.ScheduledExecutorService;
 final class JanusAccountIsolation {
     private static final String BINDING_PREFS = "janus_account_binding";
     private static final String BINDING_KEY = "profile";
+    private static final String RECURSIVE_PREFS = "janus_recursive_core_engine_v1";
     private static final String[] DEVICE_KEYS = new String[]{
             "theme_mode", "accent", "background_cycles_enabled",
             "observe_telemetry_enabled", "local_background_interval_seconds",
@@ -32,7 +33,9 @@ final class JanusAccountIsolation {
         boolean switched = !previous.isBlank() && !clean.isBlank() && !previous.equals(clean);
         if (switched) {
             resetAccountBoundState(app);
-            JanusLocalCoreRuntime.get(app).start();
+            JanusLocalCoreRuntime runtime = JanusLocalCoreRuntime.get(app);
+            runtime.start();
+            JanusRecursiveCoreEngine.get(app).start(runtime);
         }
         if (!clean.isBlank()) binding.edit().putString(BINDING_KEY, clean).apply();
     }
@@ -44,6 +47,10 @@ final class JanusAccountIsolation {
     }
 
     private static void resetAccountBoundState(Context app) {
+        // Stop first (which may checkpoint), then clear the account-bound nested state
+        // so a stopped engine cannot immediately write the previous account back.
+        JanusRecursiveCoreEngine.clearInstance();
+        app.getSharedPreferences(RECURSIVE_PREFS, Context.MODE_PRIVATE).edit().clear().commit();
         stopAndDetachLocalRuntime();
         SharedPreferences prefs = app.getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE);
         Map<String, Object> keep = new LinkedHashMap<>();

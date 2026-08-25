@@ -16,11 +16,13 @@ public final class JanusChatResponseRegistry {
     private static final String KEY = "recent";
     private static final Deque<JanusChatPresentation> RECENT = new ArrayDeque<>();
     private static SharedPreferences prefs;
+    private static Context appContext;
     private JanusChatResponseRegistry() {}
 
     public static synchronized void init(Context context) {
         if (prefs != null || context == null) return;
-        prefs = context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        appContext = context.getApplicationContext();
+        prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         try {
             JSONArray a = new JSONArray(prefs.getString(KEY, "[]"));
             for (int i = Math.max(0, a.length() - MAX); i < a.length(); i++) {
@@ -33,7 +35,20 @@ public final class JanusChatResponseRegistry {
 
     public static synchronized void capture(String rawJson) {
         try {
-            remember(JanusChatPresentation.fromResponse(new JSONObject(rawJson), rawJson));
+            JSONObject root = new JSONObject(rawJson);
+            String reply = root.optString("reply", "").trim();
+            if (!reply.isEmpty()) JanusRecursiveCoreBridge.sense("peer", "global_interface", reply);
+
+            JSONObject localCounsel = root.optJSONObject("local_core_counsel");
+            if (localCounsel != null && localCounsel.length() > 0) {
+                JanusRecursiveCoreBridge.applyAiCounsel(localCounsel);
+                // The counsel remains distinct inside each recursive core. The outer
+                // local society receives only a bounded notification that a revision
+                // occurred, never the model's private reasoning trace.
+                if (appContext != null) JanusLocalTypedSense.ingest(appContext, "peer", "recursive_ai_counsel",
+                        "Per-core AI counsel returned for the local recursive JANUS society; each addressed core revised against its peers.");
+            }
+            remember(JanusChatPresentation.fromResponse(root, rawJson));
         } catch (Exception ignored) {}
     }
 

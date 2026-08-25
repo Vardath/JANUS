@@ -1,0 +1,116 @@
+name: Test JANUS Recursive Core Engine
+
+on:
+  pull_request:
+    paths:
+      - 'server_v2/**'
+      - 'android/**'
+      - '.github/workflows/test-recursive-core-engine.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server_v2/**'
+      - 'android/**'
+      - '.github/workflows/test-recursive-core-engine.yml'
+
+jobs:
+  recursive-core-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate recursive server architecture
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -s server_v2/recursive_core.py
+          test -s server_v2/recursive_mind.py
+          test -s server_v2/recursive_sensory.py
+          test -s server_v2/recursive_background.py
+          grep -q 'every top-level core is itself a full JANUS core' server_v2/recursive_mind.py
+          grep -q 'global_core_responses' server_v2/recursive_mind.py
+          grep -q 'local_core_responses' server_v2/recursive_mind.py
+          grep -q 'single_call_recursive_deliberation' server_v2/recursive_mind.py
+          grep -q 'peer_turn_count' server_v2/recursive_core.py
+          grep -q 'recursive_janus_inside_every_core' server_v2/protocol.py
+          grep -q 'top_level_ai_capable_cores.*22' server_v2/protocol.py
+          grep -q 'recursive_mind.start' server_v2/entrypoint.py
+          grep -q 'sensory_bus_module.ingest = recursive_sensory.ingest' server_v2/entrypoint.py
+          grep -q 'v2_recursive_core_state' server_v2/runtime_persistence.py
+          grep -q '_restore_recursive' server_v2/runtime_persistence.py
+          grep -q '_checkpoint_recursive' server_v2/runtime_persistence.py
+          grep -q 'recursive_tick(mind, aid)' server_v2/background.py
+          grep -q 'model_calls.*0' server_v2/recursive_background.py
+          python -m py_compile server_v2/recursive_core.py server_v2/recursive_mind.py server_v2/recursive_sensory.py server_v2/recursive_background.py server_v2/runtime_persistence.py server_v2/entrypoint.py server_v2/topology.py server_v2/protocol.py server_v2/architecture_api.py
+          python - <<'PY'
+          from server_v2.recursive_core import FACULTIES, FANO_LINES, RecursiveCoreProcessor, RecursiveCoreState
+          from server_v2.recursive_background import tick
+          from server_v2.senses import Appraisal
+          assert set(FACULTIES) == set(range(1,8))
+          assert len(FANO_LINES) == 7
+          names=['evidence','safety','counterpoint','context','logic','novelty','memory','left_hemisphere','right_hemisphere','front','interface']
+          p = RecursiveCoreProcessor()
+          states = {n: RecursiveCoreState(n) for n in names}
+          first = {}
+          for n,s in states.items():
+              first[n] = p.think(s, 'A new uncertain idea may help but could create privacy risk.', Appraisal(), n)
+              assert len(first[n]['weights']) == 8
+              assert first[n]['recursive_janus'] is True
+              assert first[n]['ai_capable'] is True
+          for n,s in states.items():
+              peers=[(k,v['conclusion']) for k,v in first.items() if k != n]
+              revised=p.think(s,'peer revision',Appraisal(),n,peers)
+              assert revised['revision_count'] >= 1
+              assert revised['peer_turn_count'] >= 10
+          assert len(states) == 11
+
+          class Outer:
+              def __init__(self):
+                  self.last_public_summary='retained state'; self.appraisal=Appraisal()
+          class DummyMind:
+              def __init__(self):
+                  self._nested={n:RecursiveCoreState(n) for n in names}
+                  self._outer={n:Outer() for n in names}
+                  self._processor=RecursiveCoreProcessor()
+              def _states(self, aid): return self._outer
+              def _recursive_states(self, aid): return self._nested
+              def _purpose(self, n): return n
+          dm=DummyMind(); result=tick(dm,1)
+          assert result == {'cores':11,'peer_revisions':110,'model_calls':0}
+          assert all(s.peer_turn_count >= 10 for s in dm._nested.values())
+          print('Recursive server core, persistence and background contract OK')
+          PY
+      - name: Validate Android nested JANUS cores
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=android/app/src/main/java/com/vardath/janus
+          test -s "$BASE/JanusRecursiveCoreEngine.java"
+          test -s "$BASE/JanusRecursiveCoreBridge.java"
+          grep -q 'internal seven-position JANUS/Fano processor' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'scheduleAtFixedRate' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'processPeerRevision' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'applyAiCounsel' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'background_model_calls' "$BASE/JanusRecursiveCoreEngine.java"
+          grep -q 'LOCAL RECURSIVE JANUS CORE STATES' "$BASE/JanusThoughtBridge.java"
+          grep -q 'local_core_counsel' "$BASE/JanusChatResponseRegistry.java"
+          grep -q 'JanusRecursiveCoreEngine.get(this).start(runtime)' "$BASE/JanusApplication.java"
+          grep -q 'janus_recursive_core_engine_v1' "$BASE/JanusAccountIsolation.java"
+          grep -q 'JanusRecursiveCoreEngine.get(app).sense' "$BASE/JanusLocalTypedSense.java"
+          ! grep -q 'OpenAI\|HttpURLConnection\|new URL' "$BASE/JanusRecursiveCoreEngine.java"
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v5
+        with: { gradle-version: '8.11.1' }
+      - name: Ensure stable debug signing key exists
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+      - name: Compile and assemble recursive Android APK
+        working-directory: android
+        env:
+          JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}'
+        run: gradle --no-daemon :app:compileDebugJavaWithJavac :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"

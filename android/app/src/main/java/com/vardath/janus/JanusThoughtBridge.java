@@ -11,11 +11,22 @@ import java.util.Locale;
  * It reports persisted observable processing, not phenomenal/private consciousness.
  */
 public final class JanusThoughtBridge {
+    private static final String RECURSIVE_START = "[LOCAL RECURSIVE JANUS CORE STATES]";
+    private static final String RECURSIVE_END = "[END LOCAL RECURSIVE JANUS CORE STATES]";
     private JanusThoughtBridge() {}
 
     public static String augment(JanusLocalCoreRuntime runtime, String userMessage) {
-        if (runtime == null || !asksAboutBackgroundActivity(userMessage)) return userMessage;
+        if (runtime == null) return userMessage;
         try {
+            // Ordinary foreground Chat always receives a bounded snapshot from the
+            // complete JANUS/Fano processor living inside each of the eleven local
+            // top-level cores. This is externalizable state, never private CoT.
+            JSONObject recursive = JanusRecursiveCoreBridge.foreground(runtime, userMessage);
+            String recursiveContext = "\n\n" + RECURSIVE_START + "\n"
+                    + clip(recursive.toString(), 24000) + "\n" + RECURSIVE_END;
+
+            if (!asksAboutBackgroundActivity(userMessage)) return userMessage + recursiveContext;
+
             JSONObject s = runtime.statusJson();
             JSONArray events = s.optJSONArray("observe_events");
             StringBuilder recent = new StringBuilder();
@@ -56,17 +67,18 @@ public final class JanusThoughtBridge {
                     + "The Android local 11-core runtime reports phase=" + s.optString("phase", "unknown")
                     + ", running=" + s.optBoolean("running", false)
                     + ", background_cycles_enabled=" + s.optBoolean("background_cycles_enabled", false) + ".\n"
+                    + "Each of these eleven outer cores now also owns a persistent internal seven-position JANUS/Fano processor. The nested processors revise against peer-core conclusions in deterministic background cycles with zero model/API calls.\n"
                     + "These are persisted deterministic local processing events with zero model/API calls. They are real app-side JANUS processing between messages. Describe what the cores actually processed when asked, rather than claiming that no background thinking/processing occurred. Do not describe this as phenomenal consciousness or an uninterrupted private stream of consciousness.\n"
                     + (recent.length() == 0 ? "Recent externalizable local activity: none retained.\n" : "Recent externalizable local activity:\n" + recent)
-                    + (fano.length() == 0 ? "" : "Current Fano attention orientations used by the local cores:\n" + fano)
+                    + (fano.length() == 0 ? "" : "Current Fano attention orientations for the outer local cores:\n" + fano)
                     + (front.isEmpty() ? "" : "Current local Front appraisal/intention state: " + front + "\n")
                     + (frontAppraisal == null ? "" : "Front control appraisal: " + frontAppraisal.toString() + "\n")
                     + (face.isEmpty() ? "" : "Current local interface state: " + face + "\n")
                     + (interfaceAppraisal == null ? "" : "Interface control appraisal: " + interfaceAppraisal.toString() + "\n")
-                    + "The seven Fano directions are computational attention lenses and home roles: d1 Evidence/truth-grounding; d2 Safety/valence-welfare; d3 Counterpoint/significance-conflict; d4 Context/pattern-relationship; d5 Logic/understanding-model; d6 Novelty/possibility-imagination; d7 Memory/continuity-experience. Both hemispheres receive all seven. Left emphasizes logic, constraint and explicit causal consistency; Right emphasizes imagination, association, alternatives and gestalt. Front integrates them into bounded appraisal/intention, and Interface chooses expression/action. These are control semantics, not evidence that Fano mathematics proves any external claim.\n"
-                    + "Answer the user's question from this device activity. If there was activity, summarize its actual topics/results and, when useful, mention which attention orientations or appraisal dimensions dominated. Distinguish deterministic local-core processing from server/model activity.\n"
+                    + "The outer seven specialist names are dispositions, not missing faculties. Inside every top-level core the same internal Fano faculties are available: d1 truth, d2 valence, d3 significance, d4 pattern, d5 understanding, d6 possibility and d7 continuity. Evidence can imagine and remember; Novelty can test evidence; Front and Interface can inspect risk and grounding.\n"
+                    + "Answer the user's question from this device activity. Distinguish deterministic local-core processing from server/model activity.\n"
                     + "[END DEVICE JANUS CONTEXT]";
-            return userMessage + context;
+            return userMessage + context + recursiveContext;
         } catch (Exception ignored) {
             return userMessage;
         }

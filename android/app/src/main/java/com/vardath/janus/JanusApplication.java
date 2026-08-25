@@ -56,6 +56,10 @@ public class JanusApplication extends Application {
             @Override public void onActivityDestroyed(Activity activity) { JanusVoiceUiPolish.destroy(activity); }
         });
 
-        JanusLocalCoreRuntime.get(this).start();
+        JanusLocalCoreRuntime runtime = JanusLocalCoreRuntime.get(this);
+        runtime.start();
+        // Every outer local core owns a complete internal JANUS/Fano processor.
+        // This nested background cognition is deterministic and makes zero API calls.
+        JanusRecursiveCoreEngine.get(this).start(runtime);
     }
 }
