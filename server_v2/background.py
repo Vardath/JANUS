@@ -6,14 +6,15 @@ import time
 
 from . import governance, mailer, storage
 from .mind import mind
+from .recursive_background import tick as recursive_tick
 
 
 class BackgroundCoordinator:
     """Low-duty coordinator for the clean server mind.
 
-    Ordinary 11-core wake/sleep cycles remain deterministic and zero-API. This
-    coordinator separately handles bounded curiosity research, useful proactive
-    messages, functional self-assessment records and owner-gated maintenance.
+    Ordinary 11-core wake/sleep cycles and the nested recursive JANUS/Fano cycles
+    remain deterministic and zero-API. This coordinator separately handles bounded
+    curiosity research, useful proactive messages, self-assessment and maintenance.
     """
 
     def __init__(self):
@@ -44,6 +45,10 @@ class BackgroundCoordinator:
         for a in accounts:
             aid = int(a["id"])
             governance.ensure_account(aid)
+            # Every global top-level core runs its own complete JANUS/Fano processor,
+            # then revises against the bounded conclusions of the other ten cores.
+            # This is deterministic/local processing and performs zero model/API calls.
+            recursive_tick(mind, aid)
             state = storage.one("SELECT * FROM v2_background_state WHERE account_id=?", (aid,))
             if not state: continue
             now = storage.now()
@@ -62,8 +67,8 @@ class BackgroundCoordinator:
         if now - int(state["last_self_assessment_at"] or 0) < 6 * 3600: return
         rel = governance.reliability(aid)
         avg = sum(float(x["consistency_score"]) for x in rel)/len(rel) if rel else 0.5
-        detail = f"Functional self-assessment: historical downstream consistency calibration {avg:.3f}; architecture intact at 7 -> 2 -> 1 -> 1; this is not a truth score or consciousness claim."
-        storage.add_event(aid,"consensus","self_assessment",detail,detail,"background")
+        detail = f"Functional self-assessment: historical downstream consistency calibration {avg:.3f}; recursive 1|3|7 society intact; this is not a truth score or consciousness claim."
+        storage.add_event(aid,"front","self_assessment",detail,detail,"background")
         self._touch(aid,"last_self_assessment_at",now)
 
     def _is_maintenance_owner(self, aid: int) -> bool:
