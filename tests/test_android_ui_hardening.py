@@ -12,11 +12,11 @@ def test_authoritative_build_is_native_and_patch_free():
     assert not Path('android/app/src/main/assets/index.html').exists()
 
 
-def test_android_v108_is_direct_native_product():
+def test_android_v110_is_direct_native_product():
     text = Path('android/app/build.gradle').read_text(encoding='utf-8')
-    assert "versionCode 108" in text
-    assert "versionName '1.08'" in text
-    assert 'governed self-diagnosis, capability-request ledger and ChatGPT Supervisor handoff' in text
+    assert "versionCode 110" in text
+    assert "versionName '1.10'" in text
+    assert 'app-only appearance isolation' in text
     main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
     assert 'android.webkit.WebView' not in main
     assert 'JavascriptInterface' not in main
@@ -51,14 +51,28 @@ def test_navigation_system_chrome_and_core_map_are_hardened():
     assert '!"Chat".equals(selected)' in nav
     assert 'JanusNavigationPolish.install(activity)' in app
     assert 'JanusSystemChrome.install(activity)' in app
-    assert 'theme_mode' in chrome and 'accent' in chrome
-    assert 'registerOnSharedPreferenceChangeListener' in chrome
-    assert 'setStatusBarColor(chrome)' in chrome
-    assert 'setNavigationBarColor(chrome)' in chrome
+    assert 'theme_mode' not in chrome
+    assert 'accent' not in chrome
+    assert 'registerOnSharedPreferenceChangeListener' not in chrome
+    assert 'setStatusBarColor' not in chrome
+    assert 'setNavigationBarColor' not in chrome
+    assert 'Configuration.UI_MODE_NIGHT_MASK' in chrome
     assert 'LAYER_TYPE_SOFTWARE' not in core_map
     assert 'setShadowLayer' not in core_map
     assert 'catch (Throwable ignored)' in core_map
     assert 'drawFallback' in core_map
+
+
+def test_janus_theme_preferences_are_app_view_only():
+    main = (BASE / 'MainActivity.java').read_text(encoding='utf-8')
+    chrome = (BASE / 'JanusSystemChrome.java').read_text(encoding='utf-8')
+    assert 'putString("theme_mode",mode)' in main
+    assert 'putString("accent",accent)' in main
+    assert 'backgroundColor()' in main
+    assert 'surfaceColor()' in main
+    assert 'accentColor()' in main
+    assert 'theme_mode' not in chrome
+    assert 'accent' not in chrome
 
 
 def test_background_activity_bridge_and_active_fano_policy_remain_present():
