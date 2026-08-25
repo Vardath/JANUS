@@ -43,7 +43,6 @@ jobs:
           def post(path, **kw):
               return session.post(BASE+path, timeout=120, **kw)
 
-          # Render may still be deploying when a main commit triggers this workflow.
           last='not attempted'
           healthy=False
           for attempt in range(90):
@@ -79,16 +78,17 @@ jobs:
           token=reg.json().get('access_token') or ''
           assert token, reg.text
           headers={'Authorization':'Bearer '+token}
+          diagnostic_headers={**headers,'X-JANUS-Live-Smoke':'1'}
 
           try:
               me=get('/auth/me',headers=headers)
               assert me.status_code==200, me.text
 
-              chat=post('/desktop/chat',headers=headers,json={
+              chat=post('/desktop/chat',headers=diagnostic_headers,json={
                   'message':'Reply with a brief greeting so this release smoke test can verify JANUS chat.',
                   'client_message_id':'live-release-'+suffix,
               })
-              assert chat.status_code==200, chat.text
+              assert chat.status_code==200, f'chat_status={chat.status_code} body={chat.text}'
               body=chat.json(); reply=str(body.get('reply') or '').strip()
               assert reply, body
               assert 'temporarily unavailable' not in reply.lower(), reply
