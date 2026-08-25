@@ -6,11 +6,13 @@ on:
     paths:
       - 'server_v2/**'
       - 'tools/verify_server_v2.py'
+      - 'tools/verify_front_serialization.py'
       - '.github/workflows/server-v2-proof.yml'
   pull_request:
     paths:
       - 'server_v2/**'
       - 'tools/verify_server_v2.py'
+      - 'tools/verify_front_serialization.py'
       - '.github/workflows/server-v2-proof.yml'
   workflow_dispatch:
 
@@ -30,7 +32,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Compile clean recursive server
-        run: python -m py_compile server_v2/*.py tools/verify_server_v2.py
+        run: python -m py_compile server_v2/*.py tools/verify_server_v2.py tools/verify_front_serialization.py
+      - name: Prove Front appraisal model boundary is JSON safe
+        run: python tools/verify_front_serialization.py
       - name: Prove no legacy application imports
         run: |
           ! grep -R "^from \(bootstrap\|janus_dashboard\|dashboard_api\|interface_chat\|secure_desktop\|attachment_chat\|image_response_compat\|src\.janus_sleep_cycle\)" server_v2
@@ -42,4 +46,5 @@ jobs:
           grep -q 'recursive-conscious-stream-v2' server_v2/entrypoint.py
           grep -q '7 specialists -> left/right -> front -> interface' server_v2/entrypoint.py
           grep -q 'append_only_persistent_ledger' server_v2/entrypoint.py
+          grep -q 'front_appraisal_json_safe = True' server_v2/entrypoint.py
           echo 'Clean recursive JANUS server proof passed for this commit; no CI job writes back to main.'
