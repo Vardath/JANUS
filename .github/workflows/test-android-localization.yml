@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Validate translation catalogue and fallback contract
+      - name: Validate translation catalogue and explicit ownership contract
         run: |
           python - <<'PY'
           import re
@@ -38,14 +38,26 @@ jobs:
           for code in ['es','fr','de','pt','it','nl','pl','tr','ru','uk','ar','fa','he','ur','hi','bn','id','vi','th','ja','ko','zh-Hans','zh-Hant']:
               assert f'all.put("{code}"' in s, f'missing language {code}'
           assert 'return english;' in s, 'English fallback must remain explicit'
-          lang = Path('android/app/src/main/java/com/vardath/janus/JanusLanguagePolish.java').read_text(encoding='utf-8')
-          ui = Path('android/app/src/main/java/com/vardath/janus/JanusUiLocalizationPolish.java').read_text(encoding='utf-8')
-          app = Path('android/app/src/main/java/com/vardath/janus/JanusApplication.java').read_text(encoding='utf-8')
+
+          base = Path('android/app/src/main/java/com/vardath/janus')
+          lang = (base / 'JanusLanguagePolish.java').read_text(encoding='utf-8')
+          ui = (base / 'JanusUiLocalizationPolish.java').read_text(encoding='utf-8')
+          main = (base / 'MainActivity.java').read_text(encoding='utf-8')
+          app = (base / 'JanusApplication.java').read_text(encoding='utf-8')
+
           assert 'activity.recreate();' in lang
-          assert 'JanusUiLocalizationPolish.install(activity);' in app
-          assert 'isConversationBody' in ui and 'parent.getChildAt(1) != view' in ui
-          assert 'view instanceof Button' in ui and "before.indexOf('\\n')" in ui
-          print(f'Validated {len(methods)} translation tables x {len(keys)} common UI strings')
+          assert 'renderSettingsCard' in lang
+          assert 'JanusLanguagePolish.renderSettingsCard(this,list)' in main
+          assert 'JanusUiLocalizationPolish.applyButton(this,b,s)' in main
+          assert 'JanusUiLocalizationPolish.applyHint(this,e,hint)' in main
+          assert 'controlText' in ui and 'applyButton' in ui and 'applyHint' in ui
+          assert 'OnGlobalLayoutListener' not in ui
+          assert 'getViewTreeObserver' not in ui
+          assert 'OnGlobalLayoutListener' not in lang
+          assert 'getViewTreeObserver' not in lang
+          assert 'JanusUiLocalizationPolish.install' not in app
+          assert 'JanusLanguagePolish.install' not in app
+          print(f'Validated {len(methods)} translation tables x {len(keys)} common UI strings with explicit control ownership')
           PY
       - uses: actions/setup-java@v5
         with:
