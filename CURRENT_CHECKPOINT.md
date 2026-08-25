@@ -26,7 +26,7 @@ Loop guards remain mandatory: identical per-core signatures become quiescent; un
 
 ## Autonomous observation / continuing input
 
-PR #52 introduces a governed digital-world observation layer so JANUS does not depend on user messages as its only source of new input.
+PR #52 implements a governed digital-world observation layer so JANUS does not depend on user messages as its only source of new input.
 
 - On every materially changed wake cycle, each of the 11 persistent global top-level cores may form its own bounded `curiosity_intent` after reviewing retained state, interaction memory and peer conclusions. Forming intentions is deterministic and makes zero model/API calls.
 - A shared research gateway selects only a small subset of those intentions for paid outside observation. Duplicate/core-level curiosity therefore does not create 11 simultaneous paid searches.
@@ -47,6 +47,10 @@ The default per-account research policy is owner-set and must remain unchanged u
 - Both `background_research` and `foreground_web` pass through the same persistent cost ledger and monthly governor.
 - Background searches are separately paced across the month and have a daily safety cap; wake/review/peer processing does not consume this paid-search allowance.
 - A configurable per-call planning estimate translates calls into the application budget. Because provider search prices and model-token overhead can change independently of this repository, this is a conservative application governor rather than an absolute external-invoice guarantee. Production telemetry and quarterly maintenance must compare real provider cost against the estimate and raise the estimate if necessary; the owner-set $20 application ceiling itself must not be raised without explicit owner instruction.
+
+### PR #52 verification
+
+The validated implementation head passed the clean server-v2 test and proof, server diagnostic, recursive-core engine, conscious-stream cycle, Android maintenance and full Android APK build workflows before merge. The recursive-core regression explicitly proves 11 research intentions on a changed global wake with zero model calls. Production deployment and real unattended accumulation remain separate post-merge verification steps.
 
 ## Stream observer
 
@@ -117,4 +121,4 @@ Android remains the active release target. Windows and iOS remain deferred.
 
 ## Next engineering task
 
-Complete CI/device validation of PR #52's autonomous-observation path and verify production cost/status telemetry before relying on it unattended. Then continue the broader **Diagnostic System v2 behavioral proof phase**: prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count and append-only maintenance behavior.
+After PR #52 merges, verify the live server is running its revision and let the global JANUS accumulate real autonomous observations within budget. Then continue the broader **Diagnostic System v2 behavioral proof phase**: prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count, autonomous research cost accounting and append-only maintenance behavior.
