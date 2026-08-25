@@ -31,7 +31,7 @@ public final class JanusStreamScreen {
         Activity a = host.activity();
         content.addView(text(a, "Stream", 28, true, false), full());
         content.addView(text(a,
-                "A readable snapshot of JANUS Front: the integrated state that receives Left and Right before Interface. Technical machine detail stays secondary.",
+                "A readable snapshot of JANUS Front: the integrated state that receives Left and Right before Interface. Hidden chain-of-thought is never exposed. Technical machine detail stays secondary.",
                 13, false, true), full());
 
         LinearLayout list = vertical(a);
