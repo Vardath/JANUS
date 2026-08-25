@@ -40,11 +40,12 @@ jobs:
           grep -q '_restore_recursive' server_v2/runtime_persistence.py
           grep -q '_checkpoint_recursive' server_v2/runtime_persistence.py
           grep -q 'recursive_tick(mind, aid)' server_v2/background.py
+          grep -q 'curiosity_intent' server_v2/recursive_background.py
           grep -q 'model_calls.*0' server_v2/recursive_background.py
           python -m py_compile server_v2/recursive_core.py server_v2/recursive_mind.py server_v2/recursive_sensory.py server_v2/recursive_background.py server_v2/runtime_persistence.py server_v2/entrypoint.py server_v2/topology.py server_v2/protocol.py server_v2/architecture_api.py
           python - <<'PY'
           from server_v2.recursive_core import FACULTIES, FANO_LINES, RecursiveCoreProcessor, RecursiveCoreState
-          from server_v2.recursive_background import tick
+          import server_v2.recursive_background as rb
           from server_v2.senses import Appraisal
           assert set(FACULTIES) == set(range(1,8))
           assert len(FANO_LINES) == 7
@@ -69,16 +70,24 @@ jobs:
                   self.last_public_summary='retained state'; self.appraisal=Appraisal()
           class DummyMind:
               def __init__(self):
+                  self.phase='wake'
                   self._nested={n:RecursiveCoreState(n) for n in names}
                   self._outer={n:Outer() for n in names}
                   self._processor=RecursiveCoreProcessor()
               def _states(self, aid): return self._outer
               def _recursive_states(self, aid): return self._nested
               def _purpose(self, n): return n
-          dm=DummyMind(); result=tick(dm,1)
-          assert result == {'cores':11,'peer_revisions':110,'model_calls':0}
+          events=[]
+          rb.storage.add_event=lambda *args, **kwargs: events.append((args,kwargs))
+          rb.storage.list_memories=lambda *args, **kwargs: []
+          dm=DummyMind(); result=rb.tick(dm,1)
+          assert result['cores'] == 11
+          assert result['peer_revisions'] == 110
+          assert result['research_intentions'] == 11
+          assert result['model_calls'] == 0
+          assert sum(1 for args,kwargs in events if len(args) > 2 and args[2] == 'curiosity_intent') == 11
           assert all(s.peer_turn_count >= 10 for s in dm._nested.values())
-          print('Recursive server core, persistence and background contract OK')
+          print('Recursive server core, persistence, curiosity-intention and background contract OK')
           PY
       - name: Validate Android nested JANUS cores
         shell: bash
