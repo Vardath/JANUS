@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v1.12: app-only appearance isolation plus full JANUS-surface accent tinting.
+// v1.11: app-only appearance isolation plus full JANUS-surface accent tinting.
 // RC hardening keeps release-signing preparation and the authoritative native product boundary.
 // No WebView UI, no generated HTML, no composer/patch pipeline.
 android {
@@ -33,8 +33,8 @@ android {
         applicationId 'com.vardath.janus'
         minSdk 26
         targetSdk 36
-        versionCode 112
-        versionName '1.12'
+        versionCode 111
+        versionName '1.11'
         def googleWebClientId = project.findProperty('JANUS_GOOGLE_WEB_CLIENT_ID') ?: '236215282074-7s6uj0tdeen1r3ptcpd2nlmkam97j0l3.apps.googleusercontent.com'
         buildConfigField 'String', 'GOOGLE_WEB_CLIENT_ID', '"' + googleWebClientId + '"'
     }
