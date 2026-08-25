@@ -165,13 +165,20 @@ def _research_plan(account_id: int, now: int | None = None) -> dict[str, float]:
     calls = {str(r["scope"]): int(r["calls"] or 0) for r in rows}
     background_calls = calls.get("background_research", 0)
     foreground_calls = calls.get("foreground_web", 0)
+    background_usd = background_calls * per_call
+    foreground_usd = foreground_calls * per_call
+    total_usd = background_usd + foreground_usd
     return {
         "per_call_usd": per_call,
         "monthly_max_usd": total_cap,
         "autonomous_target_usd": autonomous_cap,
-        "background_estimated_usd": background_calls * per_call,
-        "foreground_estimated_usd": foreground_calls * per_call,
-        "total_estimated_usd": (background_calls + foreground_calls) * per_call,
+        "background_calls": float(background_calls),
+        "foreground_calls": float(foreground_calls),
+        "background_estimated_usd": background_usd,
+        "foreground_estimated_usd": foreground_usd,
+        "total_estimated_usd": total_usd,
+        "remaining_total_usd": max(0.0, total_cap - total_usd),
+        "remaining_autonomous_usd": max(0.0, autonomous_cap - background_usd),
     }
 
 
@@ -194,10 +201,6 @@ def permit(account_id: int, scope: str, estimated_usd: float = 0.0) -> bool:
     now = storage.now()
     day_start = now - 86400
 
-    # All web research, whether user-directed or autonomous, shares one monthly
-    # account budget. Background curiosity has its own $10 target/ceiling inside the
-    # $20 total, leaving the rest available to user-directed searching. The caller's
-    # historical cost estimate is normalized so old routes cannot bypass the ceiling.
     if scope in RESEARCH_SCOPES:
         plan = _research_plan(account_id, now)
         normalized_cost = float(plan["per_call_usd"])
