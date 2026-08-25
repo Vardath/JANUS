@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Internal recursive cognition for each of the eleven Android top-level cores.
+ * Every outer core owns an internal seven-position JANUS/Fano processor.
  *
  * This is not a second 11-core society. Each Node below is the JANUS/Fano processor
  * living inside the corresponding outer core. Every node retains all seven internal
@@ -34,17 +35,17 @@ public final class JanusRecursiveCoreEngine {
     };
     private static final int[][] BIASES = new int[][]{
             {0,0,0,0,0,0,0,0},
-            {0,5,0,1,0,2,0,0}, // evidence
-            {0,0,5,2,0,0,0,1}, // safety
-            {0,2,2,5,0,1,0,0}, // counterpoint
-            {0,0,0,0,5,0,2,1}, // context
-            {0,2,0,1,2,5,0,0}, // logic
-            {0,0,2,0,2,1,5,0}, // novelty
-            {0,1,1,0,1,1,0,5}, // memory
-            {0,3,0,2,0,5,0,1}, // left
-            {0,0,1,0,4,0,5,2}, // right
-            {0,0,3,4,0,2,1,3}, // front
-            {0,2,3,3,0,2,2,1}, // interface
+            {0,5,0,1,0,2,0,0},
+            {0,0,5,2,0,0,0,1},
+            {0,2,2,5,0,1,0,0},
+            {0,0,0,0,5,0,2,1},
+            {0,2,0,1,2,5,0,0},
+            {0,0,2,0,2,1,5,0},
+            {0,1,1,0,1,1,0,5},
+            {0,3,0,2,0,5,0,1},
+            {0,0,1,0,4,0,5,2},
+            {0,0,3,4,0,2,1,3},
+            {0,2,3,3,0,2,2,1},
     };
 
     private static JanusRecursiveCoreEngine instance;
@@ -115,7 +116,6 @@ public final class JanusRecursiveCoreEngine {
             Node n = nodes.get(name);
             n.aiCounsel = clip(text, 900);
             n.revisions++;
-            // AI counsel belongs to that core first; peers see only its bounded conclusion.
             think(n, "AI counsel to this core: " + n.aiCounsel, peerDigest(name));
         }
         processPeerRevision("AI counsel peer revision");
@@ -164,9 +164,7 @@ public final class JanusRecursiveCoreEngine {
     }
 
     private void processSociety(String stimulus) {
-        // Round one: each outer core independently runs a full seven-position JANUS readout.
         for (Node n : nodes.values()) think(n, stimulus, "");
-        // Round two: every core reacts to the bounded conclusions of the other ten.
         processPeerRevision("peer response");
         persist();
     }
@@ -272,8 +270,8 @@ public final class JanusRecursiveCoreEngine {
     }
 
     static void clearAccountBoundState(Context context) {
-        context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply();
         clearInstance();
+        context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().commit();
     }
 
     private static int indexOf(String name) {
