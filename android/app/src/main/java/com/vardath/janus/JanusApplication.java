@@ -21,14 +21,14 @@ public class JanusApplication extends Application {
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private void install(Activity activity) {
-                // Stability-first shell. The native MainActivity already owns all product screens.
-                // Global-layout polishers previously walked and sometimes mutated the same live
-                // hierarchy concurrently, which could terminate the Activity when detail screens
-                // such as Cores, Memory and Settings were created. Keep only non-mutating chrome,
-                // Back navigation and diagnostics until decoration is reintroduced through an
-                // explicit render pass rather than ViewTreeObserver mutation.
+                // Stability-first shell. MainActivity owns the actual product screens.
+                // High-frequency global-layout presentation layers are temporarily disabled
+                // because several of them walk and mutate the same hierarchy while detail
+                // screens are being created. Keep only system chrome, Back navigation,
+                // diagnostics and the governed maintenance handoff.
                 JanusSystemChrome.install(activity);
                 JanusNavigationPolish.install(activity);
+                JanusMaintenanceSupervisorPolish.install(activity);
             }
             @Override public void onActivityCreated(Activity activity, Bundle state) { install(activity); }
             @Override public void onActivityStarted(Activity activity) {}
