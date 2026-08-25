@@ -70,7 +70,7 @@ public final class JanusThoughtBridge {
                     + "Each of these eleven outer cores now also owns a persistent internal seven-position JANUS/Fano processor. The nested processors revise against peer-core conclusions in deterministic background cycles with zero model/API calls.\n"
                     + "These are persisted deterministic local processing events with zero model/API calls. They are real app-side JANUS processing between messages. Describe what the cores actually processed when asked, rather than claiming that no background thinking/processing occurred. Do not describe this as phenomenal consciousness or an uninterrupted private stream of consciousness.\n"
                     + (recent.length() == 0 ? "Recent externalizable local activity: none retained.\n" : "Recent externalizable local activity:\n" + recent)
-                    + (fano.length() == 0 ? "" : "Current outer Fano attention orientations used by the local cores:\n" + fano)
+                    + (fano.length() == 0 ? "" : "Current Fano attention orientations for the outer local cores:\n" + fano)
                     + (front.isEmpty() ? "" : "Current local Front appraisal/intention state: " + front + "\n")
                     + (frontAppraisal == null ? "" : "Front control appraisal: " + frontAppraisal.toString() + "\n")
                     + (face.isEmpty() ? "" : "Current local interface state: " + face + "\n")
