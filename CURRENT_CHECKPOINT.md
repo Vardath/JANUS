@@ -46,7 +46,7 @@ The default per-account research policy is owner-set and must remain unchanged u
 - The remaining allowance is reserved for user-directed research; autonomous research may not consume it.
 - Both `background_research` and `foreground_web` pass through the same persistent cost ledger and monthly governor.
 - Background searches are separately paced across the month and have a daily safety cap; wake/review/peer processing does not consume this paid-search allowance.
-- The current default per-search planning estimate is configurable because provider pricing/token overhead can change. This is an application-side budget governor, not a guarantee about an external provider invoice if provider pricing changes unexpectedly; maintenance should review the estimate when pricing changes.
+- A configurable per-call planning estimate translates calls into the application budget. Because provider search prices and model-token overhead can change independently of this repository, this is a conservative application governor rather than an absolute external-invoice guarantee. Production telemetry and quarterly maintenance must compare real provider cost against the estimate and raise the estimate if necessary; the owner-set $20 application ceiling itself must not be raised without explicit owner instruction.
 
 ## Stream observer
 
