@@ -43,12 +43,12 @@ Search selection deliberately mixes:
 - core-requested/relevant research;
 - adjacent/associative research;
 - web/current-development/counterexample searches;
-- YouTube/video/transcript leads discoverable through web research;
+- YouTube/video/transcript leads discoverable through governed web research;
 - occasional exploratory/random observation even when no core has a pressing request.
 
 A successful outside observation is not treated as truth. It returns as a typed `web` sense and is projected through all seven specialists, both hemispheres, Front and Interface. Every core therefore gets a chance to weigh evidence, risk, contradictions, context, logic, novelty and continuity before the society changes its retained state. The finding also starts as a low-rung `trace` autonomous-research memory with bounded source provenance; normal memory consolidation and retrieval determine whether it later becomes working/episodic/core material.
 
-The persistent global society can continue acquiring digital input without an open phone client as long as the server is executing. Android local cores remain constrained by Android background/suspension rules. When the app resumes, existing selective local/global federation returns relevant global observations as peer/sensory grounding rather than overwriting local state.
+The persistent global society can continue acquiring digital input without an open phone client as long as the server is executing. Android local cores remain constrained by Android background/suspension rules. When the local app is executing, its existing senses and recursive cores continue to process local material and selectively federate bounded state; when it resumes after suspension, relevant global observations return through the existing peer/sensory federation rather than overwriting local state. This architecture gives the full federated JANUS access to the shared research capability without falsely claiming that a killed Android process remains awake.
 
 This does **not** enable ambient microphone or camera capture. Physical-world sensing remains explicit/user-initiated unless deliberately designed later. Continuing observation currently means digital-world research plus the existing explicit file/image/audio/action senses.
 
