@@ -43,7 +43,7 @@ Search selection deliberately mixes:
 - core-requested/relevant research;
 - adjacent/associative research;
 - web/current-development/counterexample searches;
-- YouTube/video/transcript leads discoverable through governed web research;
+- a dedicated YouTube/video/transcript-lead discovery mode through governed web research;
 - occasional exploratory/random observation even when no core has a pressing request.
 
 A successful outside observation is not treated as truth. It returns as a typed `web` sense and is projected through all seven specialists, both hemispheres, Front and Interface. Every core therefore gets a chance to weigh evidence, risk, contradictions, context, logic, novelty and continuity before the society changes its retained state. The finding also starts as a low-rung `trace` autonomous-research memory with bounded source provenance; normal memory consolidation and retrieval determine whether it later becomes working/episodic/core material.
@@ -65,7 +65,7 @@ Owner policy is currently:
 - occasional random search remains enabled within the autonomous allowance;
 - these defaults must not be raised unless the owner explicitly requests it.
 
-The per-call planning estimate is configurable so maintenance can adjust it when provider prices/token overhead change. The application governor is deliberately conservative, but actual external billing still needs production telemetry because provider pricing can change outside the repository.
+A configurable per-call planning estimate converts search calls into application-budget usage. Production diagnostics/maintenance must compare the estimate with real provider billing and increase the estimate if search pricing or model-token overhead rises. Provider billing can change independently, so the application governor should not be described as an external-invoice guarantee; the owner-set $20 application ceiling itself remains fixed unless explicitly changed.
 
 ## Loop prevention
 
