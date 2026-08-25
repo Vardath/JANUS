@@ -2,7 +2,7 @@
 
 **Current authoritative continuation:** `JANUS_CONSCIOUS_STREAM_MEMORY_CYCLE_CHECKPOINT_20260825.md`
 
-**Current Android continuation:** `JANUS_ANDROID_V110_UI_REBUILD_CHECKPOINT_20260825.md`
+**Current Android continuation:** `JANUS_ANDROID_V110_SAFEAREA_READABILITY_CHECKPOINT_20260825.md`
 
 **Current project status:** `JANUS_PROJECT_STATUS_20260825.md`
 
@@ -40,9 +40,7 @@ The former localization and language-selector global-layout walkers are retired.
 - The curated translation catalogue and English fallback remain intact.
 - Localization CI now forbids `OnGlobalLayoutListener` / `getViewTreeObserver` in both localization components.
 
-The localization, Stream-owner, conscious-stream, UI-hardening, RC-readiness, recursive-core, protocol, maintenance, clean-server and authoritative APK build gates all passed on PR #48 before merge.
-
-## Android appearance and stability baseline
+## Android appearance, safe area and readability baseline
 
 The v1.09 stability shell disabled competing cosmetic/runtime view-tree injection layers after real-device crashes in detail screens suggested multiple layout listeners were mutating the same hierarchy during layout.
 
@@ -51,6 +49,15 @@ PR #45, merge `edb3f1f5b00153da0f572cff54057fb16f37c058`, completed v1.10 app-on
 - JANUS `theme_mode` and `accent` remain app-owned appearance settings.
 - They no longer recolour Android status/navigation bars.
 - `JanusSystemChrome` follows only the device's own light/dark configuration for system-bar icon contrast.
+
+PR #49, merge `23553c5683e50e37f1a963237de1aabc4b231675`, completed the next safe-area/readability pass:
+
+- `JanusSafeArea` applies system-bar, display-cutout and IME insets directly to each authored root; it does not walk the live hierarchy or use global-layout listeners.
+- Authentication and signed-in app roots opt into safe-area handling when created.
+- `JanusBuildInfo` now supplies visible Android version/build identity from `BuildConfig.VERSION_NAME` and `BuildConfig.VERSION_CODE`; the Options title is no longer hard-coded to a release number.
+- The five top-level native pages use a horizontally scrollable navigation surface with readable minimum tab widths rather than compressing all five labels into a narrow row.
+- Stable Chat, Messages and Observe headings are localized explicitly at creation time; conversation bodies remain untouched.
+- The safe-area/readability, authoritative APK, RC-readiness, localization, Stream-owner, conscious-stream, recursive-core, UI-hardening, protocol, maintenance and clean-server gates all passed before merge.
 
 The safe UI baseline is now **explicit screen/component ownership and deterministic rendering**. Do not restore the former global-layout polish/injection stack merely to regain cosmetics.
 
@@ -74,13 +81,14 @@ Android remains the active release target. Windows and iOS remain deferred.
 
 ## Next engineering task
 
-Continue the Android UI rebuild from the explicit-owner baseline.
+The next concrete phase is **real-device validation of the explicit-owner v1.10 UI**.
 
-1. Replace remaining hard-coded visible version/build labels with `BuildConfig` or one authoritative version helper.
-2. Continue migrating static shell text to explicit localized rendering while leaving conversation/research/user content untouched.
-3. Improve readability and navigation without reintroducing hierarchy walkers or competing runtime decorators.
-4. Make safe-area/system-control coexistence explicit so JANUS content is not hidden by status/navigation bars, predictive Back, keyboards or accessibility overlays.
-5. Re-test Cores, Memory, Settings, Stream, Messages, Observe and Options on the real Samsung device after each major UI step.
-6. If any detail screen still closes, expose the stored `JanusClientDiagnostics` crash report directly in-app with copy/share support and fix from the exact stack trace rather than speculative UI changes.
+1. Test Chat, Messages, Observe, Stream, Options, Cores, Memory and Settings on the real Samsung device.
+2. Open and dismiss the keyboard in Chat and authentication flows and confirm content/navigation remain above system/IME insets.
+3. Check status/navigation bars, gesture navigation, predictive Back and accessibility/text scaling for overlap or inaccessible controls.
+4. Confirm JANUS theme/accent changes stay app-local and do not recolour the phone/system theme.
+5. Confirm the horizontally scrollable five-page navigation remains readable and every page is reachable.
+6. If any detail screen still closes, expose/use the stored `JanusClientDiagnostics` crash report directly in-app with copy/share support and fix from the exact stack trace rather than speculative layout changes.
+7. Continue explicit shell localization/readability cleanup only after the device path is stable.
 
 The broader **Diagnostic System v2 behavioral proof phase** remains required after the Android UI is stable. It must prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count and append-only maintenance behavior.
