@@ -26,6 +26,7 @@ jobs:
           test -s server_v2/recursive_core.py
           test -s server_v2/recursive_mind.py
           test -s server_v2/recursive_sensory.py
+          test -s server_v2/recursive_background.py
           grep -q 'every top-level core is itself a full JANUS core' server_v2/recursive_mind.py
           grep -q 'global_core_responses' server_v2/recursive_mind.py
           grep -q 'local_core_responses' server_v2/recursive_mind.py
@@ -35,14 +36,21 @@ jobs:
           grep -q 'top_level_ai_capable_cores.*22' server_v2/protocol.py
           grep -q 'recursive_mind.start' server_v2/entrypoint.py
           grep -q 'sensory_bus_module.ingest = recursive_sensory.ingest' server_v2/entrypoint.py
-          python -m py_compile server_v2/recursive_core.py server_v2/recursive_mind.py server_v2/recursive_sensory.py server_v2/entrypoint.py server_v2/topology.py server_v2/protocol.py server_v2/architecture_api.py
+          grep -q 'v2_recursive_core_state' server_v2/runtime_persistence.py
+          grep -q '_restore_recursive' server_v2/runtime_persistence.py
+          grep -q '_checkpoint_recursive' server_v2/runtime_persistence.py
+          grep -q 'recursive_tick(mind, aid)' server_v2/background.py
+          grep -q 'model_calls.*0' server_v2/recursive_background.py
+          python -m py_compile server_v2/recursive_core.py server_v2/recursive_mind.py server_v2/recursive_sensory.py server_v2/recursive_background.py server_v2/runtime_persistence.py server_v2/entrypoint.py server_v2/topology.py server_v2/protocol.py server_v2/architecture_api.py
           python - <<'PY'
           from server_v2.recursive_core import FACULTIES, FANO_LINES, RecursiveCoreProcessor, RecursiveCoreState
+          from server_v2.recursive_background import tick
           from server_v2.senses import Appraisal
           assert set(FACULTIES) == set(range(1,8))
           assert len(FANO_LINES) == 7
+          names=['evidence','safety','counterpoint','context','logic','novelty','memory','left_hemisphere','right_hemisphere','front','interface']
           p = RecursiveCoreProcessor()
-          states = {n: RecursiveCoreState(n) for n in ['evidence','safety','counterpoint','context','logic','novelty','memory','left_hemisphere','right_hemisphere','front','interface']}
+          states = {n: RecursiveCoreState(n) for n in names}
           first = {}
           for n,s in states.items():
               first[n] = p.think(s, 'A new uncertain idea may help but could create privacy risk.', Appraisal(), n)
@@ -55,7 +63,22 @@ jobs:
               assert revised['revision_count'] >= 1
               assert revised['peer_turn_count'] >= 10
           assert len(states) == 11
-          print('Recursive server core contract OK')
+
+          class Outer:
+              def __init__(self):
+                  self.last_public_summary='retained state'; self.appraisal=Appraisal()
+          class DummyMind:
+              def __init__(self):
+                  self._nested={n:RecursiveCoreState(n) for n in names}
+                  self._outer={n:Outer() for n in names}
+                  self._processor=RecursiveCoreProcessor()
+              def _states(self, aid): return self._outer
+              def _recursive_states(self, aid): return self._nested
+              def _purpose(self, n): return n
+          dm=DummyMind(); result=tick(dm,1)
+          assert result == {'cores':11,'peer_revisions':110,'model_calls':0}
+          assert all(s.peer_turn_count >= 10 for s in dm._nested.values())
+          print('Recursive server core, persistence and background contract OK')
           PY
       - name: Validate Android nested JANUS cores
         shell: bash
