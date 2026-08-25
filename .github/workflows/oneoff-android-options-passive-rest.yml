@@ -18,7 +18,6 @@ jobs:
 
           main_path = Path('android/app/src/main/java/com/vardath/janus/MainActivity.java')
           text = main_path.read_text(encoding='utf-8')
-
           replacements = [
               (
                   '    private static final String[] CORE_NAMES = new String[]{\n            "evidence", "logic", "counterpoint", "context", "memory", "safety", "novelty",\n            "left_hemisphere", "right_hemisphere", "consensus", "interface"\n    };',
@@ -74,11 +73,8 @@ jobs:
                   raise SystemExit(f'JanusLocalCoreRuntime replacement expected once, found {count}: {old[:100]}')
               core = core.replace(old, new)
           core_path.write_text(core, encoding='utf-8')
-
-          # One-off workflow removes itself before the resulting patch commit.
           Path('.github/workflows/oneoff-android-options-passive-rest.yml').unlink()
           PY
-
           grep -q '"front", "interface"' android/app/src/main/java/com/vardath/janus/MainActivity.java
           grep -q 'main.post(() -> { try { action.run(); } catch (Throwable failure)' android/app/src/main/java/com/vardath/janus/MainActivity.java
           grep -q 'passive-rest' android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
@@ -87,6 +83,13 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v5
         with: { gradle-version: '8.11.1' }
+      - name: Ensure debug signing key exists
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
       - name: Compile Android client
         working-directory: android
         env:
