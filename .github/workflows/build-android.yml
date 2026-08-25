@@ -24,11 +24,10 @@ jobs:
           test ! -e "$BASE/JanusThoughtContextPolish.java"
           test ! -e android/app/src/main/assets/index.html
           ! grep -R -q 'android.webkit.WebView\|JavascriptInterface' "$BASE"
-          grep -q "versionName '1.09'" android/app/build.gradle
-          grep -q "versionCode 109" android/app/build.gradle
+          grep -q "versionName '1.10'" android/app/build.gradle
+          grep -q "versionCode 110" android/app/build.gradle
           grep -q "applicationId 'com.vardath.janus'" android/app/build.gradle
           grep -q 'resetContentSurface' "$BASE/MainActivity.java"
-          grep -q 'Options · v1.09 (109)' "$BASE/MainActivity.java"
       - name: Verify v1.08 governed self-diagnosis and Supervisor handoff
         shell: bash
         run: |
@@ -66,17 +65,24 @@ jobs:
           grep -q 'JanusMaintenanceSupervisorPolish.install(activity)' "$APP"
           grep -q 'JanusClientDiagnostics.flushPending(activity)' "$APP"
           python -m py_compile server_v2/diagnostics.py server_v2/chat.py server_v2/maintenance.py server_v2/entrypoint.py server_v2/protocol.py server_v2/topology.py server_v2/senses.py server_v2/mind.py
-      - name: Verify v1.07 system chrome, Back and Runtime Cores hardening remains intact
+      - name: Verify app-only theme boundary, Back and Runtime Cores hardening remains intact
         shell: bash
         run: |
           set -euxo pipefail
           BASE=android/app/src/main/java/com/vardath/janus
-          CHROME="$BASE/JanusSystemChrome.java"; MAP="$BASE/JanusCoreMapView.java"; NAV="$BASE/JanusNavigationPolish.java"; APP="$BASE/JanusApplication.java"; MANIFEST=android/app/src/main/AndroidManifest.xml
+          CHROME="$BASE/JanusSystemChrome.java"; MAP="$BASE/JanusCoreMapView.java"; NAV="$BASE/JanusNavigationPolish.java"; APP="$BASE/JanusApplication.java"; MAIN="$BASE/MainActivity.java"; MANIFEST=android/app/src/main/AndroidManifest.xml
           grep -q 'enableOnBackInvokedCallback="true"' "$MANIFEST"
           grep -q 'getOnBackInvokedDispatcher' "$NAV"
           grep -q 'parent.performClick()' "$NAV"
           grep -q 'JanusSystemChrome.install(activity)' "$APP"
-          grep -q 'theme_mode' "$CHROME"; grep -q 'accent' "$CHROME"
+          grep -q 'putString("theme_mode",mode)' "$MAIN"
+          grep -q 'putString("accent",accent)' "$MAIN"
+          ! grep -q 'theme_mode' "$CHROME"
+          ! grep -q 'accent' "$CHROME"
+          ! grep -q 'registerOnSharedPreferenceChangeListener' "$CHROME"
+          ! grep -q 'setStatusBarColor' "$CHROME"
+          ! grep -q 'setNavigationBarColor' "$CHROME"
+          grep -q 'Configuration.UI_MODE_NIGHT_MASK' "$CHROME"
           ! grep -q 'LAYER_TYPE_SOFTWARE' "$MAP"
           ! grep -q 'setShadowLayer' "$MAP"
           grep -q 'drawFallback' "$MAP"
@@ -161,7 +167,7 @@ jobs:
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
-          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.09 fresh-content navigation hardening + governed self-diagnosis; passive-rest local runtime retained\nArchitecture migration: conceptual 1-3-7; mechanical 7 subconscious -> 2 hemispheres -> Front -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
+          printf 'JANUS Android authoritative native build identity\nVersion: %s\nPackage: com.vardath.janus\nSource commit: %s\nUI: v1.10 app-only theme isolation on the v1.09 stability shell; JANUS appearance no longer drives Android system chrome\nArchitecture migration: conceptual 1-3-7; mechanical 7 subconscious -> 2 hemispheres -> Front -> Interface\n' "$VERSION" "$GITHUB_SHA" > oauth-build-info.txt
       - uses: actions/upload-artifact@v4
         with:
           name: JANUS-Android-v${{ steps.app_version.outputs.version }}-FULL-REBUILD

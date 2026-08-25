@@ -58,8 +58,8 @@ jobs:
           grep -q 'JANUS_RELEASE_STORE_PASSWORD' "$GRADLE"
           grep -q 'JANUS_RELEASE_KEY_ALIAS' "$GRADLE"
           grep -q 'JANUS_RELEASE_KEY_PASSWORD' "$GRADLE"
-          grep -q "versionName '1.08'" "$GRADLE"
-          grep -q "versionCode 108" "$GRADLE"
+          grep -q "versionName '1.10'" "$GRADLE"
+          grep -q "versionCode 110" "$GRADLE"
           ! grep -q 'storePassword.*JANUS' "$GRADLE"
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '17' }
