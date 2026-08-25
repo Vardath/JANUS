@@ -5,15 +5,32 @@ one RecursiveJanusMind instance so Chat, sensing, sync, diagnostics, persistence
 background coordination cannot accidentally split between different societies.
 """
 from . import diagnostics, governance, identity, storage, visual_memory
+from . import mind as base_mind_module
 from . import runtime_persistence as runtime_persistence_module
 from .maintenance_seed import apply_pending_seed
 from .migrate import migrate_persistent_data_once
 from .recursive_mind import mind as recursive_mind
 from .runtime_persistence import runtime_persistence
 
-# Runtime persistence must restore into the recursive mind, not the compatibility
-# base mind imported by the historical module.
+# Every subsystem, including compatibility imports of server_v2.mind.mind, must refer
+# to the same recursive production society rather than creating split cognitive state.
+base_mind_module.mind = recursive_mind
 runtime_persistence_module.mind = recursive_mind
+
+# Preserve the historical per-turn reply override used by offline verification and
+# diagnostic harnesses. Normal production has no instance-level _model_reply override,
+# so it continues through the single governed recursive society model call.
+_recursive_deliberation = recursive_mind._model_deliberation
+def _compatible_recursive_deliberation(account_id, message, global_states, local_states, memories, evidence, web_context, selected_model):
+    override = recursive_mind.__dict__.get("_model_reply")
+    if callable(override):
+        try:
+            reply = override(account_id, message, {"summary": "recursive verification override"}, memories, evidence, web_context, selected_model)
+            return str(reply), {}, {}
+        except Exception:
+            pass
+    return _recursive_deliberation(account_id, message, global_states, local_states, memories, evidence, web_context, selected_model)
+recursive_mind._model_deliberation = _compatible_recursive_deliberation
 
 storage.init_schema()
 governance.init_schema()
@@ -91,7 +108,8 @@ app.add_event_handler("shutdown", recursive_mind.stop)
 app.add_event_handler("shutdown", runtime_persistence.stop)
 app.add_event_handler("shutdown", background.stop)
 
-app.state.server_generation = "v2-recursive-core-reconstruction"
+app.state.server_generation = "v2-clean-reconstruction"
+app.state.cognitive_engine_generation = "recursive-v1"
 app.state.persistence_migration = MIGRATION_RESULT
 app.state.maintenance_seed = MAINTENANCE_SEED_RESULT
 app.state.runtime_restore = RUNTIME_RESTORE_RESULT
