@@ -36,6 +36,9 @@ public final class JanusChatResponseRegistry {
     public static synchronized void capture(String rawJson) {
         try {
             JSONObject root = new JSONObject(rawJson);
+            String reply = root.optString("reply", "").trim();
+            if (!reply.isEmpty()) JanusRecursiveCoreBridge.sense("peer", "global_interface", reply);
+
             JSONObject localCounsel = root.optJSONObject("local_core_counsel");
             if (localCounsel != null && localCounsel.length() > 0) {
                 JanusRecursiveCoreBridge.applyAiCounsel(localCounsel);
