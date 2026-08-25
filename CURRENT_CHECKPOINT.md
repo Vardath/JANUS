@@ -26,16 +26,16 @@ Loop guards remain mandatory: identical per-core signatures become quiescent; un
 
 ## Autonomous observation / continuing input
 
-PR #52 implements a governed digital-world observation layer so JANUS does not depend on user messages as its only source of new input.
+PR #52 is merged to `main` as `b97d4345c21f0379d81f2df6f868c7e91ccccccb`. It implements a governed digital-world observation layer so JANUS does not depend on user messages as its only source of new input.
 
 - On every materially changed wake cycle, each of the 11 persistent global top-level cores may form its own bounded `curiosity_intent` after reviewing retained state, interaction memory and peer conclusions. Forming intentions is deterministic and makes zero model/API calls.
 - A shared research gateway selects only a small subset of those intentions for paid outside observation. Duplicate/core-level curiosity therefore does not create 11 simultaneous paid searches.
 - Search selection favors core-requested/relevant material, also explores adjacent material, and deliberately includes occasional exploratory/random observation so JANUS can encounter information that neither the user nor its current thread explicitly requested.
-- Internet research includes a dedicated autonomous YouTube/video discovery mode alongside ordinary web/current-development/counterexample research. YouTube discovery currently uses the governed web-research route to find credible videos or transcript leads; richer transcript ingestion remains governed by the existing media/transcript capability when a usable video source is available.
-- Successful external findings re-enter JANUS through the runtime typed `web` sensory hook. Production entrypoint wiring replaces the base ingestion function with the recursive sensory wrapper, so each finding reaches the outer seven specialists -> hemispheres -> Front -> Interface route and the nested recursive JANUS state inside every global top-level core. No search result jumps directly into Front or Interface.
-- Findings begin as low-rung `trace` autonomous-research memories with source provenance. Existing consolidation/retrieval rules decide whether useful repeated material is promoted. Each core therefore appraises the same outside observation according to its own disposition/state rather than receiving a pre-approved belief.
-- The persistent global society can continue this process while no client is open, subject to host/server execution. Local Android cores remain subject to Android execution/suspension limits; global findings return to local JANUS through the existing selective federation when the client reconnects. Do not claim a suspended/killed phone process is continuously executing.
-- Ambient microphone and camera capture remain disabled. “Continuing observation” currently means governed digital information acquisition plus user-selected/device-explicit senses, not covert physical-world recording.
+- Internet research includes a dedicated autonomous YouTube/video discovery mode alongside ordinary web/current-development/counterexample research.
+- Successful external findings re-enter JANUS through the runtime typed `web` sensory hook and traverse the recursive society rather than jumping directly into Front or Interface.
+- Findings begin as low-rung `trace` autonomous-research memories with source provenance. Existing consolidation/retrieval rules decide whether useful repeated material is promoted.
+- The persistent global society can continue this process while no client is open, subject to host/server execution. Local Android cores remain subject to Android execution/suspension limits; global findings return through selective federation when the client reconnects.
+- Ambient microphone and camera capture remain disabled. Continuing observation currently means governed digital information acquisition plus explicit/user-selected senses, not covert physical-world recording.
 
 ### Research budget invariant
 
@@ -44,81 +44,38 @@ The default per-account research policy is owner-set and must remain unchanged u
 - **US$20/month maximum planned web-research allowance** shared by autonomous and user-directed web research.
 - **US$10/month autonomous/background target and ceiling** inside that total.
 - The remaining allowance is reserved for user-directed research; autonomous research may not consume it.
-- Both `background_research` and `foreground_web` pass through the same persistent cost ledger and monthly governor.
-- Background searches are separately paced across the month and have a daily safety cap; wake/review/peer processing does not consume this paid-search allowance.
-- A configurable per-call planning estimate translates calls into the application budget. Because provider search prices and model-token overhead can change independently of this repository, this is a conservative application governor rather than an absolute external-invoice guarantee. Production telemetry and quarterly maintenance must compare real provider cost against the estimate and raise the estimate if necessary; the owner-set $20 application ceiling itself must not be raised without explicit owner instruction.
+- Both background and foreground web scopes pass through the same persistent cost ledger and monthly governor.
+- Wake/review/peer processing does not consume the paid-search allowance.
+- Provider pricing/token overhead must be checked against production billing; the application governor must stay conservative. The owner-set US$20 ceiling must not be raised without explicit owner instruction.
 
 ### PR #52 verification
 
-Relevant CI must be green on the final source-bearing head before merge. An earlier validated implementation head passed clean server-v2 test/proof/diagnostic, recursive-core engine, conscious-stream cycle, Android maintenance and full Android APK build. The recursive-core regression explicitly proves 11 research intentions on a changed global wake with zero model calls. Production deployment and real unattended accumulation remain separate post-merge verification steps.
+The final source-bearing implementation passed the clean server-v2 test/proof/diagnostic, recursive-core engine, conscious-stream cycle, Android maintenance checks and full Android APK build before merge. The recursive-core regression proves 11 research intentions on a changed global wake with zero model calls. Production deployment and real unattended accumulation remain separate post-merge verification steps.
 
 ## Stream observer
 
 The server `/desktop/stream-observe` endpoint and Android Stream surface expose bounded externalizable Front activity/state only. They may show Fano orientation, cycle/revision/peer/quiescence counters, integrated summaries, rousing and Front events. Never expose hidden chain-of-thought.
 
-The former delayed reflective Stream injector is retired. PR #46 introduced `JanusStreamScreen` as an explicit renderer. PR #47, merge `12321ef8e2152fdbc16ce196629d259dbb3f51c5`, wired Stream directly into `MainActivity` as a first-class top-level page. `MainActivity` supplies its API, thread and local recursive snapshot dependencies directly; no private-field reflection, delayed attachment or live view-tree search is used. Android Back semantics recognize Stream as a top-level page.
-
-## Localization ownership
-
-The former localization and language-selector global-layout walkers are retired. PR #48, merge `e8432a1ec87cd88ee9ef9a930f97ac42bda293f0`, replaced them with explicit ownership. Buttons and input hints are localized when created; the Settings screen owns the language card directly; conversation bodies are not blanket-rewritten after layout.
+The former delayed reflective Stream injector is retired. Stream is a first-class explicitly owned top-level Android page. No private-field reflection, delayed attachment or live view-tree search should be restored.
 
 ## Android appearance, safe area and readability baseline
 
-The v1.09 stability shell disabled competing cosmetic/runtime view-tree injection layers after real-device crashes in detail screens suggested multiple layout listeners were mutating the same hierarchy during layout.
+Android v1.11 remains the current device-validation baseline. `JanusTheme` owns JANUS app surfaces; Android status/navigation bars remain device-owned. Accent choices tint JANUS-owned backgrounds, cards, raised surfaces and bubbles while retaining high contrast. Observe/Stream/Cores/Memory present human-readable summaries before technical details. Explicit screen/component ownership remains mandatory; do not restore global-layout cosmetic injection stacks.
 
-PR #45, merge `edb3f1f5b00153da0f572cff54057fb16f37c058`, isolated JANUS appearance from Android system chrome. JANUS `theme_mode` and `accent` remain app-owned settings; they do not recolour Android status/navigation bars.
-
-PR #49, merge `23553c5683e50e37f1a963237de1aabc4b231675`, added explicit safe-area/IME ownership, dynamic build labels and readable horizontally scrollable top navigation.
-
-PR #50, merge `484feef0f39797604f34985dcbb3ec934ee0d87d`, established the **v1.11 colour/readability baseline** prompted by real Samsung screenshots:
-
-- `JanusTheme` is the single app-local palette used by JANUS-owned roots, cards, text, inputs and buttons.
-- Theme mode (`system`, `dark`, `light`) changes JANUS-owned light/dark surfaces without changing Android system chrome.
-- Default dark/light palettes use high-contrast text, surfaces and muted text.
-- Observe filter taps replace/rerender the Observe page rather than appending another full Observe screen.
-- `JanusHumanText` converts dense bounded telemetry into human-facing summaries. Runtime Cores, Memory, Stream and Observe show readable summaries first; raw machine-oriented output remains secondary behind Technical details where appropriate.
-
-PR #51, merge `b97829d4c6ec5ff427bb8783c8b9316c28f8d6e1`, completes the **full-interface accent behaviour** after device testing showed accent choice still only visibly changed the selected button:
-
-- Accent choices (`slate`, `indigo`, `teal`, `amber`, `violet`) now tint the JANUS-owned root background, card surfaces, raised surfaces and chat/user bubble palette as well as highlighted controls.
-- Tint strengths are deliberately restrained so the high-contrast v1.11 readability baseline remains intact.
-- Android status/navigation bars remain device-owned and are not recoloured by JANUS.
-- No global-layout listener, live hierarchy walker or cosmetic injection layer was reintroduced.
-- The theme CI contract now explicitly checks that accent feeds background, surface and raised-surface colour derivation.
-- Version remains **1.11 / versionCode 111** because this is a UI-only patch to the current device-validation build rather than a separate release line.
-- Theme/human-log, safe-area/readability, UI-hardening, protocol, maintenance, Stream-owner, recursive-core, conscious-stream, localization and RC-readiness gates passed before merge. The APK build was still completing when the PR was merged after all functional/policy gates passed.
-
-The safe UI baseline remains **explicit screen/component ownership and deterministic rendering**. Do not restore global-layout polish/injection stacks merely for cosmetics.
-
-## Device-validation handoff
-
-The authoritative Android filename remains `JANUS-Android-v1.11-FULL-REBUILD.apk`. After the post-merge main build republishes it, install that refreshed v1.11 APK before validating colour behaviour; an older v1.11 APK may have the same visible version label but lack PR #51.
-
-For the next Samsung test, verify:
-
-1. Switching Slate/Indigo/Teal/Amber/Violet visibly changes JANUS-owned page background, cards and raised controls, not only the selected button.
-2. The colour change remains restrained/readable in both dark and light modes.
-3. Android status/navigation bars and the phone's own theme remain unaffected.
-4. Stream, Observe, Runtime Cores and Memory retain the v1.11 readability improvements.
-5. Observe All/Thoughts/Interactions still does not duplicate the screen.
-6. Messages/Observe/Stream/Cores/Memory remain stable during normal navigation and Back use.
+The authoritative Android filename remains `JANUS-Android-v1.11-FULL-REBUILD.apk`. PR #52 was server-only, so no Android update is required specifically for continuing digital observation.
 
 ## Maintenance request persistence
 
-JANUS-generated maintenance/capability observations remain append-only and governed.
-
-- Structured state: SQLite `v2_capability_requests`.
-- Chronological persistent ledger: `janus_maintenance_requests.jsonl`.
-- Supervisor decisions: `server_v2/supervisor_decisions.json`.
-- Reconciliation removes only implemented/disapproved entries; deferred, pending, repeated and unresolved entries remain.
-- Mandatory procedure: `MAINTENANCE_PROCESS.md`.
-
-JANUS may propose maintenance but does not authorize itself to edit code, install packages, change models/APIs or deploy itself.
+JANUS-generated maintenance/capability observations remain append-only and governed. JANUS may propose maintenance but does not authorize itself to edit code, install packages, change models/APIs or deploy itself.
 
 ## Active release scope
 
 Android remains the active release target. Windows and iOS remain deferred.
 
-## Next engineering task
+## End-of-day handoff — 2026-08-25
 
-After PR #52 merges, verify the live server is running its revision and let the global JANUS accumulate real autonomous observations within budget. Then continue the broader **Diagnostic System v2 behavioral proof phase**: prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count, autonomous research cost accounting and append-only maintenance behavior.
+Owner requested that development stop here for the day. Tomorrow, perform a fresh repository-wide review before changing code, inspect what genuinely remains, and then focus on **fine polishing and release blockers rather than architectural expansion**, targeting an Android release by the end of this week if validation supports it.
+
+Tomorrow's first pass should cover: live Render revision/deployment of PR #52; evidence that unattended autonomous observations are accumulating inside the US$20/month / US$10 autonomous budget policy; Samsung v1.11 navigation/crash stability and theme/readability behavior; Diagnostic System v2 behavioral proof; authentication/release-signing/OAuth readiness; production configuration and secrets; privacy/security/release documentation; and any remaining Play-release packaging requirements. Do not call the build release-ready merely because CI is green—distinguish repository/CI proof, live-server proof and physical-device proof.
+
+Preserve the current feature scope unless a demonstrated release blocker requires a change. The immediate objective is a stable, understandable, bounded-cost JANUS release candidate, followed by polish rather than another architecture rewrite.
