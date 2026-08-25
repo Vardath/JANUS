@@ -26,12 +26,14 @@ class BackgroundCoordinator:
     internal reviewing, peer exchange and curiosity formation remain zero-cost.
     """
 
-    SEARCH_ESTIMATE_USD = 0.01
-
     def __init__(self):
         self._running = False
         self._thread: threading.Thread | None = None
         self.tick_seconds = max(60, int(os.getenv("JANUS_V2_BACKGROUND_TICK_SECONDS", "300")))
+
+    @property
+    def search_estimate_usd(self) -> float:
+        return max(0.001, float(os.getenv("JANUS_RESEARCH_ESTIMATED_USD_PER_CALL", "0.01")))
 
     def start(self):
         if self._running:
@@ -194,8 +196,9 @@ class BackgroundCoordinator:
         )
         autonomous_calls = sum(int(r["calls"] or 0) for r in rows if r["scope"] == "background_research")
         all_calls = sum(int(r["calls"] or 0) for r in rows)
-        autonomous_spend = autonomous_calls * self.SEARCH_ESTIMATE_USD
-        estimated_total_spend = all_calls * self.SEARCH_ESTIMATE_USD
+        per_call = self.search_estimate_usd
+        autonomous_spend = autonomous_calls * per_call
+        estimated_total_spend = all_calls * per_call
         elapsed_days = max(1.0, (now - start) / 86400.0)
         paced_allowance = autonomous * (min(float(days), elapsed_days) / float(days))
         return total, autonomous, autonomous_spend, estimated_total_spend, paced_allowance
@@ -259,13 +262,14 @@ class BackgroundCoordinator:
         if now - int(state["last_research_at"] or 0) < min_gap:
             return
         total, target, auto_spend, total_spend, paced = self._research_budget(aid, now)
-        if total_spend + self.SEARCH_ESTIMATE_USD > total:
+        per_call = self.search_estimate_usd
+        if total_spend + per_call > total:
             return
-        if auto_spend + self.SEARCH_ESTIMATE_USD > target:
+        if auto_spend + per_call > target:
             return
-        if auto_spend + self.SEARCH_ESTIMATE_USD > paced and random.random() > 0.08:
+        if auto_spend + per_call > paced and random.random() > 0.08:
             return
-        if not governance.permit(aid, "background_research", self.SEARCH_ESTIMATE_USD):
+        if not governance.permit(aid, "background_research", per_call):
             return
 
         mode, query = self._choose_curiosity(aid)
