@@ -1,0 +1,56 @@
+name: Test JANUS Android Safe Area and Readability
+
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/test-android-safearea-readability.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/test-android-safearea-readability.yml'
+
+jobs:
+  safearea-readability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify explicit safe-area, dynamic build identity and readable nav contracts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=android/app/src/main/java/com/vardath/janus
+          MAIN="$BASE/MainActivity.java"
+          SAFE="$BASE/JanusSafeArea.java"
+          BUILD="$BASE/JanusBuildInfo.java"
+          test -s "$SAFE"; test -s "$BUILD"
+          grep -q 'JanusSafeArea.install(root)' "$MAIN"
+          grep -q 'WindowInsetsCompat.Type.systemBars()' "$SAFE"
+          grep -q 'WindowInsetsCompat.Type.displayCutout()' "$SAFE"
+          grep -q 'WindowInsetsCompat.Type.ime()' "$SAFE"
+          grep -q 'Math.max(bars.bottom, ime.bottom)' "$SAFE"
+          ! grep -q 'OnGlobalLayoutListener\|getViewTreeObserver' "$SAFE"
+          grep -q 'BuildConfig.VERSION_NAME' "$BUILD"
+          grep -q 'BuildConfig.VERSION_CODE' "$BUILD"
+          grep -q 'JanusBuildInfo.pageLabel("Options")' "$MAIN"
+          ! grep -q 'Options · v1\.10 (110)' "$MAIN"
+          grep -q 'HorizontalScrollView navScroll' "$MAIN"
+          grep -q 'b.setMinWidth(dp(92))' "$MAIN"
+          grep -q 'JanusUiLocalizationPolish.shellText(this, "Chat")' "$MAIN"
+          grep -q 'JanusUiLocalizationPolish.shellText(this, "Messages")' "$MAIN"
+          grep -q 'JanusUiLocalizationPolish.shellText(this, "Observe")' "$MAIN"
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v5
+        with: { gradle-version: '8.11.1' }
+      - name: Ensure debug signing key exists
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"; fi
+      - name: Compile and assemble Android
+        working-directory: android
+        env: { JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}' }
+        run: gradle --no-daemon :app:compileDebugJavaWithJavac :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
