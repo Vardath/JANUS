@@ -94,10 +94,13 @@ services:
         value: "12"
       - key: JANUS_BACKGROUND_DAILY_TOKEN_CAP
         value: "20000"
+
+      # Continuing digital observation. Wake/review and curiosity-intent formation are
+      # zero-model/API; only selected outside observations spend the governed allowance.
       - key: JANUS_CURIOSITY_WEB
         value: "1"
       - key: JANUS_CURIOSITY_DAILY_SEARCH_CAP
-        value: "4"
+        value: "40"
       - key: JANUS_CURIOSITY_RELEVANT_DAILY_CAP
         value: "2"
       - key: JANUS_CURIOSITY_ADJACENT_DAILY_CAP
@@ -105,7 +108,26 @@ services:
       - key: JANUS_CURIOSITY_WANDER_DAILY_CAP
         value: "1"
       - key: JANUS_CURIOSITY_MIN_GAP_SECONDS
-        value: "7200"
+        value: "1200"
+      - key: JANUS_RESEARCH_MONTHLY_MAX_USD
+        value: "20"
+      - key: JANUS_AUTONOMOUS_RESEARCH_TARGET_USD
+        value: "10"
+      - key: JANUS_RESEARCH_ESTIMATED_USD_PER_CALL
+        value: "0.01"
+
+      # Private Supervisor maintenance inbox. Render SQLite + JSONL remain canonical.
+      # Supply a fine-grained GitHub token with Issues read/write ONLY on
+      # Vardath/JANUS-privatebuild; do not grant Contents/source-code write permission.
+      - key: JANUS_MAINTENANCE_GITHUB_MIRROR
+        value: "1"
+      - key: JANUS_MAINTENANCE_GITHUB_REPO
+        value: Vardath/JANUS-privatebuild
+      - key: JANUS_MAINTENANCE_GITHUB_ISSUE
+        value: "1"
+      - key: JANUS_MAINTENANCE_GITHUB_TOKEN
+        sync: false
+
       - key: JANUS_IMAGE_MODEL
         value: gpt-image-1
       - key: JANUS_IMAGE_QUALITY
