@@ -12,11 +12,11 @@ When JANUS presents a maintenance handoff, follow this command:
 
 JANUS-generated maintenance observations are appended to the persistent JSONL ledger. Normal JANUS operation must **never overwrite** this file.
 
-Default deployed path:
+Effective deployed path:
 
 `/data/janus_maintenance_requests.jsonl`
 
-Configured with:
+The ledger path is derived from the configured persistent `JANUS_DB_PATH` by default. It can be explicitly overridden with:
 
 `JANUS_MAINTENANCE_REQUEST_FILE=/data/janus_maintenance_requests.jsonl`
 
