@@ -7,7 +7,7 @@ It supersedes the old stopping-state language at the end of `JANUS_137_SENSORY_I
 
 Windows and iOS work is intentionally deferred until the Android version is ready for release and its setup/release process is understood end-to-end.
 
-PR #52 adds a pending continuing-input/autonomous-observation layer. Treat it as unmerged until CI/merge state proves otherwise, but include its behavior and cost accounting in Diagnostic System v2 once merged.
+PR #52 adds the continuing-input/autonomous-observation layer. Its validated implementation head passed clean server-v2, recursive-core, conscious-stream, maintenance, diagnostic and Android APK build gates before merge. Live deployment and unattended runtime behavior must still be verified separately after merge.
 
 ## Current product state
 Android currently has:
@@ -159,7 +159,7 @@ Do not expose private hidden chain-of-thought. Show only bounded externalizable 
 
 ## Android RC1 plan — adjusted order
 
-### Phase A — Diagnostic System v2 [NEXT after PR #52 validation]
+### Phase A — Diagnostic System v2 [NEXT after PR #52 production validation]
 1. Audit every current diagnostic check and identify static/shallow/self-reported checks.
 2. Introduce PASS/WARN/FAIL/UNVERIFIED/NOT-APPLICABLE result schema.
 3. Add category summaries and an overall health posture.
@@ -234,6 +234,6 @@ Before calling Android released:
 - broad new architectural features unrelated to Android RC blockers.
 
 ## Next-session instruction
-Resume by checking PR #52 CI/merge/deploy state, then continue **Diagnostic System v2, Phase A**.
+Resume by verifying PR #52 merge/deploy state and unattended runtime evidence, then continue **Diagnostic System v2, Phase A**.
 
 Do not begin by redesigning the 1-3-7 architecture again. Treat the current 11-local + 11-global Fano/sensory architecture as the active implementation unless a concrete diagnostic or soak-test failure disproves part of it.
