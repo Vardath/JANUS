@@ -1,0 +1,4 @@
+Expected live server generation: v2-clean-reconstruction
+Expected cognitive generation: recursive-conscious-stream-v2
+Expected global core count: 11
+Expected Android-critical surfaces: health, protocol, auth, chat, core sync, stream observe, maintenance
