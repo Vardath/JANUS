@@ -64,18 +64,18 @@ FANO_LINES = (
 HEMISPHERE_ROLES = {
     "left_hemisphere": {
         "meaning": "logic / discrimination / constraint",
-        "purpose": "run its own complete JANUS processor while constraining the whole society into explicit, sequential, causal and consistency-focused interpretations",
+        "purpose": "receive all seven subconscious projections, run its own complete JANUS processor, and constrain the whole society into explicit, sequential, causal and consistency-focused interpretations",
     },
     "right_hemisphere": {
         "meaning": "imagination / association / expansion",
-        "purpose": "run its own complete JANUS processor while expanding the whole society through contextual, gestalt, relational, alternative and generative interpretations",
+        "purpose": "receive all seven subconscious projections, run its own complete JANUS processor, and expand the whole society through contextual, gestalt, relational, alternative and generative interpretations",
     },
 }
 
 FRONT_CORE = "front"
 INTERFACE_CORE = "interface"
 CORE_NAMES = (*SPECIALIST_ROLES.keys(), *HEMISPHERE_ROLES.keys(), FRONT_CORE, INTERFACE_CORE)
-ARCHITECTURE = "recursive 1-3-7: 11 top-level cores, each containing a complete seven-position JANUS/Fano processor"
+ARCHITECTURE = "1-3-7: recursive society with 11 top-level cores, each containing a complete seven-position JANUS/Fano processor"
 MECHANICAL_FLOW = "7 -> 2 -> 1 -> 1"
 
 
