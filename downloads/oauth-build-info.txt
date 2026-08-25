@@ -1,0 +1,6 @@
+JANUS Android authoritative native build identity
+Version: 1.11
+Package: com.vardath.janus
+Source commit: 9dfd128ec46638ec5fa92b4c6a7d29ea03792fa6
+UI: v1.11 app-local colour themes + human-readable telemetry/log presentation; Android system chrome remains device-owned
+Architecture migration: conceptual 1-3-7; mechanical 7 subconscious -> 2 hemispheres -> Front -> Interface
