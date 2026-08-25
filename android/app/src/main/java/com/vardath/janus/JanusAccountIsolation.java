@@ -32,7 +32,9 @@ final class JanusAccountIsolation {
         boolean switched = !previous.isBlank() && !clean.isBlank() && !previous.equals(clean);
         if (switched) {
             resetAccountBoundState(app);
-            JanusLocalCoreRuntime.get(app).start();
+            JanusLocalCoreRuntime runtime = JanusLocalCoreRuntime.get(app);
+            runtime.start();
+            JanusRecursiveCoreEngine.get(app).start(runtime);
         }
         if (!clean.isBlank()) binding.edit().putString(BINDING_KEY, clean).apply();
     }
@@ -44,6 +46,7 @@ final class JanusAccountIsolation {
     }
 
     private static void resetAccountBoundState(Context app) {
+        JanusRecursiveCoreEngine.clearAccountBoundState(app);
         stopAndDetachLocalRuntime();
         SharedPreferences prefs = app.getSharedPreferences(JanusApiClient.PREFS, Context.MODE_PRIVATE);
         Map<String, Object> keep = new LinkedHashMap<>();
