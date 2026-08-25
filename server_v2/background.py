@@ -60,8 +60,6 @@ class BackgroundCoordinator:
         for a in accounts:
             aid = int(a["id"])
             governance.ensure_account(aid)
-            # Changed retained material is reconsidered by all eleven recursive cores.
-            # Each changed wake may also form zero-cost per-core curiosity intentions.
             recursive_tick(mind, aid)
             state = storage.one("SELECT * FROM v2_background_state WHERE account_id=?", (aid,))
             if not state:
@@ -190,9 +188,6 @@ class BackgroundCoordinator:
             max(0.0, float(os.getenv("JANUS_AUTONOMOUS_RESEARCH_TARGET_USD", "10"))),
         )
         start, end, days = self._month_window(now)
-        # The authoritative cost ledger is shared with foreground research. Count calls
-        # rather than trusting older per-call estimates, then apply the configured search
-        # planning cost. governance.permit() independently enforces the same hard ceiling.
         rows = storage.rows(
             "SELECT scope,calls FROM v2_cost_ledger WHERE account_id=? AND allowed=1 AND created_at>=? AND created_at<? AND scope IN ('background_research','foreground_web')",
             (aid, start, end),
@@ -223,24 +218,30 @@ class BackgroundCoordinator:
         )
         roll = random.random()
 
-        # Most autonomous observation is driven by what one of the cores actually noticed.
-        if intents and roll < 0.60:
+        if intents and roll < 0.55:
             chosen = random.choice(intents[:44])
             return (
                 "autonomous_core_intent",
                 "Obtain one credible new outside observation, source, current development, counterexample, video/transcript lead, or piece of evidence that could help this JANUS core evaluate its material. "
                 f"Requesting core={chosen['core_name']}. {str(chosen['detail'])[:900]}",
             )
-        if open_item and roll < 0.78:
+        if open_item and roll < 0.72:
             return (
                 "autonomous_relevant",
-                f"Find one useful current development, source, counterexample, video/transcript lead or piece of evidence relevant to: {open_item['title']} {str(open_item['detail'])[:500]}",
+                f"Find one useful current development, source, counterexample or piece of evidence relevant to: {open_item['title']} {str(open_item['detail'])[:500]}",
             )
-        if mem and roll < 0.92:
+        if mem and roll < 0.86:
             return (
                 "autonomous_adjacent",
-                "Explore one useful but not necessarily obvious adjacent idea, field, source, video, pattern or development connected to: "
+                "Explore one useful but not necessarily obvious adjacent idea, field, source, pattern or development connected to: "
                 + str(mem["content"])[:650],
+            )
+        if roll < 0.94:
+            seed = str(mem["content"])[:400] if mem else "a potentially useful topic outside the current conversation"
+            return (
+                "autonomous_youtube",
+                "Search specifically for a credible YouTube/video source or transcript lead that could expose JANUS to a useful explanation, demonstration, lecture, documentary, interview, experiment or opposing viewpoint. Prefer substantive sources over clickbait. Topic may be relevant or adjacent: "
+                + seed,
             )
         seed = str(mem["content"])[:300] if mem else (
             "science, history, technology, culture, nature, mathematics or human knowledge"
@@ -254,8 +255,6 @@ class BackgroundCoordinator:
     def _curiosity(self, aid: int, now: int, state):
         if os.getenv("JANUS_CURIOSITY_WEB", "1") != "1":
             return
-        # Wake/review can occur every few minutes; expensive outside observation is
-        # separately paced around the autonomous half of the monthly budget.
         min_gap = max(600, int(os.getenv("JANUS_CURIOSITY_MIN_GAP_SECONDS", "1200")))
         if now - int(state["last_research_at"] or 0) < min_gap:
             return
@@ -264,8 +263,6 @@ class BackgroundCoordinator:
             return
         if auto_spend + self.SEARCH_ESTIMATE_USD > target:
             return
-        # Usually remain near the $10/month trajectory. A small stochastic allowance
-        # makes observation irregular rather than clockwork and permits occasional wandering.
         if auto_spend + self.SEARCH_ESTIMATE_USD > paced and random.random() > 0.08:
             return
         if not governance.permit(aid, "background_research", self.SEARCH_ESTIMATE_USD):
@@ -301,13 +298,11 @@ class BackgroundCoordinator:
             text,
             salience=0.55,
             uncertainty=0.5,
-            novelty=0.7 if mode == "autonomous_random" else 0.55,
+            novelty=0.75 if mode in {"autonomous_random", "autonomous_youtube"} else 0.55,
             metadata=metadata,
             mode="background",
         )
 
-        # Store the finding at the lowest durable rung. Existing consolidation and
-        # retrieval rules decide whether repeated/useful material earns promotion.
         memory_text = (
             f"Autonomous research ({mode.removeprefix('autonomous_')}): {text[:1400]}"
             + (" Sources: " + " | ".join(source_labels[:4]) if source_labels else "")
