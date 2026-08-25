@@ -1,0 +1,54 @@
+name: Test JANUS Android Theme and Human Logs
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/test-android-theme-human-logs.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/test-android-theme-human-logs.yml'
+jobs:
+  theme-human-logs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify app-local theming and human-readable telemetry contracts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BASE=android/app/src/main/java/com/vardath/janus
+          MAIN="$BASE/MainActivity.java"; THEME="$BASE/JanusTheme.java"; HUMAN="$BASE/JanusHumanText.java"; STREAM="$BASE/JanusStreamScreen.java"
+          test -s "$THEME"; test -s "$HUMAN"; test -s "$STREAM"
+          grep -q 'versionCode 111' android/app/build.gradle
+          grep -q "versionName '1.11'" android/app/build.gradle
+          grep -q 'putString("theme_mode",mode)' "$MAIN"
+          grep -q 'putString("accent",accent)' "$MAIN"
+          grep -q 'JanusTheme.applyAccentButton(this, b)' "$MAIN"
+          grep -q 'JanusTheme.applyRoot(this,v)' "$MAIN"
+          grep -q 'JanusTheme.applyCard(this,l)' "$MAIN"
+          grep -q 'JanusTheme.applyButton(this,b)' "$MAIN"
+          grep -q 'JanusTheme.applyCard(a, x)' "$STREAM"
+          grep -q 'JanusTheme.applyText(a, v, muted)' "$STREAM"
+          grep -q 'JanusHumanText.summarize' "$STREAM"
+          grep -q 'JanusHumanText.summarize(out)' "$MAIN"
+          grep -q 'JanusHumanText.memoryTitle(rawMemory)' "$MAIN"
+          grep -q 'showPage("Observe")' "$MAIN"
+          ! grep -q '0x181C8CFF' "$STREAM"
+          ! grep -q 'setStatusBarColor\|setNavigationBarColor\|SYSTEM_UI_FLAG' "$THEME"
+          ! grep -q 'OnGlobalLayoutListener\|getViewTreeObserver' "$THEME"
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v5
+        with: { gradle-version: '8.11.1' }
+      - name: Ensure debug signing key exists
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"; fi
+      - name: Compile and assemble themed Android
+        working-directory: android
+        env: { JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}' }
+        run: gradle --no-daemon :app:compileDebugJavaWithJavac :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
