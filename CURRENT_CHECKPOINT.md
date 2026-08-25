@@ -2,6 +2,8 @@
 
 **Current authoritative continuation:** `JANUS_CONSCIOUS_STREAM_MEMORY_CYCLE_CHECKPOINT_20260825.md`
 
+**Current Android continuation:** `JANUS_ANDROID_V110_UI_REBUILD_CHECKPOINT_20260825.md`
+
 **Current project status:** `JANUS_PROJECT_STATUS_20260825.md`
 
 **Mandatory maintenance runbook:** `MAINTENANCE_PROCESS.md`
@@ -36,6 +38,8 @@ Do not restore the first prototype's unconditional peer rebroadcast behavior. Cu
 
 A dedicated native Android **Stream** surface and server `/desktop/stream-observe` endpoint expose bounded externalizable Front activity/state only. They may show Fano orientation, cycle/revision/peer/quiescence counters, integrated summaries, rousing and Front events. Never expose hidden chain-of-thought.
 
+The former Android Stream activation layer used delayed view-tree searching and private-field reflection. v1.09 disabled that injection path during crash isolation. The replacement `JanusStreamScreen` is now an explicit screen-owned renderer with dependencies supplied by its host; it does not search or rewrite the live view tree and does not use reflection. It still needs direct native navigation integration before the Stream migration is complete.
+
 ## Maintenance request persistence
 
 JANUS-generated maintenance/capability observations must be preserved rather than regenerated over one another.
@@ -64,13 +68,22 @@ Current maintenance hardening adds the append-only persistent request ledger, au
 
 ### Android UI stability checkpoint — 2026-08-25
 
-The real-device crash affecting several detail screens persisted after the earlier navigation/surface reset changes. Investigation identified a plausible shared risk: multiple independent Android `OnGlobalLayoutListener`/UI-polish layers were walking and sometimes modifying the same live view hierarchy while detail screens were being laid out.
+The real-device crash affecting several detail screens persisted after earlier navigation/surface-reset changes. Investigation identified a plausible shared risk: multiple independent Android `OnGlobalLayoutListener`/UI-polish layers were walking and sometimes modifying the same live view hierarchy while detail screens were being laid out.
 
-A stability-first v1.09 build was therefore produced that disables the competing cosmetic/runtime view-tree injection layers while preserving the native screen implementations, system chrome, Back handling, crash diagnostics and governed maintenance handoff. The authoritative Java compile and APK build passed and the APK was published. This build is intentionally plainer and exists primarily to isolate the crash source.
+A stability-first v1.09 build therefore disabled competing cosmetic/runtime view-tree injection layers while preserving native screens, Android Back handling, crash diagnostics and governed maintenance handoff. The authoritative Java compile and APK build passed. This build was intentionally plainer and existed primarily to isolate the crash source.
 
-Important newly observed real-device bug: the current colour/theme controls are affecting the **Android phone/system theme/chrome rather than JANUS app-only colours**. This is incorrect behavior and must be fixed before further visual polish.
+### Android v1.10 app-only theme isolation — completed
 
-The menus are now usable enough to continue development from within the app.
+The theme bug exposed by real-device testing has now been fixed in PR #45, merge `edb3f1f5b00153da0f572cff54057fb16f37c058`.
+
+- JANUS `theme_mode` and `accent` remain application-owned appearance settings.
+- They no longer recolour Android status/navigation bars.
+- `JanusSystemChrome` follows only the device's own light/dark configuration for system-bar icon contrast.
+- The authoritative APK build, UI-hardening, RC-readiness, auth, protocol, recursive-core and maintenance gates passed on the PR head before merge.
+
+Two older Android gates remain useful signals rather than reasons to restore unsafe behavior: Stream and localization still expected runtime injection layers that v1.09 deliberately stopped installing. Those surfaces must be migrated to explicit screen/component ownership.
+
+The new `JanusStreamScreen` begins that migration and is recorded in `JANUS_ANDROID_V110_UI_REBUILD_CHECKPOINT_20260825.md`.
 
 ## Active release scope
 
@@ -78,19 +91,20 @@ Android remains the active release target. Windows and iOS remain deferred.
 
 ## Next engineering task
 
-**Next session starts with Android UI rebuild and the newly exposed theme bug.**
+**Continue the Android UI rebuild from explicit ownership, not from the old polish/injection stack.**
 
 Priority order:
 
-1. Fix colour/theme settings so they modify JANUS app appearance only and never alter the host Android phone theme/system appearance.
-2. Rework the Android UI for readability, clarity and simpler navigation.
-3. Move JANUS interaction surfaces away from native Android control styling/layout assumptions wherever practical so JANUS controls and Android/system controls can coexist safely.
-4. Ensure both sets of controls/buttons remain usable with no JANUS element hidden behind, overlapped by, or confused with system/native Android buttons.
-5. Replace fragile runtime view-tree decoration/injection patterns with explicit screen-owned layouts and deterministic rendering.
-6. Preserve safe areas, predictive/system Back behavior, accessibility, system chrome compatibility and existing functional menus while doing the rebuild.
-7. Re-test Cores, Memory, Settings, Stream, Messages, Observe and Options on the real Samsung device after each major UI step.
-8. If any detail screen still closes in the stability path, expose the stored `JanusClientDiagnostics` crash report directly in-app with copy/share support and fix from the exact stack trace rather than further speculative UI changes.
+1. Wire `JanusStreamScreen` into first-class native navigation/page routing without reflection, delayed attachment or live view-tree search.
+2. Move localization from the disabled global UI-localization injector into deterministic screen/component ownership while preserving the translation catalogue and English fallback.
+3. Replace hard-coded visible build labels such as `Options · v1.09 (109)` with `BuildConfig` or one authoritative version helper.
+4. Rework the Android UI for readability, clarity and simpler navigation.
+5. Move JANUS interaction surfaces away from fragile native-control styling/layout assumptions wherever practical so JANUS controls and Android/system controls can coexist safely.
+6. Ensure no JANUS element is hidden behind, overlapped by or confused with system navigation/buttons, predictive-back affordances, status/navigation bars, keyboards or accessibility overlays.
+7. Preserve safe areas, predictive/system Back behavior, accessibility, Chat history, Messages, Observe, diagnostics, maintenance governance and existing functional menus.
+8. Re-test Cores, Memory, Settings, Stream, Messages, Observe and Options on the real Samsung device after each major UI step.
+9. If any detail screen still closes, expose the stored `JanusClientDiagnostics` crash report directly in-app with copy/share support and fix from the exact stack trace rather than further speculative UI changes.
 
-The earlier broader **Diagnostic System v2 — behavioral proof phase** remains required after the Android UI is stable. It must still prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count, and append-only maintenance behavior.
+The broader **Diagnostic System v2 — behavioral proof phase** remains required after the Android UI is stable. It must still prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count and append-only maintenance behavior.
 
-Do not resume cosmetic polishing on top of the current global-layout injection stack. The next UI pass should simplify ownership and rendering first.
+Do not resume cosmetic polishing on top of the former global-layout injection stack. Screen ownership and deterministic rendering are now the UI baseline.
