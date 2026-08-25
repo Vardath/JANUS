@@ -7,7 +7,7 @@ It supersedes the old stopping-state language at the end of `JANUS_137_SENSORY_I
 
 Windows and iOS work is intentionally deferred until the Android version is ready for release and its setup/release process is understood end-to-end.
 
-PR #52 adds the continuing-input/autonomous-observation layer. Its validated implementation head passed clean server-v2, recursive-core, conscious-stream, maintenance, diagnostic and Android APK build gates before merge. Live deployment and unattended runtime behavior must still be verified separately after merge.
+PR #52 adds the continuing-input/autonomous-observation layer. Its implementation includes per-core zero-cost curiosity intentions, governed outside research, recursive sensory re-entry, trace-memory provenance and the shared monthly research governor. Live deployment and unattended runtime behavior must still be verified separately after merge.
 
 ## Current product state
 Android currently has:
@@ -83,7 +83,7 @@ The diagnostic engine/report should separate at least:
    - files/documents;
    - images/vision;
    - web/research;
-   - autonomous web observations through the full sensory route;
+   - autonomous web observations through the recursive full-society sensory route;
    - YouTube/video-oriented discovery through governed research;
    - audio attachment understanding;
    - push-to-talk recognition availability/permission state;
@@ -164,7 +164,7 @@ Do not expose private hidden chain-of-thought. Show only bounded externalizable 
 2. Introduce PASS/WARN/FAIL/UNVERIFIED/NOT-APPLICABLE result schema.
 3. Add category summaries and an overall health posture.
 4. Add evidence/timestamp/source fields.
-5. Add continuing-input checks for curiosity intentions, sensory integration and monthly budget accounting.
+5. Add continuing-input checks for curiosity intentions, recursive sensory integration and monthly budget accounting.
 6. Build dedicated native full-diagnostic screen.
 7. Make Chat diagnostic response concise with a `View full diagnostic` action.
 8. Preserve Copy/Share-to-Supervisor handoff.
