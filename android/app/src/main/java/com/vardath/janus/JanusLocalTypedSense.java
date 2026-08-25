@@ -22,7 +22,8 @@ final class JanusLocalTypedSense {
         String detail = clean(content, 1800);
         if (type.isEmpty() || detail.isEmpty()) return false;
         try {
-            JanusLocalCoreRuntime runtime = JanusLocalCoreRuntime.get(context.getApplicationContext());
+            Context app = context.getApplicationContext();
+            JanusLocalCoreRuntime runtime = JanusLocalCoreRuntime.get(app);
             Method broadcast = JanusLocalCoreRuntime.class.getDeclaredMethod(
                     "broadcastSense", String.class, String.class, String.class);
             Method service = JanusLocalCoreRuntime.class.getDeclaredMethod("serviceBurst", boolean.class);
@@ -35,6 +36,9 @@ final class JanusLocalTypedSense {
                 service.invoke(runtime, true);
                 persist.invoke(runtime);
             }
+            // The same sense also reaches the complete JANUS/Fano processor living
+            // inside every top-level local core. This nested pass is deterministic.
+            JanusRecursiveCoreEngine.get(app).sense(type, origin.isEmpty() ? "capability" : origin, detail);
             return true;
         } catch (Exception ignored) {
             // Fail closed: never relabel a capability event as user text or peer state.
