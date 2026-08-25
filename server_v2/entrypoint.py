@@ -43,6 +43,7 @@ from .advanced import router as advanced_router  # noqa: E402
 from .architecture_api import router as architecture_router  # noqa: E402
 from .background import background  # noqa: E402
 from .chat import router as chat_router  # noqa: E402
+from .chat_error_guard import install as install_chat_error_guard  # noqa: E402
 from .desktop import router as desktop_router  # noqa: E402
 from .identity_api import router as identity_router  # noqa: E402
 from .images import router as image_router  # noqa: E402
@@ -74,6 +75,7 @@ app.include_router(image_router)
 app.include_router(maintenance_router)
 app.include_router(identity_router)
 app.include_router(advanced_router)
+install_chat_error_guard(app)
 app.add_event_handler("startup", background.start)
 app.add_event_handler("startup", runtime_persistence.start)
 app.add_event_handler("startup", recursive_mind.start)
