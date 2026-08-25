@@ -21,7 +21,7 @@ public final class JanusThoughtBridge {
             // Ordinary foreground Chat always receives a bounded snapshot from the
             // complete JANUS/Fano processor living inside each of the eleven local
             // top-level cores. This is externalizable state, never private CoT.
-            JSONObject recursive = JanusRecursiveCoreEngine.getFromRuntime(runtime).foreground(userMessage);
+            JSONObject recursive = JanusRecursiveCoreBridge.foreground(runtime, userMessage);
             String recursiveContext = "\n\n" + RECURSIVE_START + "\n"
                     + clip(recursive.toString(), 24000) + "\n" + RECURSIVE_END;
 
