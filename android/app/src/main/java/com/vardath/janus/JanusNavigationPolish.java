@@ -61,7 +61,7 @@ public final class JanusNavigationPolish {
     }
 
     private static String selectedTopPage(View root) {
-        for (String page : new String[]{"Chat", "Messages", "Observe", "Options"}) {
+        for (String page : new String[]{"Chat", "Messages", "Observe", "Stream", "Options"}) {
             Button b = findButton(root, page);
             if (b != null && b.getAlpha() > .9f) return page;
         }
