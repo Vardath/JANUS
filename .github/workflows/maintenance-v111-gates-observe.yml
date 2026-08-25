@@ -1,0 +1,41 @@
+name: Maintenance v1.11 gates and Observe theme
+on:
+  push:
+    branches: [android-v111-theme-human-logs]
+    paths: ['.github/workflows/maintenance-v111-gates-observe.yml']
+permissions:
+  contents: write
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: android-v111-theme-human-logs
+      - name: Update v1.11 gates and Observe palette
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          # Keep release gates aligned with the new device build identity.
+          for p in Path('.github/workflows').glob('*.yml'):
+              if p.name.startswith('maintenance-v111-gates-observe'): continue
+              s=p.read_text(encoding='utf-8')
+              n=s.replace("versionName '1.10'", "versionName '1.11'").replace('versionCode 110', 'versionCode 111')
+              if n != s: p.write_text(n, encoding='utf-8')
+
+          p=Path('android/app/src/main/java/com/vardath/janus/JanusObserveScreen.java')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('private static LinearLayout vertical(Activity a){LinearLayout x=new LinearLayout(a);x.setOrientation(LinearLayout.VERTICAL);return x;}', 'private static LinearLayout vertical(Activity a){LinearLayout x=new LinearLayout(a);x.setOrientation(LinearLayout.VERTICAL);JanusTheme.applyRoot(a,x);return x;}')
+          s=s.replace('x.setBackgroundColor(0x181C8CFF);return x;', 'JanusTheme.applyCard(a,x);return x;')
+          s=s.replace('v.setTextColor(0xffe8eef7);if(bold)', 'JanusTheme.applyText(a,v,false);if(bold)')
+          s=s.replace('b.setGravity(Gravity.CENTER);return b;', 'b.setGravity(Gravity.CENTER);JanusTheme.applyButton(a,b);return b;')
+          s=s.replace('card.addView(text(a,x.optString("detail",x.optString("summary","")),15,false));', 'card.addView(text(a,JanusHumanText.summarize(x.optString("detail",x.optString("summary",""))),15,false));')
+          p.write_text(s,encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/maintenance-v111-gates-observe.yml
+          git add .github/workflows android/app/src/main/java/com/vardath/janus/JanusObserveScreen.java
+          git commit -m "Align v1.11 gates and theme Observe telemetry [skip ci]"
+          git push origin HEAD:android-v111-theme-human-logs
