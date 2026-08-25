@@ -11,9 +11,9 @@ import androidx.core.view.WindowInsetsControllerCompat;
 /**
  * Keeps Android-owned system chrome independent from JANUS appearance settings.
  *
- * JANUS theme_mode/accent preferences are intentionally app-view-only. They must
- * never recolour or otherwise track the host Android status/navigation bars.
- * This class only keeps system-bar icon contrast aligned with the device's own
+ * JANUS appearance preferences are intentionally app-view-only. They must never
+ * recolour or otherwise track the host Android status/navigation bars. This
+ * class only keeps system-bar icon contrast aligned with the device's own
  * current light/dark configuration.
  */
 public final class JanusSystemChrome {
