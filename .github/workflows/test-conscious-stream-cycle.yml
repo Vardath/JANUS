@@ -28,7 +28,8 @@ jobs:
           grep -q 'foreground_rouse' server_v2/conscious_mind.py
           grep -q 'memory_maintenance.maintain' server_v2/conscious_mind.py
           grep -q 'quiescent_count' server_v2/recursive_core.py
-          grep -q 'changed == 0' server_v2/recursive_background.py
+          grep -q '_background_fingerprints' server_v2/recursive_background.py
+          grep -q 'fingerprints.get(aid) == fp' server_v2/recursive_background.py
           grep -q 'recalled interaction memory' server_v2/recursive_background.py
           grep -q '/desktop/stream-observe' server_v2/stream_api.py
           python -m py_compile server_v2/conscious_mind.py server_v2/memory_maintenance.py server_v2/recursive_core.py server_v2/recursive_background.py server_v2/stream_api.py server_v2/entrypoint.py
