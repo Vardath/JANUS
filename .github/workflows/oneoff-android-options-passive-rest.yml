@@ -1,0 +1,107 @@
+name: One-off Android options/passive-rest recovery
+on:
+  push:
+    branches: ['fix/android-options-passive-rest']
+permissions:
+  contents: write
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Patch Android option navigation, Front naming and passive rest
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('android/app/src/main/java/com/vardath/janus/MainActivity.java')
+          text = main_path.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  '    private static final String[] CORE_NAMES = new String[]{\n            "evidence", "logic", "counterpoint", "context", "memory", "safety", "novelty",\n            "left_hemisphere", "right_hemisphere", "consensus", "interface"\n    };',
+                  '    private static final String[] CORE_NAMES = new String[]{\n            "evidence", "safety", "counterpoint", "context", "logic", "novelty", "memory",\n            "left_hemisphere", "right_hemisphere", "front", "interface"\n    };'
+              ),
+              (
+                  'option(list, "Cores", "11 live cores: 7 specialists → 2 hemispheres → Consensus → Interface", this::showCores);',
+                  'option(list, "Cores", "11 live cores: 7 specialists → 2 hemispheres → Front → Interface", this::showCores);'
+              ),
+              (
+                  '    private void option(LinearLayout list, String title, String subtitle, Runnable action) { Button b = button(title + "\\n" + subtitle); b.setGravity(Gravity.START | Gravity.CENTER_VERTICAL); b.setOnClickListener(v -> action.run()); list.addView(b, full()); }',
+                  '    private void option(LinearLayout list, String title, String subtitle, Runnable action) { Button b = button(title + "\\n" + subtitle); b.setGravity(Gravity.START | Gravity.CENTER_VERTICAL); b.setOnClickListener(v -> { b.setEnabled(false); main.post(() -> { try { action.run(); } catch (Throwable failure) { showOptionFailure(title, failure); } }); }); list.addView(b, full()); }\n    private void showOptionFailure(String title, Throwable failure) { try { content.removeAllViews(); Button back = button("← Options"); back.setOnClickListener(v -> showPage("Options")); content.addView(back, full()); content.addView(text(title, 28, true), full()); content.addView(text("This screen could not be opened safely. JANUS kept the app running instead of closing.\\n\\n" + failure.getClass().getSimpleName() + (failure.getMessage() == null ? "" : ": " + clip(failure.getMessage(), 500)), 14, false), full()); } catch (Throwable ignored) { toast("That JANUS screen could not be opened safely."); } }'
+              ),
+              (
+                  'Switch bg=new Switch(this);bg.setText("Background/sleep core cycles");',
+                  'Switch bg=new Switch(this);bg.setText("Background wake cycles");'
+              ),
+              (
+                  'runtime.addView(text("Deterministic local cycles use zero model/API calls. Paid background language reflection remains disabled by default. Settings here are device-local and cannot overwrite protected server identity/core state.",12,false));',
+                  'runtime.addView(text("Deterministic local cognition runs only during wake and uses zero model/API calls. Rest is passive: state stays loaded and foreground input remains immediately responsive, while scheduled autonomous thought is suspended. Settings here are device-local and cannot overwrite protected server identity/core state.",12,false));'
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'MainActivity replacement expected once, found {count}: {old[:100]}')
+              text = text.replace(old, new)
+          main_path.write_text(text, encoding='utf-8')
+
+          core_path = Path('android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java')
+          core = core_path.read_text(encoding='utf-8')
+          replacements = [
+              (
+                  '            x.put("processing_mode", "interface".equals(c.name) ? "continuous" : ("wake".equals(phase) ? "full-rate" : "low-duty"));',
+                  '            x.put("processing_mode", "wake".equals(phase) ? "full-rate" : "passive-rest");'
+              ),
+              (
+                  '            record("interface", "", "phase", "Local JANUS entered low-duty mode; all cores remain available for foreground sensing.", "");',
+                  '            record("interface", "", "phase", "Local JANUS entered passive rest; scheduled cognition is suspended while all cores remain available for foreground sensing.", "");'
+              ),
+              (
+                  '        if (!cores.get("interface").inbox.isEmpty()) cycle("interface");\n        if (prefs.getBoolean("background_cycles_enabled", true)) {\n            if ("wake".equals(phase) || now - lastBackgroundAt >= backgroundIntervalMs()) {\n                serviceBurst(false);\n                lastBackgroundAt = now;\n                if ("sleep".equals(phase)) record("interface", "", "maintenance", "Low-duty local maintenance pass completed with zero model/API calls.", "");\n            }\n            if (now - lastAutonomousAt >= Math.max(60_000L, backgroundIntervalMs())) {\n                autonomousPulse();\n                lastAutonomousAt = now;\n            }\n        }',
+                  '        if (prefs.getBoolean("background_cycles_enabled", true) && "wake".equals(phase)) {\n            if (now - lastBackgroundAt >= backgroundIntervalMs()) {\n                serviceBurst(false);\n                lastBackgroundAt = now;\n            }\n            if (now - lastAutonomousAt >= Math.max(60_000L, backgroundIntervalMs())) {\n                autonomousPulse();\n                lastAutonomousAt = now;\n            }\n        }'
+              ),
+              (
+                  '        remember("user: " + clean);\n        record("interface", "", "user_topic", "Local JANUS sensed the current user topic: " + clip(clean, 600), clean);',
+                  '        remember("user: " + clean);\n        if ("sleep".equals(phase)) record("interface", "", "foreground_rouse", "Foreground user input roused local JANUS from passive rest for this interaction.", clean);\n        record("interface", "", "user_topic", "Local JANUS sensed the current user topic: " + clip(clean, 600), clean);'
+              ),
+          ]
+          for old, new in replacements:
+              count = core.count(old)
+              if count != 1:
+                  raise SystemExit(f'JanusLocalCoreRuntime replacement expected once, found {count}: {old[:100]}')
+              core = core.replace(old, new)
+          core_path.write_text(core, encoding='utf-8')
+
+          # One-off workflow removes itself before the resulting patch commit.
+          Path('.github/workflows/oneoff-android-options-passive-rest.yml').unlink()
+          PY
+
+          grep -q '"front", "interface"' android/app/src/main/java/com/vardath/janus/MainActivity.java
+          grep -q 'main.post(() -> { try { action.run(); } catch (Throwable failure)' android/app/src/main/java/com/vardath/janus/MainActivity.java
+          grep -q 'passive-rest' android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
+          ! grep -q 'Low-duty local maintenance pass completed' android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v5
+        with: { gradle-version: '8.11.1' }
+      - name: Compile Android client
+        working-directory: android
+        env:
+          JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}'
+        run: gradle --no-daemon :app:compileDebugJavaWithJavac --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
+      - name: Assemble debug APK
+        working-directory: android
+        env:
+          JANUS_GOOGLE_WEB_CLIENT_ID: '${{ secrets.JANUS_GOOGLE_WEB_CLIENT_ID }}'
+        run: gradle --no-daemon :app:assembleDebug --stacktrace -PJANUS_GOOGLE_WEB_CLIENT_ID="$JANUS_GOOGLE_WEB_CLIENT_ID"
+      - name: Commit verified recovery patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/src/main/java/com/vardath/janus/MainActivity.java android/app/src/main/java/com/vardath/janus/JanusLocalCoreRuntime.java .github/workflows/oneoff-android-options-passive-rest.yml
+          git commit -m "Fix Android option crashes and enforce passive rest"
+          git push origin HEAD:fix/android-options-passive-rest
