@@ -1,12 +1,12 @@
 # JANUS Android UI Improvement Progress
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 
 ## Authoritative baseline
 - Native `android/` client only; no WebView/generated HTML/patch-composer product path.
 - Production server: `server_v2/`.
-- Runtime topology: 7 specialists -> 2 hemispheres -> Consensus -> Interface.
-- Preserve forward-only routing, feedback-only federation, stable Observe snapshots, zero-API deterministic local cycles, authenticated account ownership, and owner-gated maintenance.
+- Runtime topology: 7 specialists -> 2 hemispheres -> Front/stream -> Interface.
+- Preserve forward-only outward routing, feedback-only federation, stable Observe/Stream snapshots, zero-API deterministic local cycles, authenticated account ownership, and owner-gated maintenance.
 - JANUS may diagnose/report its own externalizable failures, but may not approve maintenance, edit source, install packages, change model/API configuration, or deploy itself.
 
 ## Verified published passes
@@ -22,6 +22,19 @@ Updated: 2026-08-24
 - v1.05: Android system Back navigation adapter + hidden device background-activity bridge introduced; published APK verified, but Back still failed on the real Samsung device because predictive-back callback enablement was not explicit.
 - v1.06: natural background-thought questions now surface real persisted local processing; seven persistent Fano directions became active computational attention orientations; published APK verified and Chat behavior validated on-device.
 - v1.07: theme-aware system chrome, explicit predictive-Back enablement and hardware-safe Runtime Cores renderer; published APK verified pending wider real-device validation.
+- v1.08: governed self-diagnosis, retained server-side Chat history from v1.08 onward, client crash replay, owner-controlled Supervisor handoff and maintenance decision return path.
+- v1.09 stability pass: detail-screen crashes persisted after surface reset/navigation changes. Investigation identified multiple independent global-layout polish/injection layers as a plausible shared source. A stability-first build disabled competing cosmetic/runtime view-tree injection while preserving native screens, system chrome, Back handling, crash diagnostics and governed maintenance handoff. Authoritative Java compile and APK assembly passed and the build was published.
+
+## Real-device findings after v1.09
+
+### Detail-screen stability
+The exact original shared crash mechanism is not yet proven. v1.09 deliberately removes fragile decoration layers so future diagnosis can distinguish native screen faults from presentation-stack faults. If a detail screen still closes, use the retained `JanusClientDiagnostics` exception report and expose it in-app before making another speculative structural fix.
+
+### Theme / colour bug
+The current JANUS colour/theme controls are affecting the **Android phone/system theme or system chrome rather than JANUS app-only colours**. This is incorrect. Theme settings must be scoped to JANUS-owned views/resources only. They must not change the user's device theme, global Android appearance, or other apps.
+
+### Navigation usability
+The current menu set is usable enough to continue. This gives a stable starting point for a deliberate UI rebuild instead of continuing incremental cosmetic patches.
 
 ## v1.08 — governed self-diagnosis and ChatGPT Supervisor maintenance loop
 ### Requested behavior
@@ -42,7 +55,7 @@ JANUS diagnoses and requests; it does not authorize or execute maintenance. `aut
 
 ### Android implementation
 - `JanusClientDiagnostics` installs a bounded uncaught-exception capture. An Android crash is stored locally as exception type/message + short stack trace and submitted to the governed diagnostic endpoint on the next authenticated resume. If submission fails it stays queued; reporting failure cannot recursively crash-report itself.
-- `JanusApiClient` now always sends `user_visible_message` before optional hidden device-thought augmentation so Supervisor history never misattributes hidden context to the user.
+- `JanusApiClient` always sends `user_visible_message` before optional hidden device-thought augmentation so Supervisor history never misattributes hidden context to the user.
 - `JanusMaintenanceSupervisorPolish` adds owner-controlled `Copy handoff` and `Share to ChatGPT` actions to Maintenance Review. Nothing is transmitted automatically.
 - Existing Messages UI naturally receives `capability_request` and later `supervisor_decision` messages through the established server message channel.
 
@@ -55,20 +68,18 @@ JANUS diagnoses and requests; it does not authorize or execute maintenance. `aut
 ### History limitation
 The server cannot reconstruct Chat text that was never stored before v1.08. The handoff is complete for server-retained history from v1.08 deployment onward; older local Android history remains local unless separately supplied/exported. The handoff packet says this explicitly instead of claiming false completeness.
 
-## v1.08 release rule
-Do not merge until:
-1. self-diagnosis/decision-ledger/server Python syntax and governance gate passes;
-2. Android visible-message preservation, crash replay and Supervisor copy/share gate passes;
-3. v1.07 system chrome/Back/CoreMap regression remains green;
-4. v1.06 thought/Fano regression remains green;
-5. v1.04 Chat performance regression remains green;
-6. maintenance/auth/protocol/UI hardening checks remain green;
-7. authoritative Java compilation and APK assembly succeed;
-8. after merge, verify `apk-download` records `Publish JANUS Android native v1.08`.
+## Next Android UI session
 
-## Required v1.08 validation
-- Ask JANUS for something that truly cannot be completed/configured and confirm a capability-request Message appears without JANUS claiming it fixed itself.
-- Open Maintenance Review and confirm Copy/Share Supervisor handoff is present and explicitly owner-controlled.
-- Confirm the packet contains the request list, repo-review command and all chat retained since v1.08.
-- After a future ChatGPT maintenance review/deployment, confirm Messages shows APPROVED/DISAPPROVED/DEFERRED outcomes plus implementation state/version.
-- Reconfirm v1.07 Back/theme/Cores behavior, v1.06 between-message thought reporting and v1.04 typing responsiveness.
+The next pass is a rebuild/simplification pass, not another layer of runtime polish.
+
+1. Fix the app-theme scope bug first: JANUS colour settings must style JANUS only.
+2. Redesign for cleaner reading, simpler hierarchy and easier navigation.
+3. Reduce dependence on native Android button/control styling and fragile assumptions about system control geometry.
+4. Keep JANUS controls and Android/system controls visually and spatially separate so both remain safe to use.
+5. Nothing important may sit behind, overlap, or be obscured by system navigation/buttons, predictive-back affordances, status/navigation bars, keyboards, accessibility overlays, or JANUS's own persistent controls.
+6. Prefer explicit screen-owned layouts/components over global view-tree scanning, rewriting or injection.
+7. Preserve safe-area handling, predictive/system Back behavior, accessibility, existing functional menus, Chat history, diagnostics, Messages, Stream/Observe and maintenance governance.
+8. Real-device test Cores, Memory, Settings, Stream, Messages, Observe and Options after each major layout milestone.
+9. If crashes remain, surface the exact stored crash report in-app with copy/share and fix from the stack trace.
+
+Do not restore the old global-layout cosmetic stack merely to regain visual polish. Clean ownership and deterministic rendering are the new UI baseline.
