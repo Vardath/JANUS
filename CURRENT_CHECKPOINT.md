@@ -2,7 +2,7 @@
 
 **Current authoritative continuation:** `JANUS_CONSCIOUS_STREAM_MEMORY_CYCLE_CHECKPOINT_20260825.md`
 
-**Current Android continuation:** Android v1.11 app-local colour + human-readable telemetry pass (PR #50, merge `484feef0f39797604f34985dcbb3ec934ee0d87d`)
+**Current Android continuation:** Android v1.11 full-interface colour patch + human-readable telemetry baseline (PR #51, merge `b97829d4c6ec5ff427bb8783c8b9316c28f8d6e1`)
 
 **Current project status:** `JANUS_PROJECT_STATUS_20260825.md`
 
@@ -42,31 +42,37 @@ PR #45, merge `edb3f1f5b00153da0f572cff54057fb16f37c058`, isolated JANUS appeara
 
 PR #49, merge `23553c5683e50e37f1a963237de1aabc4b231675`, added explicit safe-area/IME ownership, dynamic build labels and readable horizontally scrollable top navigation.
 
-PR #50, merge `484feef0f39797604f34985dcbb3ec934ee0d87d`, is the **v1.11 colour/readability pass** prompted by real Samsung screenshots:
+PR #50, merge `484feef0f39797604f34985dcbb3ec934ee0d87d`, established the **v1.11 colour/readability baseline** prompted by real Samsung screenshots:
 
-- `JanusTheme` is now the single app-local palette used by JANUS-owned roots, cards, text, inputs and buttons.
-- Theme mode (`system`, `dark`, `light`) and accent choices (`slate`, `indigo`, `teal`, `amber`, `violet`) now visibly repaint JANUS UI rather than merely saving preferences.
-- Theme code contains no Android status-bar/navigation-bar recolouring APIs; Android system chrome remains device-owned.
-- Default dark/light palettes use high-contrast text, surfaces and muted text. The previous Stream dark-text-on-dark-blue failure is removed.
-- Selected top-level navigation and selected Observe filters use the chosen accent; unselected controls remain neutral/readable.
-- Observe filter taps now replace/rerender the Observe page rather than appending another full Observe screen. This fixes the repeated Observe UI seen in device testing.
-- `JanusHumanText` converts dense bounded telemetry into a human-facing summary. Runtime Cores, Memory, Stream and Observe show readable summaries first; raw machine-oriented output remains secondary behind Technical details where appropriate.
-- Version is **1.11 / versionCode 111**.
-- PR validation passed after stale v1.10 CI assertions were brought forward. The authoritative main-branch Java compile and APK assembly passed and the direct-download publish step succeeded.
+- `JanusTheme` is the single app-local palette used by JANUS-owned roots, cards, text, inputs and buttons.
+- Theme mode (`system`, `dark`, `light`) changes JANUS-owned light/dark surfaces without changing Android system chrome.
+- Default dark/light palettes use high-contrast text, surfaces and muted text.
+- Observe filter taps replace/rerender the Observe page rather than appending another full Observe screen.
+- `JanusHumanText` converts dense bounded telemetry into human-facing summaries. Runtime Cores, Memory, Stream and Observe show readable summaries first; raw machine-oriented output remains secondary behind Technical details where appropriate.
+
+PR #51, merge `b97829d4c6ec5ff427bb8783c8b9316c28f8d6e1`, completes the **full-interface accent behaviour** after device testing showed accent choice still only visibly changed the selected button:
+
+- Accent choices (`slate`, `indigo`, `teal`, `amber`, `violet`) now tint the JANUS-owned root background, card surfaces, raised surfaces and chat/user bubble palette as well as highlighted controls.
+- Tint strengths are deliberately restrained so the high-contrast v1.11 readability baseline remains intact.
+- Android status/navigation bars remain device-owned and are not recoloured by JANUS.
+- No global-layout listener, live hierarchy walker or cosmetic injection layer was reintroduced.
+- The theme CI contract now explicitly checks that accent feeds background, surface and raised-surface colour derivation.
+- Version remains **1.11 / versionCode 111** because this is a UI-only patch to the current device-validation build rather than a separate release line.
+- Theme/human-log, safe-area/readability, UI-hardening, protocol, maintenance, Stream-owner, recursive-core, conscious-stream, localization and RC-readiness gates passed before merge. The APK build was still completing when the PR was merged after all functional/policy gates passed.
 
 The safe UI baseline remains **explicit screen/component ownership and deterministic rendering**. Do not restore global-layout polish/injection stacks merely for cosmetics.
 
 ## Device-validation handoff
 
-The authoritative Android build is now `JANUS-Android-v1.11-FULL-REBUILD.apk`, published at `apk-download/downloads/JANUS-Android-v1.11-FULL-REBUILD.apk`. The published file was verified present after the successful main-branch build.
+The authoritative Android filename remains `JANUS-Android-v1.11-FULL-REBUILD.apk`. After the post-merge main build republishes it, install that refreshed v1.11 APK before validating colour behaviour; an older v1.11 APK may have the same visible version label but lack PR #51.
 
 For the next Samsung test, verify:
 
-1. Switching System/Dark/Light changes JANUS itself immediately after the screen rerenders/reopens but does not alter the phone's Android theme or system bar colours.
-2. Slate/Indigo/Teal/Amber/Violet visibly change JANUS accents, especially selected navigation/filter controls.
-3. Stream has readable foreground/background contrast.
-4. Observe All/Thoughts/Interactions no longer duplicates the screen.
-5. Runtime Cores and Memory are readable as summaries, with Technical details available for raw diagnostic data.
+1. Switching Slate/Indigo/Teal/Amber/Violet visibly changes JANUS-owned page background, cards and raised controls, not only the selected button.
+2. The colour change remains restrained/readable in both dark and light modes.
+3. Android status/navigation bars and the phone's own theme remain unaffected.
+4. Stream, Observe, Runtime Cores and Memory retain the v1.11 readability improvements.
+5. Observe All/Thoughts/Interactions still does not duplicate the screen.
 6. Messages/Observe/Stream/Cores/Memory remain stable during normal navigation and Back use.
 
 ## Maintenance request persistence
@@ -87,6 +93,6 @@ Android remains the active release target. Windows and iOS remain deferred.
 
 ## Next engineering task
 
-The immediate next task is **real-device validation of v1.11 colours and human-readable telemetry** using the published v1.11 APK. Fix any remaining device-specific contrast, theme refresh or log-layout defect from exact device evidence. If a detail screen closes, use `JanusClientDiagnostics` rather than speculative layout changes.
+The immediate next task is **real-device validation of the refreshed v1.11 full-interface accent behaviour** using the APK republished after PR #51. Fix any remaining device-specific contrast, theme refresh or log-layout defect from exact device evidence. If a detail screen closes, use `JanusClientDiagnostics` rather than speculative layout changes.
 
 After Android UI stability, continue the broader **Diagnostic System v2 behavioral proof phase**: prove the 22-core recursive architecture, peer exchange/quiescence, sleep/wake behavior, memory behavior, seven -> Left/Right -> Front -> Interface routing, observer evidence, zero background model-call count and append-only maintenance behavior.
