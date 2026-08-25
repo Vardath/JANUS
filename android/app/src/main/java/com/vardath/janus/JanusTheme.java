@@ -1,6 +1,5 @@
 package com.vardath.janus;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
@@ -27,12 +26,48 @@ public final class JanusTheme {
                 == Configuration.UI_MODE_NIGHT_YES;
     }
 
-    public static int background(Context c) { return dark(c) ? Color.rgb(15, 18, 22) : Color.rgb(248, 249, 251); }
-    public static int surface(Context c) { return dark(c) ? Color.rgb(31, 37, 44) : Color.rgb(236, 239, 243); }
-    public static int surfaceRaised(Context c) { return dark(c) ? Color.rgb(40, 48, 57) : Color.WHITE; }
+    private static int neutralBackground(Context c) {
+        return dark(c) ? Color.rgb(15, 18, 22) : Color.rgb(248, 249, 251);
+    }
+
+    private static int neutralSurface(Context c) {
+        return dark(c) ? Color.rgb(31, 37, 44) : Color.rgb(236, 239, 243);
+    }
+
+    private static int neutralRaised(Context c) {
+        return dark(c) ? Color.rgb(40, 48, 57) : Color.WHITE;
+    }
+
+    private static int blend(int base, int tint, float amount) {
+        float a = Math.max(0f, Math.min(1f, amount));
+        int r = Math.round(Color.red(base) * (1f - a) + Color.red(tint) * a);
+        int g = Math.round(Color.green(base) * (1f - a) + Color.green(tint) * a);
+        int b = Math.round(Color.blue(base) * (1f - a) + Color.blue(tint) * a);
+        return Color.rgb(r, g, b);
+    }
+
+    /**
+     * Accent now tints the whole JANUS-owned interface instead of only selected buttons.
+     * The tint remains deliberately restrained so contrast/readability stay stable.
+     */
+    public static int background(Context c) {
+        return blend(neutralBackground(c), accent(c), dark(c) ? 0.07f : 0.035f);
+    }
+
+    public static int surface(Context c) {
+        return blend(neutralSurface(c), accent(c), dark(c) ? 0.13f : 0.07f);
+    }
+
+    public static int surfaceRaised(Context c) {
+        return blend(neutralRaised(c), accent(c), dark(c) ? 0.20f : 0.11f);
+    }
+
     public static int text(Context c) { return dark(c) ? Color.rgb(248, 250, 252) : Color.rgb(24, 29, 35); }
     public static int muted(Context c) { return dark(c) ? Color.rgb(194, 202, 211) : Color.rgb(82, 91, 101); }
-    public static int userBubble(Context c) { return dark(c) ? Color.rgb(38, 61, 84) : Color.rgb(219, 235, 252); }
+    public static int userBubble(Context c) {
+        int base = dark(c) ? Color.rgb(38, 61, 84) : Color.rgb(219, 235, 252);
+        return blend(base, accent(c), dark(c) ? 0.22f : 0.13f);
+    }
 
     public static int accent(Context c) {
         String a = prefs(c).getString("accent", "slate");

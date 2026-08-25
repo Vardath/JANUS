@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 
-// v1.10: app-only appearance isolation; JANUS theme/accent no longer drive Android system chrome.
+// v1.11: app-only appearance isolation plus full JANUS-surface accent tinting.
 // RC hardening keeps release-signing preparation and the authoritative native product boundary.
 // No WebView UI, no generated HTML, no composer/patch pipeline.
 android {
