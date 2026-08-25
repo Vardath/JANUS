@@ -1,65 +1,64 @@
 # JANUS current checkpoint
 
-**Current authoritative continuation:** `JANUS_RECURSIVE_CORE_CHECKPOINT_20260825.md`
+**Current authoritative continuation:** `JANUS_CONSCIOUS_STREAM_MEMORY_CYCLE_CHECKPOINT_20260825.md`
 
 Updated: 2026-08-25
 
-## Critical architecture rule
+## Critical architecture rules
 
-Every one of the **22 top-level cores** is itself a complete JANUS-capable core:
+Every one of the **22 top-level cores** is itself a complete JANUS-capable core: 11 local/Android + 11 global/server. Each contains all seven internal JANUS/Fano faculties. Outer role names are dispositions, not deleted faculties.
 
-- 11 local/Android top-level cores;
-- 11 global/server top-level cores.
+Every user event is registered to all cores. The only outward response route is:
 
-Each top-level core contains its own complete seven-position JANUS/Fano processor, persistent bounded state, outer role/disposition, peer responsiveness and governed foreground AI capability.
+`seven specialists -> Left + Right -> Front / stream of consciousness -> Interface -> user`
 
-The outer roles Evidence, Safety, Counterpoint, Context, Logic, Novelty, Memory, Left Hemisphere, Right Hemisphere, Front and Interface are **dispositions of complete JANUS cores**. They are not the seven internal Fano faculties. Every outer core retains all seven internal faculties: truth, valence, significance, pattern, understanding, possibility and continuity.
+Interface receives Front only. Specialists and hemispheres may communicate internally but may not bypass Front into Interface.
 
-Do not flatten this architecture again by treating the seven outer specialist roles as if they were merely the seven Fano positions.
+## Sleep / wake
 
-## Implemented state
+Wake and rest alternate. Wake may perform bounded deterministic peer processing and reconsider retained interaction memory with zero model/API calls. Rest is passive: no scheduled recursive thought occurs, but state stays loaded and immediately responsive. Foreground user input can always rouse processing during rest.
 
-The recursive-core architecture was merged in PR #35 as `a129e5c4974f785f0ea014d958b8d2102666c61f`.
+Rest is useful for persistence and conservative memory housekeeping. Core memories are never automatically deleted. Episodic memories are retained for review. Only stale low-value trace/working memories may be auto-pruned.
 
-Implemented and tested:
+## Loop prevention
 
-- persistent recursive JANUS/Fano state inside all 11 Android local cores;
-- persistent recursive JANUS/Fano state inside all 11 global cores;
-- each recursive core responds to bounded conclusions from peer cores and revises;
-- whole-society background revision covers 11 × 10 = 110 directed peer relationships;
-- recursive background processing makes zero model/API calls;
-- one governed foreground model call can return distinct bounded AI counsel for all 11 global cores, all supplied 11 local cores, and the final Interface reply rather than making 22 separate paid calls;
-- returned local counsel is delivered back to the corresponding local recursive core and peer-revised;
-- file/image/audio/web/memory/runtime/peer/action-result sensing participates in recursive cognition;
-- local/global societies remain separate and selective/no-overwrite;
-- account isolation, privacy, voice, localization, RC hardening, maintenance governance and protected identity remain intact;
-- no raw hidden chain-of-thought is exposed and no phenomenal-consciousness claim is made.
+Do not restore the first prototype's unconditional peer rebroadcast behavior. Current safeguards are mandatory:
+
+- identical per-core stimulus/peer/counsel signatures become quiescent;
+- unchanged whole-society retained state + recalled-memory input does not start another all-peer wake pass;
+- changed wake processing is bounded and terminates rather than recursively rebroadcasting forever.
+
+## Stream observer
+
+A dedicated native Android **Stream** surface and server `/desktop/stream-observe` endpoint expose bounded externalizable Front activity/state only. They may show Fano orientation, cycle/revision/peer/quiescence counters, integrated summaries, rousing and Front events. Never expose hidden chain-of-thought.
+
+## Current implementation
+
+Recursive-core architecture: PR #35, merge `a129e5c4974f785f0ea014d958b8d2102666c61f`.
+
+Conscious-stream / memory / sleep-wake / loop-quiescence behavior: PR #36, merge `bdc77124213e3ddd7495f043d09d380ab7b3bdf3`.
+
+PR #36 passed clean server v2, protocol, recursive-core, conscious-stream cycle, authoritative APK, RC1, UI, localization and maintenance gates before merge.
 
 ## Active release scope
 
-Android remains the only active release target. Windows and iOS remain deferred until the Android release and setup path is stable and understood.
+Android remains the active release target. Windows and iOS remain deferred.
 
 ## Next engineering task
 
-**Diagnostic System v2 — recursive-core-aware Phase A.**
+**Diagnostic System v2 — behavioral proof phase.**
 
-The diagnostic system must prove the recursive architecture is active instead of merely repeating architecture labels.
+Diagnostics must prove rather than merely label:
 
-For each local and global top-level core, expose bounded externalizable evidence such as:
+1. all 22 top-level cores have recursive JANUS state;
+2. actual peer exchange occurs when input changes;
+3. unchanged peer traffic becomes quiescent instead of looping;
+4. wake vs passive rest is correctly enforced;
+5. foreground input rouses processing during rest;
+6. user-interaction memory is stored/retrieved/reconsidered appropriately;
+7. rest memory maintenance protects core/episodic memory and prunes only eligible low-value memory;
+8. seven -> Left/Right -> Front -> Interface is the actual outward route with no Interface shortcut;
+9. Front stream observer shows externalizable evidence without hidden reasoning;
+10. background recursive model-call count remains zero.
 
-1. recursive JANUS processor active/inactive;
-2. seven-position internal Fano readout/weights;
-3. currently dominant internal faculty;
-4. cycle count;
-5. peer revision / peer-turn activity;
-6. latest bounded conclusion;
-7. whether bounded AI counsel has been received;
-8. persistence/restoration status;
-9. local/global provenance;
-10. recursive background model-call count, expected to be zero.
-
-Diagnostics must distinguish `PASS`, `WARN`, `FAIL`, `UNVERIFIED`, and `NOT_APPLICABLE`, and must distinguish architecture presence from runtime evidence and live deployment evidence.
-
-The Chat result for a full diagnostic should become a concise health summary. Detailed diagnostic material belongs in a dedicated native report/expandable surface rather than a giant wall of text in Chat.
-
-After Diagnostic System v2 is sufficiently useful, continue the Android real-device soak/release-candidate plan and fix only observed release blockers before public signing/release.
+Continue to distinguish PASS / WARN / FAIL / UNVERIFIED / NOT_APPLICABLE and architecture presence vs runtime/live-deployment evidence. Then proceed to real-device soak testing, specifically watching runaway counters/repeated peer events, sleep/wake responsiveness, battery/background scheduling, memory growth/pruning and Stream observer behavior.
