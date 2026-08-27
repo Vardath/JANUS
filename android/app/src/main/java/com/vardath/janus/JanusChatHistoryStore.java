@@ -6,7 +6,7 @@ import android.content.SharedPreferences;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** Authoritative structured Chat history with one-way legacy migration. */
+/** Authoritative structured Chat history with one-way legacy migration and attachment metadata persistence. */
 public final class JanusChatHistoryStore {
     public static final String LEGACY_KEY = "chat_history_native_v1";
     public static final String STRUCTURED_KEY = "chat_history_native_v2";
@@ -30,6 +30,10 @@ public final class JanusChatHistoryStore {
     public static synchronized String structuredJson(Context context) { return read(context).toString(); }
 
     public static synchronized void append(Context context, String who, String body, JanusChatPresentation presentation) {
+        append(context, who, body, presentation, null);
+    }
+
+    public static synchronized void append(Context context, String who, String body, JanusChatPresentation presentation, JSONArray attachments) {
         install(context);
         if (prefs == null) return;
         try {
@@ -38,11 +42,12 @@ public final class JanusChatHistoryStore {
             int start = Math.max(0, current.length() - (MAX - 1));
             for (int i = start; i < current.length(); i++) next.put(current.get(i));
             JSONObject record = new JSONObject();
-            record.put("schema", 2);
+            record.put("schema", 3);
             record.put("who", who == null ? "JANUS" : who);
             record.put("body", presentation != null && "JANUS".equals(who) ? presentation.reply : (body == null ? "" : body));
             record.put("at", System.currentTimeMillis());
             if (presentation != null) record.put("presentation", presentation.toJson());
+            if (attachments != null && attachments.length() > 0) record.put("attachments", attachments);
             next.put(record);
             prefs.edit().putString(STRUCTURED_KEY, next.toString()).apply();
         } catch (Exception ignored) {}
