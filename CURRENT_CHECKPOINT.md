@@ -8,7 +8,9 @@
 
 **Mandatory maintenance runbook:** `MAINTENANCE_PROCESS.md`
 
-Updated: 2026-08-25
+**Branding/legal release plan:** `BRANDING_AND_NAME_RELEASE_PLAN.md` — preferred future public name is **JANUS 137**, but no broad rename should occur until the legal-release/name-clearance gate is performed.
+
+Updated: 2026-08-28
 
 ## Critical architecture rules
 
@@ -50,7 +52,7 @@ The default per-account research policy is owner-set and must remain unchanged u
 
 ### PR #52 verification
 
-The final source-bearing implementation passed the clean server-v2 test/proof/diagnostic, recursive-core engine, conscious-stream cycle, Android maintenance checks and full Android APK build before merge. The recursive-core regression proves 11 research intentions on a changed global wake with zero model calls. Production deployment and real unattended accumulation remain separate post-merge verification steps.
+The final source-bearing implementation passed the clean server-v2 test/proof/diagnostic, recursive-core engine, conscious-stream cycle, Android maintenance checks and full Android APK build before merge. Production deployment and real unattended accumulation remain separate post-merge verification steps.
 
 ## Stream observer
 
@@ -76,6 +78,6 @@ Android remains the active release target. Windows and iOS remain deferred.
 
 Owner requested that development stop here for the day. Tomorrow, perform a fresh repository-wide review before changing code, inspect what genuinely remains, and then focus on **fine polishing and release blockers rather than architectural expansion**, targeting an Android release by the end of this week if validation supports it.
 
-Tomorrow's first pass should cover: live Render revision/deployment of PR #52; evidence that unattended autonomous observations are accumulating inside the US$20/month / US$10 autonomous budget policy; Samsung v1.11 navigation/crash stability and theme/readability behavior; Diagnostic System v2 behavioral proof; authentication/release-signing/OAuth readiness; production configuration and secrets; privacy/security/release documentation; and any remaining Play-release packaging requirements. Do not call the build release-ready merely because CI is green—distinguish repository/CI proof, live-server proof and physical-device proof.
+Tomorrow's first pass should cover: live Render revision/deployment of PR #52; evidence that unattended autonomous observations are accumulating inside the US$20/month / US$10 autonomous budget policy; Samsung v1.11 navigation/crash stability and theme/readability behavior; Diagnostic System v2 behavioral proof; authentication/release-signing/OAuth readiness; production configuration and secrets; privacy/security/release documentation; **JANUS 137 name clearance and controlled public-brand rename planning**; and any remaining Play-release packaging requirements. Do not call the build release-ready merely because CI is green—distinguish repository/CI proof, live-server proof and physical-device proof.
 
 Preserve the current feature scope unless a demonstrated release blocker requires a change. The immediate objective is a stable, understandable, bounded-cost JANUS release candidate, followed by polish rather than another architecture rewrite.
